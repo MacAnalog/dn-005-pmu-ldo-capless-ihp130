@@ -1,0 +1,161 @@
+{
+ "circuit": "ldo_ihp_capless",
+ "pdk": "ihp-sg13g2",
+ "corner": "tt",
+ "design": {
+  "circuit": "ldo_ihp_capless",
+  "pdk": "ihp-sg13g2",
+  "corner": "tt",
+  "sizing": {},
+  "note": "capless double-mirror FVF LDO, design of record (003 optimizer winner, rounded)"
+ },
+ "scorecard": {
+  "i_q_ua": 36.27715,
+  "v_out_v": 1.200072,
+  "load_regulation.vout_max": 1.200064,
+  "load_regulation.vout_min": 1.200036,
+  "load_reg_mv": 0.028,
+  "line_regulation.vout_max": 1.200093,
+  "line_regulation.vout_min": 1.200034,
+  "line_reg_mv": 0.059,
+  "dropout.vin_at": 1.306,
+  "dropout.vout_at": 1.199857,
+  "v_dropout_mv": 106.1432,
+  "psrr.vout_db": -69.9531,
+  "psrr_1k_db": 69.9531,
+  "psrr_1m.vout_db": -15.30499,
+  "psrr_1m_db": 15.30499,
+  "tran_load_step.vout_min": 1.095189,
+  "tran_load_step.vout_post": 1.200036,
+  "tran_load_step.tcross": 1.125389e-06,
+  "v_undershoot_mv": 104.847,
+  "t_transient_us": 0.125389,
+  "loopgain_db": 49.94548,
+  "ugf_loop_khz": 836.5011999999999,
+  "pm_loop_deg": 72.41882,
+  "ac_loopgain.gm_at_180": -6.426522,
+  "ms_peak_db": 7.149795,
+  "tloop_ph_dc_deg": 179.9755,
+  "gm_loop_db": 6.426522,
+  "ac_loopgain_lo.loopgain_db": 49.92815,
+  "ugf_loop_lo_khz": 837.1976999999999,
+  "pm_loop_lo_deg": 72.38293,
+  "ac_loopgain_lo.gm_at_180": -5.747062,
+  "ac_loopgain_lo.ms_peak": 14.08911,
+  "ac_loopgain_lo.tloop_ph_dc": 179.9755,
+  "gm_loop_lo_db": 5.747062,
+  "ac_loopgain_hi.loopgain_db": 49.94469,
+  "ugf_loop_hi_khz": 831.1705000000001,
+  "pm_loop_hi_deg": 72.31013,
+  "ac_loopgain_hi.gm_at_180": -6.562671,
+  "ac_loopgain_hi.ms_peak": 5.50909,
+  "ac_loopgain_hi.tloop_ph_dc": 179.9754,
+  "gm_loop_hi_db": 6.562671,
+  "loop_stability.zout_dc": -46.52091,
+  "loop_stability.zout_max": 53.637,
+  "zout_peak_db": 100.1579,
+  "noise.onoise_total": 0.000366433,
+  "vn_out_urms": 19142.44,
+  "tran_line_step.vout_max": 1.251651,
+  "tran_line_step.vout_min": 1.200034,
+  "v_line_pp_mv": 51.617000000000004
+ },
+ "bench_measures": {
+  "dc_op": {
+   "i_supply": 3.627715e-05,
+   "vout_dc": 1.200072
+  },
+  "load_regulation": {
+   "vout_max": 1.200064,
+   "vout_min": 1.200036,
+   "load_reg": 2.8e-05
+  },
+  "line_regulation": {
+   "vout_max": 1.200093,
+   "vout_min": 1.200034,
+   "line_reg": 5.9e-05
+  },
+  "dropout": {
+   "vin_at": 1.306,
+   "vout_at": 1.199857,
+   "v_dropout": 0.1061432
+  },
+  "psrr": {
+   "vout_db": -69.9531,
+   "psrr_vdd_db": 69.9531
+  },
+  "psrr_1m": {
+   "vout_db": -15.30499,
+   "psrr_vdd_db": 15.30499
+  },
+  "tran_load_step": {
+   "vout_min": 1.095189,
+   "vout_post": 1.200036,
+   "tcross": 1.125389e-06,
+   "v_undershoot": 0.104847,
+   "t_transient": 1.25389e-07
+  },
+  "ac_loopgain": {
+   "loopgain_db": 49.94548,
+   "ugf_loop": 836501.2,
+   "pm_loop": 72.41882,
+   "gm_at_180": -6.426522,
+   "ms_peak": 7.149795,
+   "tloop_ph_dc": 179.9755,
+   "gm_loop_db": 6.426522
+  },
+  "ac_loopgain_lo": {
+   "loopgain_db": 49.92815,
+   "ugf_loop": 837197.7,
+   "pm_loop": 72.38293,
+   "gm_at_180": -5.747062,
+   "ms_peak": 14.08911,
+   "tloop_ph_dc": 179.9755,
+   "gm_loop_db": 5.747062
+  },
+  "ac_loopgain_hi": {
+   "loopgain_db": 49.94469,
+   "ugf_loop": 831170.5,
+   "pm_loop": 72.31013,
+   "gm_at_180": -6.562671,
+   "ms_peak": 5.50909,
+   "tloop_ph_dc": 179.9754,
+   "gm_loop_db": 6.562671
+  },
+  "loop_stability": {
+   "zout_dc": -46.52091,
+   "zout_max": 53.637,
+   "zout_peak_db": 100.1579
+  },
+  "noise": {
+   "onoise_total": 0.000366433,
+   "vn_out_rms": 0.01914244
+  },
+  "tran_line_step": {
+   "vout_max": 1.251651,
+   "vout_min": 1.200034,
+   "v_line_pp": 0.051617
+  }
+ },
+ "bench_status": {
+  "dc_op": "ok",
+  "load_regulation": "ok",
+  "line_regulation": "ok",
+  "dropout": "ok",
+  "psrr": "ok",
+  "psrr_1m": "ok",
+  "tran_load_step": "ok",
+  "ac_loopgain": "ok",
+  "ac_loopgain_lo": "ok",
+  "ac_loopgain_hi": "ok",
+  "loop_stability": "ok",
+  "noise": "ok",
+  "tran_line_step": "ok"
+ },
+ "violations": [],
+ "provenance": {
+  "tag": "candidate_certify",
+  "t": "2026-09-04T15:38:37",
+  "lane": "native ngspice via NGSpice_Wrapper"
+ }
+}

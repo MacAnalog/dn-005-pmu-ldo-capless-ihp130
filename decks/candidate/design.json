@@ -1,0 +1,7 @@
+{
+ "circuit": "ldo_ihp_capless",
+ "pdk": "ihp-sg13g2",
+ "corner": "tt",
+ "sizing": {},
+ "note": "capless double-mirror FVF LDO, design of record (003 optimizer winner, rounded)"
+}
