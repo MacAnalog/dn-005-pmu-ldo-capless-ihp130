@@ -1,0 +1,157 @@
+"""005 — layout sign-off driver: GDS -> render -> DRC -> LVS -> PEX -> post-layout scorecard.
+
+Every stage is the platform's own runner (`spicexplorer_signoff`, `spicexplorer_layout`); this
+file only sequences them and writes the verdicts a reviewer reads. Two interpreters are
+involved and the split is not cosmetic:
+
+* ``gen_ldo.build`` needs **gdsfactory + ihp-gdsfactory** -> `$LDO_GF_PYTHON`
+  (default ``~/miniconda3/envs/ai_env/bin/python``); it is run as a subprocess.
+* DRC / LVS / PEX are KLayout runsets + kpex, driven from THIS interpreter through
+  `spicexplorer_signoff` (which finds its own klayout/kpex executables via `SIGNOFF_PYTHON`
+  and `$PDK_ROOT`).
+
+The engine of record is therefore **KLayout** (IHP SG13G2 runsets) for DRC/LVS and **kpex**
+(2.5D) for extraction -- not magic/netgen.
+
+Two PDK-runset quirks are handled here, both journalled:
+
+1. **kpex cannot read a 2-node ``rhigh``.** The standalone IHP LVS deck extracts the poly
+   resistor as a 2-terminal device, but kpex's bundled copy
+   (``rule_decks/custom_reader.lvs``: ``'Poly resistor should have 3 nodes'``) extracts it as
+   3-terminal (two ports + substrate, connected to pwell). The LVS schematic and the PEX
+   schematic therefore differ by that third node -- :func:`pex_schematic` adds it.
+2. **kpex cannot extract IHP MIM caps** -- ``strip_mim_for_pex`` removes the MIM device layers
+   and the C cards; the schematic MIM capacitors are spliced back for the benches.
+
+    LDO_EXP=005 uv run --no-sync python layout/signoff.py --all
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from lab import config as C  # noqa: E402
+
+CELL = "ldo_ihp_capless"
+GEN = Path(__file__).resolve().parent / "gen_ldo.py"
+GF_PYTHON = os.environ.get("LDO_GF_PYTHON", str(Path.home() / "miniconda3/envs/ai_env/bin/python"))
+WORK = C.WORK / "layout"
+
+
+def _run(cmd: list[str], **kw) -> subprocess.CompletedProcess:
+    print("  $", " ".join(str(c) for c in cmd)[:160], flush=True)
+    return subprocess.run([str(c) for c in cmd], capture_output=True, text=True, **kw)
+
+
+# ---------------------------------------------------------------- build ----
+
+def build(out: Path) -> dict:
+    """GDS + LVS reference netlist at the sizing of record (gen_ldo reads sizing.yaml itself)."""
+    out.mkdir(parents=True, exist_ok=True)
+    gds, lvs = out / f"{CELL}.gds", out / f"{CELL}_lvs.spice"
+    r = _run([GF_PYTHON, GEN, "-o", gds, "--lvs", lvs])
+    if r.returncode != 0 or not gds.is_file():
+        raise SystemExit(f"generator failed:\n{r.stdout}\n{r.stderr}")
+    m = re.search(r"area um2: (\d+)", r.stdout)
+    print(" ", r.stdout.strip().splitlines()[0])
+    return {"gds": str(gds), "lvs_netlist": str(lvs), "area_um2": int(m.group(1)) if m else None,
+            "stdout": r.stdout.strip()}
+
+
+def render(gds: Path, png: Path) -> bool:
+    r = _run([sys.executable, "-m", "spicexplorer_layout.cli", "render", str(gds), str(png)])
+    ok = png.is_file()
+    if not ok:
+        print("  render failed:", (r.stdout + r.stderr)[-500:])
+    return ok
+
+
+# ------------------------------------------------------------- sign-off ----
+
+def drc(gds: Path, out: Path) -> dict:
+    from spicexplorer_signoff.drc import run_drc
+    r = run_drc(str(gds), CELL, str(out), no_density=True)
+    print(f"  DRC: passed={r.passed} violations={r.n_violations}")
+    return {"passed": bool(r.passed), "available": bool(r.available),
+            "n_violations": int(r.n_violations), "violations": list(r.violations)[:50],
+            "report": r.report_path, "reason": r.reason}
+
+
+def lvs(gds: Path, netlist: Path, out: Path) -> dict:
+    from spicexplorer_signoff.lvs import run_lvs
+    r = run_lvs(str(gds), str(netlist), CELL, str(out), extra_args=["--combine_devices"])
+    # The wrapper's pass flag is the runset's own verdict line; keep the raw evidence beside it.
+    matched = bool(r.matched) or "Congratulations! Netlists match" in (r.log or "")
+    print(f"  LVS: matched={matched}")
+    return {"passed": bool(r.passed), "matched": matched, "available": bool(r.available),
+            "unmatched": dict(r.unmatched or {}), "report": r.report_path,
+            "netlist_sha": r.netlist_sha, "reason": r.reason}
+
+
+_R_CARD = re.compile(r"^(R\S*)\s+(\S+)\s+(\S+)\s+(rhigh|rppd|rsil)\b(.*)$", re.I)
+
+
+def pex_schematic(lvs_text: str, sub: str = "vss") -> str:
+    """The LVS netlist as kpex's reader wants it: no C cards (MIM is stripped from the GDS too)
+    and every poly resistor given its third, substrate node."""
+    from spicexplorer_signoff.pex import strip_cards
+
+    out = []
+    for ln in strip_cards(lvs_text).splitlines():
+        m = _R_CARD.match(ln.strip())
+        out.append(f"{m.group(1)} {m.group(2)} {m.group(3)} {sub} {m.group(4)}{m.group(5)}" if m else ln)
+    return "\n".join(out) + "\n"
+
+
+def pex(gds: Path, lvs_netlist: Path, out: Path) -> dict:
+    from spicexplorer_signoff.pex import run_pex, strip_mim_for_pex
+
+    pex_gds = gds.with_name(f"{CELL}_pex.gds")
+    strip_mim_for_pex(gds, pex_gds)
+    sch = gds.with_name(f"{CELL}_pex_schematic.spice")
+    sch.write_text(pex_schematic(lvs_netlist.read_text()))
+    r = run_pex(pex_gds, CELL, sch, out, mode="CC")
+    print(f"  PEX: ok={r.ok} n_C={r.n_c} n_R={r.n_r}")
+    top = sorted(((v, k) for k, v in (r.per_net_c_ff or {}).items()), reverse=True)[:12]
+    return {"ok": bool(r.ok), "available": bool(r.available), "mode": r.mode,
+            "netlist": r.netlist_path, "n_c": int(r.n_c), "n_r": int(r.n_r),
+            "per_net_c_ff": {k: round(v, 3) for v, k in top}, "reason": r.reason,
+            "log_tail": (r.log or "")[-1500:] if not r.ok else ""}
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--out", default=str(WORK))
+    ap.add_argument("--stages", default="build,render,drc,lvs,pex")
+    ap.add_argument("--all", action="store_true")
+    a = ap.parse_args()
+    out = Path(a.out).resolve()
+    out.mkdir(parents=True, exist_ok=True)
+    stages = a.stages.split(",")
+    rec: dict = {}
+    gds, netlist = out / f"{CELL}.gds", out / f"{CELL}_lvs.spice"
+
+    if "build" in stages:
+        print("build:"); rec["build"] = build(out)
+    if "render" in stages:
+        print("render:"); rec["render"] = render(gds, out / f"{CELL}.png")
+    if "drc" in stages:
+        print("drc:"); rec["drc"] = drc(gds, out / "drc")
+    if "lvs" in stages:
+        print("lvs:"); rec["lvs"] = lvs(gds, netlist, out / "lvs")
+    if "pex" in stages:
+        print("pex:"); rec["pex"] = pex(gds, netlist, out / "pex")
+
+    (out / "signoff.json").write_text(json.dumps(rec, indent=1) + "\n")
+    print("\nwrote", out / "signoff.json")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
