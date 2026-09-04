@@ -1,0 +1,7 @@
+# Generic device kind -> ihp-sg13g2 device name (1.5 V thin-oxide family, the challenge's target).
+pdk: ihp-sg13g2
+devices:
+  nmos: {model: sg13_lv_nmos}
+  pmos: {model: sg13_lv_pmos}
+  resistor: {model: rhigh}       # high-ohmic poly, ~1.36 kohm/sq: divider + bias resistor
+  capacitor: {model: cap_cmim}   # MIM, ~1.5 fF/um^2: Cout, Cc, Cx

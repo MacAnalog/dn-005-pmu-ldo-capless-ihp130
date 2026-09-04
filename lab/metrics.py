@@ -41,10 +41,24 @@ KEYMAP: dict[tuple[str, str], tuple[str, float]] = {
     ("loop_stability", "zout_peak_db"): ("zout_peak_db", 1.0),
     ("noise", "vn_out_rms"): ("vn_out_urms", 1e6),
     ("tran_line_step", "v_line_pp"): ("v_line_pp_mv", 1e3),
+    # candidate-only twins (circuits/ldo_ihp_capless): report-only PSRR at 1 MHz and the S8
+    # sign-off at the light/heavy load (harness.yaml spec_notes)
+    ("psrr_1m", "psrr_vdd_db"): ("psrr_1m_db", 1.0),
+    ("ac_loopgain_lo", "pm_loop"): ("pm_loop_lo_deg", 1.0),
+    ("ac_loopgain_lo", "ugf_loop"): ("ugf_loop_lo_khz", 1e-3),
+    ("ac_loopgain_lo", "gm_loop_db"): ("gm_loop_lo_db", 1.0),
+    ("ac_loopgain_hi", "pm_loop"): ("pm_loop_hi_deg", 1.0),
+    ("ac_loopgain_hi", "ugf_loop"): ("ugf_loop_hi_khz", 1e-3),
+    ("ac_loopgain_hi", "gm_loop_db"): ("gm_loop_hi_db", 1.0),
 }
 COLS = ("v_out_v", "i_q_ua", "load_reg_mv", "line_reg_mv", "v_dropout_mv", "psrr_1k_db",
         "v_undershoot_mv", "t_transient_us", "pm_loop_deg", "loopgain_db", "ugf_loop_khz",
         "gm_loop_db", "ms_peak_db", "zout_peak_db", "vn_out_urms", "v_line_pp_mv")
+# The candidate's scorecard: the spec columns first, then the sign-off twins and report-only extras.
+COLS_CANDIDATE = ("v_out_v", "i_q_ua", "load_reg_mv", "line_reg_mv", "v_dropout_mv", "psrr_1k_db",
+                  "v_undershoot_mv", "pm_loop_deg", "pm_loop_lo_deg", "pm_loop_hi_deg", "loopgain_db",
+                  "ugf_loop_khz", "gm_loop_db", "ms_peak_db", "psrr_1m_db", "t_transient_us",
+                  "vn_out_urms", "v_line_pp_mv")
 
 # Drift tolerances for `--check`: ngspice is deterministic for a fixed binary + models, so
 # these are the spec's own resolution, not run-to-run spread.
@@ -120,14 +134,16 @@ def certified() -> dict:
     return json.loads((C.REF_DIR / "scorecard.json").read_text())
 
 
-def certify(design: Design = REFERENCE, tag: str = "reference_certify") -> dict:
-    """Write decks/reference/{<bench>.spice, design.json, scorecard.json}; freeze afterwards."""
-    C.REF_DIR.mkdir(parents=True, exist_ok=True)
-    for old in C.REF_DIR.glob("*.spice"):
+def certify(design: Design = REFERENCE, tag: str = "reference_certify", out: Path | None = None) -> dict:
+    """Write <out>/{<bench>.spice, design.json, scorecard.json} (default decks/reference/);
+    `make freeze` afterwards. A candidate certifies into decks/candidate/ the same way."""
+    out = C.REF_DIR if out is None else Path(out)
+    out.mkdir(parents=True, exist_ok=True)
+    for old in out.glob("*.spice"):
         old.unlink()
     decks = {b: design.deck(b) for b in design.benches()}
     for b, text in decks.items():
-        (C.REF_DIR / f"{b}.spice").write_text(text)
+        (out / f"{b}.spice").write_text(text)
     values, records = run_decks(decks, tag)
     log_run(C.H, tag, values, deck="".join(decks.values()), violations=violations(C.H.spec, values),
             design=design.as_dict(), extra={"benches": {b: r["status"] for b, r in records.items()}})
@@ -140,8 +156,8 @@ def certify(design: Design = REFERENCE, tag: str = "reference_certify") -> dict:
         "violations": violations(C.H.spec, values),
         "provenance": {"tag": tag, "t": time.strftime("%Y-%m-%dT%H:%M:%S"), "lane": sim.preflight()["lane"]},
     }
-    (C.REF_DIR / "design.json").write_text(json.dumps(design.as_dict(), indent=1) + "\n")
-    (C.REF_DIR / "scorecard.json").write_text(json.dumps(doc, indent=1) + "\n")
+    (out / "design.json").write_text(json.dumps(design.as_dict(), indent=1) + "\n")
+    (out / "scorecard.json").write_text(json.dumps(doc, indent=1) + "\n")
     return doc
 
 
