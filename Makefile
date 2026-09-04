@@ -16,6 +16,9 @@ lint:  ## repo invariants (harness.yaml + scripts/lint.py extras); failures carr
 check:  ## lint + the reference reproduces its certified scorecard
 	@rc=0; $(PY) scripts/lint.py || rc=1; echo; $(PY) -m lab.metrics --check || rc=1; exit $$rc
 
+baseline:  ## simulate the frozen reference decks and print the scorecard
+	@$(PY) -m lab.metrics --baseline $(ARGS)
+
 pack:  ## working-memory context pack (K="noise gain" S="symptom text")
 	@$(HARNESS) pack $(K) $(if $(S),--symptom "$(S)") $(ARGS)
 
@@ -28,7 +31,7 @@ freeze:  ## write SHA256SUMS into the frozen dirs after a deliberate certificati
 doctor:  ## is the simulation lane alive?
 	@$(PY) -m lab.sim
 
-clean:  ## delete simulation output (never the ledger)
-	@rm -rf experiments/*/out/
+clean:  ## delete this checkout's simulation work dir + experiment output (never the ledger)
+	@d=$$($(PY) -c "from lab import config; print(config.WORK)"); echo "rm -rf $$d"; rm -rf "$$d"; rm -rf experiments/*/out/
 
-.PHONY: help lint check pack runs freeze doctor clean
+.PHONY: help lint check baseline pack runs freeze doctor clean

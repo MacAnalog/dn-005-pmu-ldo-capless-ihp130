@@ -1,11 +1,63 @@
 #!/usr/bin/env python3
-"""`make lint` runs the generic checks; add this repo's own `def check(L: Lint)` to EXTRA."""
+"""`make lint`: the platform harness checks (driven by harness.yaml) plus this repo's own."""
+from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
-from spicexplorer_harness import lint, load
+REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO))
 
-EXTRA = ()  # e.g. (reference_rebuilds,) — a check that the frozen deck still rebuilds from lab/
+from spicexplorer_harness import lint, load  # noqa: E402
+from spicexplorer_harness.lint import Lint  # noqa: E402
 
-sys.exit(lint.main(load(Path(__file__).resolve().parents[1]), extra=EXTRA))
+
+def deck_rebuild(L: Lint) -> None:
+    """Every frozen bench must still be reproducible from lab.dut.Design + design.json.
+
+    decks/reference/*.spice are bytes; lab.dut (analog-db assemble + the sizing point) is the
+    generator. If the analog-db submodule, the class templates or the builder drift, every
+    experiment silently measures a different bench than the certified one.
+    """
+    ref = REPO / "decks" / "reference"
+    dj = ref / "design.json"
+    if not dj.exists():
+        return  # nothing certified yet; the frozen check reports a missing manifest
+    try:
+        from lab.dut import Design
+        d = Design.from_dict(json.loads(dj.read_text()))
+        built = {b: d.deck(b) for b in d.benches()}
+    except Exception as exc:  # noqa: BLE001
+        L.fail("deck-rebuild", f"cannot rebuild the reference decks from design.json: {exc!r}",
+               "design.json must round-trip through lab.dut.Design.from_dict; fix the loader or re-certify")
+        return
+    fix = ("a class template, the analog-db submodule pin or lab.dut changed: revert it, or re-certify "
+           "deliberately (`python -m lab.metrics --certify && make freeze`) -- an un-reproducible "
+           "reference means every A/B is measured against a bench nobody can rebuild")
+    for b, text in built.items():
+        p = ref / f"{b}.spice"
+        if not p.exists():
+            L.fail("deck-rebuild", f"decks/reference/{b}.spice is missing", fix)
+        elif p.read_text() != text:
+            L.fail("deck-rebuild", f"lab.dut.Design.deck({b!r}) no longer reproduces decks/reference/{b}.spice", fix)
+
+
+def spec_reference(L: Lint) -> None:
+    """The certified reference numbers quoted in doc/target-spec.md are the certified ones."""
+    h = L.h
+    try:
+        sc = json.loads(h.text(h.reference_scorecard))["scorecard"]
+    except (ValueError, KeyError, TypeError):
+        return
+    flat = h.text(h.spec_doc).replace("**", "")
+    for key, fmt in (("load_reg_mv", "{:.2f}"), ("i_q_ua", "{:.0f}"), ("psrr_1k_db", "{:.1f}"),
+                     ("pm_loop_deg", "{:.1f}")):
+        if key in sc and fmt.format(sc[key]) not in flat:
+            L.fail("spec-sync", f"certified {key} = {fmt.format(sc[key])} is not quoted in {h.spec_doc}",
+                   "the spec table's 'reference baseline' column quotes decks/reference/scorecard.json; "
+                   "copy the certified numbers across (or re-certify)")
+
+
+if __name__ == "__main__":
+    sys.exit(lint.main(load(REPO), extra=(deck_rebuild, spec_reference)))

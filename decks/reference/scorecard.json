@@ -1,0 +1,124 @@
+{
+ "circuit": "ldo_005_buffered_ref",
+ "pdk": "ihp-sg13g2",
+ "corner": "tt",
+ "design": {
+  "circuit": "ldo_005_buffered_ref",
+  "pdk": "ihp-sg13g2",
+  "corner": "tt",
+  "sizing": {},
+  "note": "analog-db ldo_005_buffered_ref, committed IHP sizing, as certified"
+ },
+ "scorecard": {
+  "i_q_ua": 758.6951,
+  "v_out_v": 1.609127,
+  "load_regulation.vout_max": 1.609127,
+  "load_regulation.vout_min": 1.607853,
+  "load_reg_mv": 1.274,
+  "line_regulation.vout_max": 1.609886,
+  "line_regulation.vout_min": 1.605566,
+  "line_reg_mv": 4.32,
+  "psrr.vout_db": -44.52535,
+  "psrr_1k_db": 44.52535,
+  "dropout.vin_at": 1.77,
+  "dropout.vout_at": 1.600325,
+  "v_dropout_mv": 169.67499999999998,
+  "tran_load_step.vout_min": 1.606747,
+  "tran_load_step.vout_post": 1.608704,
+  "tran_load_step.tcross": 5.87499e-06,
+  "v_undershoot_mv": 1.957,
+  "t_transient_us": 0.87499,
+  "loop_stability.zout_dc": -14.20525,
+  "loop_stability.zout_max": -8.321581,
+  "zout_peak_db": 5.883669,
+  "loopgain_db": 91.94185,
+  "ugf_loop_khz": 569.1197,
+  "pm_loop_deg": 46.38975,
+  "ac_loopgain.gm_at_180": -41.56334,
+  "ms_peak_db": 4.344667,
+  "tloop_ph_dc_deg": 177.2245,
+  "gm_loop_db": 41.56334,
+  "noise.onoise_total": 2.538087e-05,
+  "vn_out_urms": 5037.942999999999,
+  "tran_line_step.vout_max": 1.611176,
+  "tran_line_step.vout_min": 1.607727,
+  "v_line_pp_mv": 3.449
+ },
+ "bench_measures": {
+  "dc_op": {
+   "i_supply": 0.0007586951,
+   "vout_dc": 1.609127
+  },
+  "load_regulation": {
+   "vout_max": 1.609127,
+   "vout_min": 1.607853,
+   "load_reg": 0.001274
+  },
+  "line_regulation": {
+   "vout_max": 1.609886,
+   "vout_min": 1.605566,
+   "line_reg": 0.00432
+  },
+  "psrr": {
+   "vout_db": -44.52535,
+   "psrr_vdd_db": 44.52535
+  },
+  "dropout": {
+   "vin_at": 1.77,
+   "vout_at": 1.600325,
+   "v_dropout": 0.169675
+  },
+  "tran_load_step": {
+   "vout_min": 1.606747,
+   "vout_post": 1.608704,
+   "tcross": 5.87499e-06,
+   "v_undershoot": 0.001957,
+   "t_transient": 8.7499e-07
+  },
+  "loop_stability": {
+   "zout_dc": -14.20525,
+   "zout_max": -8.321581,
+   "zout_peak_db": 5.883669
+  },
+  "ac_loopgain": {
+   "loopgain_db": 91.94185,
+   "ugf_loop": 569119.7,
+   "pm_loop": 46.38975,
+   "gm_at_180": -41.56334,
+   "ms_peak": 4.344667,
+   "tloop_ph_dc": 177.2245,
+   "gm_loop_db": 41.56334
+  },
+  "noise": {
+   "onoise_total": 2.538087e-05,
+   "vn_out_rms": 0.005037943
+  },
+  "tran_line_step": {
+   "vout_max": 1.611176,
+   "vout_min": 1.607727,
+   "v_line_pp": 0.003449
+  }
+ },
+ "bench_status": {
+  "dc_op": "ok",
+  "load_regulation": "ok",
+  "line_regulation": "ok",
+  "psrr": "ok",
+  "dropout": "ok",
+  "tran_load_step": "ok",
+  "loop_stability": "ok",
+  "ac_loopgain": "ok",
+  "noise": "ok",
+  "tran_line_step": "ok"
+ },
+ "violations": [
+  "S1 regulated output, Vin 1.5 V, no load in [1.176, 1.224] V: got 1.60913",
+  "S5 quiescent current, no load <= 50 uA: got 758.695",
+  "S8 loop phase margin at 1 mA >= 60 deg: got 46.3897"
+ ],
+ "provenance": {
+  "tag": "reference_certify",
+  "t": "2026-09-04T02:11:13",
+  "lane": "native ngspice via NGSpice_Wrapper"
+ }
+}

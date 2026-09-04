@@ -1,0 +1,7 @@
+{
+ "circuit": "ldo_005_buffered_ref",
+ "pdk": "ihp-sg13g2",
+ "corner": "tt",
+ "sizing": {},
+ "note": "analog-db ldo_005_buffered_ref, committed IHP sizing, as certified"
+}
