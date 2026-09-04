@@ -65,7 +65,7 @@ def raw_point() -> dict[str, str]:
 
 # One knob is NOT taken from the optimizer verbatim. `c_ff_w` (the feed-forward MIM across the
 # top divider resistor) has a CLIFF between 9.4 and 9.5 um: S7 jumps 107 -> 201 mV across a 0.9 %
-# change of the MIM side, and the optimizer's winner sits 15 nm from it (table 3 of the README).
+# change of the MIM side, and the optimizer's winner sits 15 nm from it (README §2).
 # The record backs the knob off to 8 um -- 19 % of margin, and the value 002 had already
 # established -- paying 2 mV of undershoot and 2.2 deg of phase margin for a point that survives
 # a rounding step. Journal: doc/journal/optimizer-parks-on-cliffs.md.

@@ -3,7 +3,7 @@
 **Paper(s):** none
 **Hypothesis:** the design of record (003) can be drawn by a *parameterized generator* — `layout/gen_ldo.py`, whose sizing comes from `sizing.yaml` and whose floorplan constants are an optimizer-ready search space — and the resulting cell will be DRC-clean, LVS-identical to the certified netlist, extractable, and will still pass the whole S1–S8 box on its **own frozen benches** run against the extracted netlist. Falsified if any sign-off stage cannot be made to pass, or if a spec falls out of the box post-layout.
 **Control:** the pre-layout scorecard of the same sizing point, re-simulated in the same run (not quoted from 003), so every pre→post shift is attributable to the extraction alone; and, for the generator bug in §2, the same generator at the 002 hand sizing, which passed LVS before and after the fix.
-**Verdict:** CONFIRMED. **DRC 0 violations, LVS matched, PEX extracted (121 C, 10 R, CC mode), and the extracted cell passes all of S1–S8** (table 1). Area 35 317 µm² (287.4 × 122.9 µm). The layout costs 9.1 mV of undershoot and 0.7° of phase margin and gives back 0.08 µA of Iq; nothing else moves by more than its own measurement resolution. The engines are **KLayout** (IHP SG13G2 runsets) for DRC/LVS and **kpex 2.5D** for extraction — not magic/netgen, which the platform's `spicexplorer_signoff` does not drive on this PDK.
+**Verdict:** CONFIRMED. **DRC 0 violations, LVS matched, PEX extracted (121 C, 10 R, CC mode), and the extracted cell passes all of S1–S8** (§1). Area 35 317 µm² (287.4 × 122.9 µm). The layout costs 9.1 mV of undershoot and 0.7° of phase margin and gives back 0.08 µA of Iq; nothing else moves by more than its own measurement resolution. The engines are **KLayout** (IHP SG13G2 runsets) for DRC/LVS and **kpex 2.5D** for extraction — not magic/netgen, which the platform's `spicexplorer_signoff` does not drive on this PDK.
 
 **Figure:** `figs/ldo_ihp_capless.png` — the cell rendered with PDK colours
 (`spicexplorer-layout render`). Three device rows (NMOS / PMOS / the pass device) between the
@@ -59,6 +59,12 @@ Two more things were needed and are worth naming. Every track is now **labelled*
 ## 4. The generator is a search space, not a drawing
 
 `layout/gen_ldo.py` takes `LayoutParams` — `dev_gap`, `grp_gap`, `track_pitch`, `ch_margin`, `rail_w`, `rail_gap`, `mim_gap`, `res_pitch`, `blk_gap`, `tap_pitch` — each with DRC-safe bounds in `BOUNDS`, which is the interface a `sim_engine: layout` co-design run (`layout-schematic-codesign`) would drive. Sizing is **not** duplicated here: the module reads `circuits/ldo_ihp_capless/pdk/ihp-sg13g2/sizing.yaml` directly, so re-sizing the cell redraws it with no edit to the generator. That co-design loop was not run — the post-layout scorecard passes, so there is nothing for it to repair yet.
+
+The **GDS itself is deliberately not committed**: the layout of record is the *generator*
+(`.claude/skills/layout-evidence` — "the layout of record is code"), so a checked-in 845 kB binary
+could only drift from `gen_ldo.py` + `sizing.yaml`. Rebuild it with
+`LDO_EXP=005 uv run --no-sync python layout/signoff.py --stages build`; `--all` re-runs the whole
+sign-off chain above.
 
 ## 5. What was not done
 

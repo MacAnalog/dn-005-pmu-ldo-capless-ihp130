@@ -13,7 +13,7 @@ variables:
 - {name: vref_val,      description: "Ideal internal reference (a real bandgap is out of scope)", default: 0.6, min: 0.6, max: 0.6, unit: V}
 - {name: r_w,           description: "rhigh poly width, shared by the three resistors (PDK minimum; fixed)", default: 0.5u, min: 0.5u, max: 0.5u, unit: m}
 - {name: r_fb_l,        description: "Feedback divider resistor length, each of XR1/XR2 (rhigh ~1.36 kohm/sq: 340u -> 1 Mohm); 1:1 -> vout = 2*vref", default: 340u, min: 100u, max: 1000u, unit: m}
-- {name: c_ff_w,        description: "Feed-forward MIM across the top divider resistor (square; 8u -> 0.1 pF, zero ~1.6 MHz). CLIFF between 9.4u and 9.5u: S7 jumps 107 -> 201 mV (003 table 3). 8u is 19 % below it", default: 8u, min: 3u, max: 14u, unit: m}
+- {name: c_ff_w,        description: "Feed-forward MIM across the top divider resistor (square; 8u -> 0.1 pF, zero ~1.6 MHz). CLIFF between 9.4u and 9.5u: S7 jumps 107 -> 201 mV (003 §2). 8u is 19 % below it", default: 8u, min: 3u, max: 14u, unit: m}
 - {name: r_bias_l,      description: "Bias resistor length (100u -> ~300 kohm): I_ref = (VDD - Vgs(XMB0)) / R", default: 138.5u, min: 30u, max: 300u, unit: m}
 - {name: x_dut_xmb0_w,  description: "NMOS bias diode width (mirror unit; XMB1/XMS are ratios of it)", default: 1u, min: 0.5u, max: 4u, unit: m}
 - {name: x_dut_xmb0_l,  description: "NMOS bias-mirror length (shared by XMB0/XMB1)", default: 1u, min: 0.5u, max: 2u, unit: m}

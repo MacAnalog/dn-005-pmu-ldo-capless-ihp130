@@ -7,8 +7,13 @@ involved and the split is not cosmetic:
 * ``gen_ldo.build`` needs **gdsfactory + ihp-gdsfactory** -> `$LDO_GF_PYTHON`
   (default ``~/miniconda3/envs/ai_env/bin/python``); it is run as a subprocess.
 * DRC / LVS / PEX are KLayout runsets + kpex, driven from THIS interpreter through
-  `spicexplorer_signoff` (which finds its own klayout/kpex executables via `SIGNOFF_PYTHON`
-  and `$PDK_ROOT`).
+  `spicexplorer_signoff` (which finds its own klayout/kpex executables via `$PDK_ROOT`).
+
+  **Leave ``SIGNOFF_PYTHON`` unset.** It is tempting to point it at the klayout/pex conda
+  interpreter -- DRC works that way -- but the PDK's ``run_lvs.py`` imports ``docopt``, which
+  that interpreter does not have, and LVS then fails *silently*: ``matched=False``, an empty
+  run directory and no reason in the log. Unset, ``pdk.runner_python()`` resolves to this
+  checkout's venv, which ships ``docopt``, and LVS reports properly.
 
 The engine of record is therefore **KLayout** (IHP SG13G2 runsets) for DRC/LVS and **kpex**
 (2.5D) for extraction -- not magic/netgen.

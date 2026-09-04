@@ -3,7 +3,7 @@
 **Paper(s):** none (topology from 002)
 **Hypothesis:** starting from the gm/ID-derived hand point of 002 (the double-mirror fold, all of S1–S8 at tt except S5), `spicexplorer-optimize` (Nevergrad NGOpt, the S1–S8 box with margin as constraints, S8 also at 0.1/10 mA, Iq as the objective) finds a point ≤ 35 µA that still meets the whole box at tt/27 °C, and that point holds S1–S8 over the five MOS corners × −40/27/125 °C with at most S8 falling below 60° at ss/−40 °C. Falsified if the optimizer cannot cut Iq by ≥ 20 % without a constraint violation, or if the corner table shows a hard-box violation at tt-adjacent corners.
 **Control:** the hand point itself (trial 0, seeded through `seed_from_init`) scored by the same project; and the reference row quoted from `decks/reference/scorecard.json`. Every candidate row is the full 13-bench `lab.metrics.evaluate` scorecard, not the optimizer's own reading.
-**Verdict:** PARTLY CONFIRMED. The optimizer cut Iq **50.17 → 36.28 µA (−27.7 %)** and passes the whole box at tt/27 °C with margin on every line (table 1) — so the ≥ 20 % clause holds, but the **≤ 35 µA target is missed by 1.28 µA**; the hypothesis is not retracted, it is scored as missed. The corner clause is **FALSIFIED, and not in the predicted place**: 12 of 15 corners pass, but the failures are **S7 at ss/−40 and ss/27 (311 and 255 mV)** and **S5 at ff/125 (61.9 µA)** — not S8, which never drops below 70.4° anywhere (table 4). Both failures are the same mechanism, and it is not sizing: the resistor-referenced bias spreads Iq **2.4× across corners** (25.6–61.9 µA), and S5 and S7 pull that one knob in opposite directions (§3). Two further findings that only the frozen benches could produce: rounding the optimizer's winner onto a layout grid **breaks S7 twice over** (§2) — once by moving the pass device off its minimum length, once by landing `c_ff_w` on a cliff.
+**Verdict:** PARTLY CONFIRMED. The optimizer cut Iq **50.17 → 36.28 µA (−27.7 %)** and passes the whole box at tt/27 °C with margin on every line (§1) — so the ≥ 20 % clause holds, but the **≤ 35 µA target is missed by 1.28 µA**; the hypothesis is not retracted, it is scored as missed. The corner clause is **FALSIFIED, and not in the predicted place**: 12 of 15 corners pass, but the failures are **S7 at ss/−40 and ss/27 (311 and 255 mV)** and **S5 at ff/125 (61.9 µA)** — not S8, which never drops below 70.3° anywhere (§3). Both failures are the same mechanism, and it is not sizing: the resistor-referenced bias spreads Iq **2.4× across corners** (25.6–61.9 µA), and S5 and S7 pull that one knob in opposite directions (§3). Two further findings that only the frozen benches could produce: rounding the optimizer's winner onto a layout grid **breaks S7 twice over** (§2) — once by moving the pass device off its minimum length, once by landing `c_ff_w` on a cliff.
 
 **Figures** (`figs.py`, regenerated from `out/*.json`; every one carries its spec bound):
 `figs/points.png` (§1, every "lower is better" spec as a fraction of its bound),
@@ -81,6 +81,11 @@ The predicted failure (S8 at ss/−40) did not happen: phase margin is the *leas
 
 - objective: `i(i_supply)` minimize, target 30 µA, log reward, weight 2
 - constraints with margin against the box: `v(vout_dc)` 1.2 ± 20 mV, `load_reg` ≤ 4 mV, `line_reg` ≤ 1.5 mV, `v_dropout` ≤ 170 mV, `psrr_vdd_db` ≥ 43 dB, `v_undershoot` ≤ 120 mV (weight 1.5), and phase margin ≥ 63° on all three of `ac_loopgain`, `ac_loopgain_lo`, `ac_loopgain_hi`
+
+`opt_best.json` is the optimizer's own winner, committed verbatim beside `run_opt.py`: the run
+directory lives under `$SX_SCRATCH` and the optimizer does not write to the harness ledger, so
+without it the 17 raw floats in `score.py` would be unsourced numbers. §1 and §2 are the record of
+what happened to them afterwards.
 
 The three loop benches all `print` the same `pm_loop` name and the optimizer keys specs by name, so each is read through the Tier-1 registry recipe `{meas: pm, out: tloop}` on the saved loop-gain wave; that recipe was validated against the deck's own `meas` on the smoke run before the full budget was spent.
 

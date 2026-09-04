@@ -23,10 +23,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 HERE = Path(__file__).resolve().parent
+REPO = Path(__file__).resolve().parents[2]
 FIGS = HERE / "figs"
 OUT = HERE / "out"
 CELL = "ldo_ihp_capless"
-DECK = Path(__file__).resolve().parents[2] / "decks" / "candidate" / "dc_op.spice"
+DECK = REPO / "decks" / "candidate" / "dc_op.spice"
+# The .sch is the DELIVERABLE, not a run artefact, so it is written beside the circuit it draws
+# and committed -- `experiments/*/out/` is git-ignored and would have swallowed it. The xschemrc
+# netlist2xschem drops next to it is host-specific (absolute PDK library paths) and stays ignored.
+SCH_DIR = REPO / "circuits" / CELL / "xschem"
 
 
 def _certified_subckt(deck: Path) -> str:
@@ -55,7 +60,8 @@ def main() -> int:
     a = ap.parse_args()
     FIGS.mkdir(parents=True, exist_ok=True)
     OUT.mkdir(parents=True, exist_ok=True)
-    sch, png = OUT / f"{CELL}.sch", FIGS / f"{CELL}.png"
+    SCH_DIR.mkdir(parents=True, exist_ok=True)
+    sch, png = SCH_DIR / f"{CELL}.sch", FIGS / f"{CELL}.png"
 
     cmd = [sys.executable, "-m", "spicexplorer_netlist2xschem.cli", a.deck,
            "--into", "XDUT", "--name", CELL, "-o", str(sch),
@@ -75,7 +81,7 @@ def main() -> int:
     # certified one as graphs (devices, models, connectivity), which is the only comparison worth
     # making -- a .sch is a drawing file, not a netlist, so it is never handed to circuitgraph.
     back = OUT / f"{CELL}.spice"
-    rcfile = OUT / "xschemrc"
+    rcfile = SCH_DIR / "xschemrc"   # written by netlist2xschem beside the .sch
     xs = _run_xschem(sch, rcfile, OUT)
     rec["xschem"] = xs
     if back.is_file():
