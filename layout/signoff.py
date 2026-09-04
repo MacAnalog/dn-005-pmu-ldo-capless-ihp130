@@ -9,11 +9,14 @@ involved and the split is not cosmetic:
 * DRC / LVS / PEX are KLayout runsets + kpex, driven from THIS interpreter through
   `spicexplorer_signoff` (which finds its own klayout/kpex executables via `$PDK_ROOT`).
 
-  **Leave ``SIGNOFF_PYTHON`` unset.** It is tempting to point it at the klayout/pex conda
-  interpreter -- DRC works that way -- but the PDK's ``run_lvs.py`` imports ``docopt``, which
-  that interpreter does not have, and LVS then fails *silently*: ``matched=False``, an empty
-  run directory and no reason in the log. Unset, ``pdk.runner_python()`` resolves to this
-  checkout's venv, which ships ``docopt``, and LVS reports properly.
+  ``SIGNOFF_PYTHON``, if set, must name an interpreter that can import **both ``docopt``**
+  (the PDK's ``run_lvs.py`` imports it) **and the layout API**. Leaving it unset resolves
+  `pdk.runner_python()` to this checkout's venv, which has both. An interpreter missing
+  ``docopt`` gives ``matched=False``, an empty run directory and an empty ``reason`` -- the
+  ``ModuleNotFoundError`` traceback IS in the returned log, but `run_lvs` does not promote a
+  non-zero exit into ``reason``, so a caller that records only ``matched``/``reason`` (this
+  file did) reports a mismatch with no cause. Platform follow-up:
+  doc/journal/run-lvs-swallows-its-own-traceback.md (review-002 m7).
 
 The engine of record is therefore **KLayout** (IHP SG13G2 runsets) for DRC/LVS and **kpex**
 (2.5D) for extraction -- not magic/netgen.
@@ -79,12 +82,21 @@ def render(gds: Path, png: Path) -> bool:
 
 # ------------------------------------------------------------- sign-off ----
 
-def drc(gds: Path, out: Path) -> dict:
+def drc(gds: Path, out: Path, no_density: bool = True) -> dict:
+    """Rule check. `no_density` skips the density/fill tables, which a standalone cell cannot
+    satisfy on its own -- they are met by fill at chip assembly. The README states the flag and
+    lists what those tables report when enabled (review-002 m1); pass `--density` to see them."""
     from spicexplorer_signoff.drc import run_drc
-    r = run_drc(str(gds), CELL, str(out), no_density=True)
+    r = run_drc(str(gds), CELL, str(out), no_density=no_density)
     print(f"  DRC: passed={r.passed} violations={r.n_violations}")
-    return {"passed": bool(r.passed), "available": bool(r.available),
-            "n_violations": int(r.n_violations), "violations": list(r.violations)[:50],
+    # `DrcViolation` is not JSON-serialisable, and this line only ever runs when the list is
+    # non-empty -- so a clean cell hid the bug until the first real violation (review-002 B1
+    # attempt). Count per rule instead: which rules fired is what a reviewer reads.
+    per_rule: dict[str, int] = {}
+    for v in r.violations:
+        per_rule[str(getattr(v, "rule", "?"))] = per_rule.get(str(getattr(v, "rule", "?")), 0) + 1
+    return {"passed": bool(r.passed), "available": bool(r.available), "no_density": bool(no_density),
+            "n_violations": int(r.n_violations), "violations_per_rule": per_rule,
             "report": r.report_path, "reason": r.reason}
 
 
@@ -135,6 +147,8 @@ def main() -> int:
     ap.add_argument("--out", default=str(WORK))
     ap.add_argument("--stages", default="build,render,drc,lvs,pex")
     ap.add_argument("--all", action="store_true")
+    ap.add_argument("--density", action="store_true",
+                    help="run the density/fill rule tables too (review-002 m1)")
     a = ap.parse_args()
     out = Path(a.out).resolve()
     out.mkdir(parents=True, exist_ok=True)
@@ -147,7 +161,7 @@ def main() -> int:
     if "render" in stages:
         print("render:"); rec["render"] = render(gds, out / f"{CELL}.png")
     if "drc" in stages:
-        print("drc:"); rec["drc"] = drc(gds, out / "drc")
+        print("drc:"); rec["drc"] = drc(gds, out / "drc", no_density=not a.density)
     if "lvs" in stages:
         print("lvs:"); rec["lvs"] = lvs(gds, netlist, out / "lvs")
     if "pex" in stages:
