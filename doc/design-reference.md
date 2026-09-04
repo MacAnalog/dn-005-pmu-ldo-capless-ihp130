@@ -67,14 +67,28 @@ right order of magnitude given the FVF is pull-down-slew-limited on the falling 
    none of its sizing carries over, only its structure and its benches.
 3. **Quiescent current ≤ 50 µA is measured at no load** (`dc_op`, `i_supply`) — a bleeder or a
    minimum-load device counts against it.
-4. **The bias sets the corner spread, and it binds at both ends.** The resistor-referenced bias
-   makes every branch current scale with `rhigh`'s sheet resistance: Iq runs 25.6 µA at ss/−40 °C
-   to 61.9 µA at ff/125 °C, a 2.4× spread on a 36.3 µA nominal. S5 therefore fails at ff/125 and
-   S7 (which is set by the same current through the gate sink's slew) fails at ss/−40 — the two
-   pull `r_bias_l` in opposite directions, so no static value passes both. A PVT-stable reference
-   (constant-gm / beta-multiplier, or `zhang2023`'s bounded adaptive bias) is the named next
-   increment; provenance: `experiments/003-sizing/README.md` §3,
-   `journal/resistor-bias-spread-binds-both-ends.md`.
+4. **The bias binds at both ends, and S7 against bias current is a THRESHOLD, not a ramp.**
+   The resistor-referenced bias makes every branch current scale with `rhigh`'s sheet resistance:
+   Iq runs 25.6 µA at ss/−40 °C to 61.9 µA at ff/125 °C, a 2.4× spread on a 36.3 µA nominal, and
+   the resistor corner alone reproduces **both** failures while neither the transistor nor the
+   capacitor corner reproduces either. But the shape of the S7 failure is a step. Sweeping the
+   bias resistor at ss/−40 °C: **83.8 mV at 30.9 µA, 88.3 mV at 28.8 µA, 309.8 mV at 27.8 µA** —
+   3.5× for a 3.4 % change of current — and the recovery time steps with it, 0.14–0.20 µs below
+   the threshold against 1.27–1.33 µs above it. That is a change of mechanism (the gate sink stops
+   being able to slew the pass gate within the load step), not a degradation of one, and it is the
+   same signature as the `c_ff_w` cliff. The same threshold exists at tt/27 °C between 30.7 and
+   25.9 µA.
+   **Total Iq is a misleading proxy for it.** Slow transistors at −40 °C *lower* Iq by 15 % and
+   *improve* S7 from 105 to 84 mV; it is the bias-branch current, not the total, that sets S7.
+   **What the exit path actually costs.** A supply-independent bias does not relax both ends at
+   once. Pinned at the design's own 36.3 µA it still fails S7 at ff/125 °C (**165 mV**); the
+   window that clears both corners is **Iq ≈ 41–50 µA**, i.e. the 36.28 µA headline would have to
+   rise 13–38 % and would spend most of its S5 margin. A constant-*gm* / beta-multiplier reference
+   is also the wrong prescription in kind: it holds transconductance constant, while the quantity
+   that sets the pass-gate slew is a current, and a beta-multiplier current still tracks the
+   resistor and the mobility. **The corner-robust headline is therefore 41–50 µA, not 36.28 µA.**
+   Provenance: `experiments/003-sizing/README.md` §3, `journal/resistor-bias-spread-binds-both-ends.md`,
+   `doc/reviews/review-002-capless-ldo.md` §3.4 + M6 (18 bias points across three corners).
 5. **Phase margin is measured with the true loop bench** (`ac_loopgain`, Middlebrook injection
    at `Vlp`), not the Zout-peaking proxy: the proxy read 0 dB on a revision of the reference
    that had no loop gain at all (analog-db `datasheet.yaml`, `pm_loop_deg` note).

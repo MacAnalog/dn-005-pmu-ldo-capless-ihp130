@@ -4,7 +4,7 @@
 is a claim until it has passed `lab.metrics.evaluate` (the full 13-bench analog-db class
 scorecard). This script does that, for three points and for the corner sweep:
 
-    control  the sizing.yaml defaults = the double-mirror fold hand point of 002 (table 5)
+    control  the double-mirror fold hand point of 002, pinned explicitly in CONTROL below
     raw      the optimizer's best knobs verbatim (floats in metres)
     record   the same point ROUNDED to values a layout can draw (W/L on a 10 nm grid, MIM
              sides and resistor lengths on a 0.5 um grid, integer pass-device multiplier)
@@ -49,7 +49,7 @@ GRID_UM: dict[str, float | None] = {
 }
 DEV_GRID_UM = 0.01          # every transistor W/L: 10 nm, drawn exactly on the 5 nm layout grid.
 # A 50 nm grid was tried first and is NOT usable: it rounds the pass device off the PDK minimum
-# length (0.13 -> 0.15 um) and S7 goes 107 -> 248 mV (doc/journal/round-the-pass-device-last.md).
+# length (0.13 -> 0.15 um) and S7 goes 107 -> 248 mV (doc/journal/round-then-rescore.md).
 
 
 def _um(v: float) -> float:
@@ -90,8 +90,23 @@ def record_point() -> dict[str, str]:
     return {**rounded_point(), **BACKOFF}
 
 
+# The 002 hand point, PINNED. It used to be spelled `{}` -- "whatever sizing.yaml says" -- which
+# was true when 003 started and false by the time 003 ended, because 003 moved those very
+# defaults onto the optimizer's winner (r_bias_l 100u -> 138.5u, x_dut_xmc_w 13u -> 15.76u and
+# eight more). An empty control silently became a second copy of the record, so the 50.17 uA row
+# this experiment rests on could not be reproduced without checking out 76eddd6. Values below are
+# `git show 76eddd6:circuits/ldo_ihp_capless/pdk/ihp-sg13g2/sizing.yaml` (review-002 m12).
+CONTROL: dict[str, str] = {
+    "c_ff_w": "8u", "r_bias_l": "100u", "x_dut_xmb1_w": "1.6u", "x_dut_xmt_w": "10u",
+    "x_dut_xm1_w": "8u", "x_dut_xm1_l": "0.5u", "x_dut_xm3_w": "1u", "x_dut_xm3_l": "1u",
+    "x_dut_xm5_w": "2u", "x_dut_xm5_l": "0.5u", "x_dut_xm6_w": "5u", "c_comp_w": "45u",
+    "x_dut_xmc_w": "13u", "x_dut_xmc_l": "0.3u", "x_dut_xma_w": "2u", "x_dut_xma_l": "0.5u",
+    "x_dut_xmcp_w": "6u", "x_dut_xmcp_l": "0.5u", "x_dut_xms_w": "2.2u", "x_dut_xms_l": "1u",
+    "x_dut_xmp_w": "10u", "x_dut_xmp_l": "0.13u", "x_dut_xmp_m": "20",
+}
+
 POINTS = {
-    "control (002 fold hand point)": {},
+    "control (002 fold hand point)": CONTROL,
     "optimizer best (raw)": raw_point(),
     "rounded (10 nm device grid)": rounded_point(),
     "design of record (rounded + c_ff_w off the cliff)": record_point(),

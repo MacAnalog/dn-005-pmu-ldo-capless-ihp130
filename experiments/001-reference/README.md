@@ -32,7 +32,7 @@ Conditions **as committed in analog-db** (not the challenge's): `.lib cornerMOSh
 | — | gain margin | `gm_loop_db` | dB | **41.56** |  |
 | — | sensitivity peak Ms | `ms_peak_db` | dB | **4.345** | ≥ 1/(2 sin(PM/2)) = 2.07 dB: consistent |
 | — | closed-loop Zout peaking | `zout_peak_db` | dB | **5.88** | proxy only |
-| — | integrated output noise 10 Hz–10 MHz | `vn_out_urms` | µVrms | **5038** |  |
+| — | integrated output noise 10 Hz–10 MHz | `vn_out_urms` | µVrms | ~~5038~~ **25.4** |  see note |
 | — | line-step deviation 3.1 → 3.5 V | `v_line_pp_mv` | mVpp | **3.449** |  |
 
 Against this repo's box (1.5 V / 1.2 V / capless, `harness.yaml`) the reference fails S1 (it

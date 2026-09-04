@@ -8,6 +8,5 @@ params:
   VDD_START: 0.9
   VDD_STOP: 1.6
   VDD_STEP: 0.002
-  VOUT_THRESH: 1.14
 flags: []
 produces: [v_dropout]

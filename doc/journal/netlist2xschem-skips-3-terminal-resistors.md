@@ -1,6 +1,6 @@
 # 2026-09-04 — netlist2xschem drops 3-terminal resistors and still reports success
 
-KIND: journal entry | type: procedural | status: live
+KIND: journal entry | type: procedural | status: superseded by journal/prefix-precedence-drops-drawable-devices.md
 
 **Observation** (experiment 004). `spicexplorer_netlist2xschem` turned the certified cell into a
 schematic and reported `wrote ldo_ihp_capless.sch (22 devices, 44 labels)` — the cell has **25**.

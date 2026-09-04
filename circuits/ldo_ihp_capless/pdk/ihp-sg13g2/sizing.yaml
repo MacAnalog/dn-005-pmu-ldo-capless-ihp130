@@ -40,5 +40,5 @@ variables:
 - {name: x_dut_xmp_w,   description: "Pass PMOS unit width (total W = w*m)", default: 10u, min: 5u, max: 20u, unit: m}
 - {name: x_dut_xmp_l,   description: "Pass PMOS length (short = low dropout, less gate cap)", default: 0.13u, min: 0.13u, max: 0.3u, unit: m}
 - {name: x_dut_xmp_m,   description: "Pass PMOS parallel multiplier (layout: fingers)", default: 19, min: 10, max: 100, unit: count, is_integer: true}
-- {name: c_out_w,       description: "Output MIM unit side (square; 58u -> 5 pF)", default: 58u, min: 40u, max: 80u, unit: m}
+- {name: c_out_w,       description: "Output MIM unit side (square; 58u -> 5 pF)", default: 58u, min: 40u, max: 75u, unit: m}   # 75u = the cap model's validated side (review-002 m10)
 - {name: c_out_m,       description: "Output MIM units in parallel (C1: c_out_m * C(c_out_w) + the bench 1 pF <= 100 pF; 4 x 5 pF of record)", default: 4, min: 1, max: 16, unit: count, is_integer: true}
