@@ -100,19 +100,17 @@ def pex_subckt(pex_netlist: Path) -> str:
     return txt
 
 
-# `Warning: singular matrix: check node ...` is what ngspice prints WHILE gmin/source stepping
-# its way to an operating point; on the extracted netlist (thousands of tiny ground caps on the
-# resistor taps) it appears once and the analysis then converges and prints every measure.
-# `lab.sim._FATAL` matches the substring and rejects the whole run, so six of the thirteen benches
-# came back NaN with their results sitting in the log. `lab/` is human-reviewed procedural code
-# (CLAUDE.md rule 10), so the fix is PROPOSED in doc/journal/singular-matrix-is-a-warning.md and
-# applied locally here: a run is still failed unless the ONLY fatal line is that warning AND the
-# log parses a measure.
-_BENIGN = re.compile(r"warning:\s*singular matrix", re.I)
+def run_frozen(decks: dict[str, str], tag: str) -> tuple[dict, dict]:
+    """Score `decks` through the FROZEN measurement path -- `lab.sim.run` + `lab.metrics.promote`,
+    the same two calls `lab.metrics.evaluate` makes for the pre-layout row.
 
-
-def run_tolerant(decks: dict[str, str], tag: str) -> tuple[dict, dict]:
-    from spicexplorer_analog_db.runner import parse_measures
+    This used to be `run_tolerant`, a local rule that re-parsed the log whenever the only fatal
+    line was ngspice's benign `Warning: singular matrix` from gmin stepping. That override existed
+    because `lab/sim.py` carried its own fatal-line table which ranked the bare substring above
+    the warning prefix; the platform's classifier, which `lab/sim.py` now calls, already gets this
+    right. Rule 2 says the frozen definitions certify, so the post-layout row and the pre-layout
+    row it is compared against must come from one path -- with the override in place they did not
+    (review-002 M4/M5)."""
     from spicexplorer_harness import batch
 
     def one(bench: str):
@@ -120,19 +118,12 @@ def run_tolerant(decks: dict[str, str], tag: str) -> tuple[dict, dict]:
             r = sim.run(decks[bench], f"{tag}__{bench}")
             return bench, {"status": "ok", "measures": r.measures}
         except sim.SimError as exc:
-            hard = [ln for ln in str(exc).splitlines()[1:] if ln.strip() and not _BENIGN.search(ln)]
-            logs = sorted((C.WORK / "runs" / f"{tag}__{bench}").rglob("*.log"),
-                          key=lambda q: q.stat().st_mtime)
-            if not hard and logs:
-                meas, _ = parse_measures(logs[-1].read_text(errors="replace"))
-                if meas:
-                    return bench, {"status": "ok (benign singular-matrix warning)", "measures": meas}
             return bench, {"status": "sim_error", "measures": {}, "error": str(exc)[:400]}
 
     records = dict(batch(list(decks), one, env=C.H.jobs_env, on_error="raise"))
     values: dict = {}
     for bench, rec in records.items():
-        if rec["status"].startswith("ok"):
+        if rec["status"] == "ok":
             values.update(M.promote(bench, rec["measures"]))
     return values, records
 
@@ -157,9 +148,9 @@ def main() -> int:
     post_decks = {b: splice_subckt(pre_decks[b], block, CELL, check_pins=False) for b in benches}
 
     print("pre-layout:", flush=True)
-    pre, pre_rec = run_tolerant(pre_decks, f"{a.tag}_pre")
+    pre, pre_rec = run_frozen(pre_decks, f"{a.tag}_pre")
     print("post-layout:", flush=True)
-    post, post_rec = run_tolerant(post_decks, f"{a.tag}_post")
+    post, post_rec = run_frozen(post_decks, f"{a.tag}_post")
     for b, r in sorted(post_rec.items()):
         if r["status"] != "ok":
             print(f"    {b}: {r['status']}")

@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from spicexplorer_analog_db.runner import parse_measures
+from spicexplorer_core.spice_engine.sim_log import fatal_lines
 
 from . import config as C
 
@@ -50,21 +51,15 @@ class RunResult:
         return self.log_path.read_text(errors="replace") if self.log_path else ""
 
 
-# The lines ngspice prints for failures it does not exit non-zero on, plus the analog-db
-# runner's fatal signatures. Any hit is a failed run, whatever the rawfile says.
-_FATAL = (
-    "doAnalyses: iteration limit reached",
-    "Transient solution failed",
-    "singular matrix",
-    "no such vector",
-    "Unknown model type",
-    "could not find a valid modelname",
-    "simulation interrupted",
-    "cannot open",
-    "Error: Library file",
-    "fatal",
-)
-_FATAL_RX = re.compile("|".join(re.escape(s) for s in _FATAL), re.IGNORECASE)
+# Which log lines make a run a failure is the PLATFORM's rule, not ours: `sim_log.fatal_lines`
+# classifies per line and orders its patterns so a `Warning:`-prefixed line never outranks the
+# bare form of the same text. That ordering is the whole point here. ngspice prints
+#     Warning: singular matrix:  check node xdut.n_37
+# once during gmin stepping on a run that then converges and reports every measure. The local
+# table this replaced matched the substring `singular matrix` with no severity ordering, so it
+# discarded seven of the thirteen post-layout benches as dead runs and the extracted cell could
+# only be scored through a local override (review-002 M4/M5;
+# doc/journal/singular-matrix-is-a-warning.md).
 
 
 def _safe(tag: str) -> str:
@@ -94,7 +89,7 @@ def run(deck: str, tag: str) -> RunResult:
                   raw_path=Path(res.raw_path) if res.raw_path else None, wall=wall)
     (out / "wall.txt").write_text(f"{wall:.3f}\n")
     log = r.log
-    bad = [ln for ln in log.splitlines() if _FATAL_RX.search(ln)]
+    bad = fatal_lines(log)
     if bad:
         raise SimError(f"{tag}: simulator error\n  " + "\n  ".join(bad[:8]))
     r.measures, r.failed = parse_measures(log)
