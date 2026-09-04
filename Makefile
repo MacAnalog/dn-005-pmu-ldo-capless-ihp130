@@ -22,7 +22,7 @@ baseline:  ## simulate the frozen reference decks and print the scorecard
 pack:  ## working-memory context pack (K="noise gain" S="symptom text")
 	@$(HARNESS) pack $(K) $(if $(S),--symptom "$(S)") $(ARGS)
 
-runs:  ## query the run ledger (ARGS="--fails" | "--best gain_db --desc" | "--exp 001" | "--where topology=b")
+runs:  ## query the run ledger (ARGS="--fails" | "--best i_q_ua" | "--exp 001" | "--kind bench" | "--where circuit=ldo_005_buffered_ref")
 	@$(HARNESS) runs $(ARGS)
 
 freeze:  ## write SHA256SUMS into the frozen dirs after a deliberate certification

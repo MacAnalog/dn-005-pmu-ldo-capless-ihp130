@@ -36,8 +36,9 @@ Conditions **as committed in analog-db** (not the challenge's): `.lib cornerMOSh
 | — | line-step deviation 3.1 → 3.5 V | `v_line_pp_mv` | mVpp | **3.449** |  |
 
 Against this repo's box (1.5 V / 1.2 V / capless, `harness.yaml`) the reference fails S1 (it
-regulates to 1.6 V), S5 (759 µA vs ≤ 50 µA) and S8 (46° vs ≥ 60°) — the first two are the
-point of the challenge, the third is the price of its three-stage loop.
+regulates to 1.6 V), S3 by the literal bound (4.32 mV, but over a 1 V sweep — 4.3 mV/V, i.e.
+~1.1 mV over our 0.25 V range, which passes), S5 (759 µA vs ≤ 50 µA) and S8 (46° vs ≥ 60°).
+S1 and S5 are the point of the challenge; S8 is the price of its three-stage loop.
 
 ## 2. Method — exact commands
 

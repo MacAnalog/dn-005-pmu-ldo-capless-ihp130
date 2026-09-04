@@ -13,7 +13,7 @@ goal: "A capless LDO (Vin 1.5 V, Vout 1.2 V, 0.1-10 mA, Cout on chip) that match
 spec:
   - {key: v_out_v,         label: "S1 regulated output, Vin 1.5 V, no load", op: in,   bound: [1.176, 1.224], unit: V}
   - {key: load_reg_mv,     label: "S2 load regulation, 0.1 -> 10 mA",        op: "<=", bound: 5,   unit: mV}
-  - {key: line_reg_mv,     label: "S3 line regulation, Vin 1.4 -> 1.65 V",   op: "<=", bound: 5,   unit: mV}
+  - {key: line_reg_mv,     label: "S3 line regulation, Vin 1.4 -> 1.65 V",   op: "<=", bound: 2,   unit: mV}
   - {key: v_dropout_mv,    label: "S4 dropout at 10 mA",                      op: "<=", bound: 200, unit: mV}
   - {key: i_q_ua,          label: "S5 quiescent current, no load",            op: "<=", bound: 50,  unit: uA}
   - {key: psrr_1k_db,      label: "S6 PSRR at 1 kHz, 1 mA",                   op: ">=", bound: 40,  unit: dB}

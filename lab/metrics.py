@@ -129,6 +129,8 @@ def certify(design: Design = REFERENCE, tag: str = "reference_certify") -> dict:
     for b, text in decks.items():
         (C.REF_DIR / f"{b}.spice").write_text(text)
     values, records = run_decks(decks, tag)
+    log_run(C.H, tag, values, deck="".join(decks.values()), violations=violations(C.H.spec, values),
+            design=design.as_dict(), extra={"benches": {b: r["status"] for b, r in records.items()}})
     doc = {
         "circuit": design.circuit, "pdk": design.pdk, "corner": design.corner,
         "design": design.as_dict(),
@@ -185,8 +187,12 @@ def main(argv=None) -> int:
     if not (C.REF_DIR / "scorecard.json").exists():
         print("no reference certified yet: `python -m lab.metrics --certify`, then `make freeze`")
         return 1
-    values, records = run_decks(frozen_decks(), "reference_check")
+    decks = frozen_decks()
+    values, records = run_decks(decks, "reference_check")
     values["_violations"] = violations(C.H.spec, values)
+    log_run(C.H, "reference_check", {k: v for k, v in values.items() if not k.startswith("_")},
+            deck="".join(decks.values()), violations=values["_violations"],
+            extra={"benches": {b: r["status"] for b, r in records.items()}})
     print(table({"reference (frozen decks)": values}))
     bad = [b for b, r in records.items() if r["status"] != "ok"]
     if bad:
