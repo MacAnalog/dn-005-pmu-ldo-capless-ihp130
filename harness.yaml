@@ -1,0 +1,60 @@
+# The one file that describes this design to the harness (spicexplorer-harness).
+# Keys not listed here keep their defaults; unknown keys fail `make lint`.
+name: ldo-ihp130
+exp_env: LDO_EXP        # env var stamping every ledger row with the experiment id
+jobs_env: LDO_JOBS      # width of spicexplorer_harness.batch
+
+# The headline of the challenge, as the context pack states it at the top of every task.
+goal: "A capless LDO (Vin 1.5 V, Vout 1.2 V, 0.1-10 mA, Cout on chip) that matches the certified reference's load/line regulation and PSRR at <= 50 uA quiescent current, without giving back phase margin, dropout or load-step undershoot"
+
+# The acceptance box. ops: < <= > >= in abs<=. Every bound must also appear in doc/target-spec.md.
+# Keys are UNIT-SCALED twins of the analog-db LDO canonical metrics (doc/benches.md has the map);
+# a bound written in base SI units (1e-4 A) would have to appear as '0.0001' in the prose.
+spec:
+  - {key: v_out_v,         label: "S1 regulated output, Vin 1.5 V, no load", op: in,   bound: [1.176, 1.224], unit: V}
+  - {key: load_reg_mv,     label: "S2 load regulation, 0.1 -> 10 mA",        op: "<=", bound: 5,   unit: mV}
+  - {key: line_reg_mv,     label: "S3 line regulation, Vin 1.4 -> 1.65 V",   op: "<=", bound: 5,   unit: mV}
+  - {key: v_dropout_mv,    label: "S4 dropout at 10 mA",                      op: "<=", bound: 200, unit: mV}
+  - {key: i_q_ua,          label: "S5 quiescent current, no load",            op: "<=", bound: 50,  unit: uA}
+  - {key: psrr_1k_db,      label: "S6 PSRR at 1 kHz, 1 mA",                   op: ">=", bound: 40,  unit: dB}
+  - {key: v_undershoot_mv, label: "S7 load-step undershoot, 0.1 -> 10 mA",    op: "<=", bound: 150, unit: mV}
+  - {key: pm_loop_deg,     label: "S8 loop phase margin at 1 mA",             op: ">=", bound: 60,  unit: deg}
+# Extra spec-frame lines for the pack: report-only columns, expensive sign-off definitions, gates.
+spec_notes:
+  - "Cout is ON CHIP ONLY: <= 100 pF total at the output node (design-reference constraint C1); the reference was certified with its committed 1 uF external Cout and is the yardstick for S2/S3/S6 only"
+  - "report-only: loopgain_db, ugf_loop_khz, gm_loop_db, ms_peak_db, zout_peak_db, t_transient_us, vn_out_urms, v_line_pp_mv, psrr_1m_db"
+  - "S8 must hold at 0.1 mA and 10 mA too (light-load PM is where capless LDOs die); the fast scorecard measures 1 mA, sign-off runs all three"
+
+# Certified artefacts, sha-locked with SHA256SUMS (`make freeze` after certification).
+frozen: []
+reference_scorecard: ""
+
+# Memory surfaces: entries stay under size_cap (20 KB); the one-line-per-entry index may grow past it.
+memory: {index_size_cap: 32000}
+
+gitignore_must: ["runs/", "*.raw", "__pycache__/", "experiments/*/out/"]
+
+# Provenance scrub: EDA-vendor / foundry names only (this repo is open PDK + open simulator end to end).
+# flags: "" = case-sensitive; default is case-insensitive.
+denylist:
+  - {pattern: "tsmc", why: proprietary foundry name}
+  - {pattern: "\\bcadence\\b", why: EDA vendor}
+  - {pattern: "\\bspectre\\b", why: proprietary simulator}
+  - {pattern: "\\bvirtuoso\\b", why: proprietary schematic editor}
+  - {pattern: "\\bmaestro\\b", why: proprietary ADE tool}
+
+# `make runs` columns ({key, w: width, p: decimals}; strings left-justified).
+ledger_columns:
+  evaluate:
+    - {key: v_out_v, w: 8, p: 4}
+    - {key: i_q_ua, w: 9, p: 2}
+    - {key: load_reg_mv, w: 9, p: 3}
+    - {key: line_reg_mv, w: 9, p: 3}
+    - {key: v_dropout_mv, w: 9, p: 1}
+    - {key: psrr_1k_db, w: 8, p: 2}
+    - {key: v_undershoot_mv, w: 9, p: 2}
+    - {key: pm_loop_deg, w: 8, p: 2}
+    - {key: ugf_loop_khz, w: 9, p: 1}
+  bench:
+    - {key: bench, w: 18}
+    - {key: status, w: 8}
