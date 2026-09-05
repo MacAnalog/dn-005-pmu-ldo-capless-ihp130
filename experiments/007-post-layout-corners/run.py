@@ -29,7 +29,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import re
 import sys
 import time
 from pathlib import Path
@@ -74,24 +73,18 @@ def block_text() -> str:
     return PEX.read_text()
 
 
-def find_cards(block: str, family: str, drain: str, gate: str, source: str) -> list[str]:
-    """Names of every extracted MOS card matching (family, d, g, s)."""
-    out = []
-    for ln in block.splitlines():
-        t = ln.split()
-        if len(t) < 6 or not t[0].upper().startswith("XM"):
-            continue
-        if not t[5].lower().endswith(f"_{family}"):
-            continue
-        if (t[1], t[2], t[3]) == (drain, gate, source):
-            out.append(t[0])
-    return out
-
-
 def class_cards(block: str, cls: str) -> dict[str, list[str]]:
+    """The extracted cards of each design device in `cls`, asserting the count it should have.
+
+    Finding a class by connectivity and injecting on it are `spicexplorer_signoff.sensitivity`
+    (`find_mos_cards` / `inject_threshold_offset`); what is design-specific and stays here is
+    :data:`CLASSES` — which nets name which device, and how many cards it was drawn as.
+    """
+    from spicexplorer_signoff.sensitivity import find_mos_cards
+
     got = {}
     for dev, (fam, d, g, s, n) in CLASSES[cls].items():
-        cards = find_cards(block, fam, d, g, s)
+        cards = find_mos_cards(block, family=fam, drain=d, gate=g, source=s)
         if len(cards) != n:
             raise SystemExit(f"{cls}/{dev}: expected {n} extracted card(s), found {cards}")
         got[dev] = cards
@@ -99,16 +92,10 @@ def class_cards(block: str, cls: str) -> dict[str, list[str]]:
 
 
 def inject_dvt(block: str, cards: list[str], dvt_mv: float) -> str:
-    """+dvt_mv on every card of one design device.
+    """A threshold-voltage INCREASE of `dvt_mv` on every card of one design device."""
+    from spicexplorer_signoff.sensitivity import inject_threshold_offset
 
-    `sensitivity.inject_vsource` makes the device see ``net + dv`` on the chosen pin, so a
-    threshold-voltage INCREASE of `dvt` is a gate source of `-dvt` (BRIEF.md section 6b).
-    """
-    from spicexplorer_signoff.sensitivity import inject_vsource
-
-    for c in cards:
-        block = inject_vsource(block, CELL, c, -dvt_mv * 1e-3, pin="g")
-    return block
+    return inject_threshold_offset(block, CELL, cards, dvt_mv * 1e-3, pin="g")
 
 
 # ------------------------------------------------------------------- running ----
@@ -200,45 +187,37 @@ def stage_mm_control(args) -> None:
 
 
 def stage_threshold(args) -> None:
-    """Bisect the dVT that puts the cell out of the spec box, one bench batch per point."""
+    """Bisect the dVT that puts the cell out of the spec box, one bench batch per point.
+
+    The search is `spicexplorer_harness.servo.bisect_threshold` — including the rule that made
+    the first version of this stage honest: the bracket TOP is evaluated first, so an
+    unbracketed range is reported as "no crossing found up to X" and never as a threshold.
+    """
+    from spicexplorer_harness.servo import bisect_threshold
+
     base = block_text()
     benches = CANDIDATE.benches()
     sigmas = json.loads((HERE / "sigma.json").read_text())
     for cls, dev in INJECT_ON.items():
         cards = class_cards(base, cls)[dev]
-        lo, hi = args.lo, args.hi          # mV, lo assumed in box, hi to be checked
-        trail = []
-        # A bisection is only meaningful if the bracket really brackets: check the top first.
-        r = score(decks_for(inject_dvt(base, cards, hi), "tt", 27.0, benches),
-                  f"007_th_{cls}_{hi:g}")
-        trail.append({"dvt_mv": hi, "out_of_box": bool(r["violations"]),
-                      "violations": r["violations"], "values": r["values"]})
-        print(f"  {cls} {hi:+8.4f} mV -> {'OUT' if r['violations'] else 'in '} box "
-              f"({len(r['violations'])})  [bracket top]", flush=True)
-        if not r["violations"]:
-            (OUT / f"threshold_{cls}.json").write_text(json.dumps(
-                {"class": cls, "device": dev, "cards": cards, "sigma_mv": sigmas[cls],
-                 "in_box_up_to_mv": hi, "out_of_box_from_mv": None,
-                 "note": f"no crossing found up to {hi} mV = {hi / sigmas[cls]:.2f} sigma",
-                 "trail": trail}, indent=1) + "\n")
-            continue
-        for _ in range(args.iters):
-            mid = round((lo + hi) / 2, 4)
-            blk = inject_dvt(base, cards, mid)
-            r = score(decks_for(blk, "tt", 27.0, benches), f"007_th_{cls}_{mid:g}")
-            out_of_box = bool(r["violations"])
-            trail.append({"dvt_mv": mid, "out_of_box": out_of_box,
-                          "violations": r["violations"], "values": r["values"]})
-            print(f"  {cls} {mid:+8.4f} mV -> {'OUT' if out_of_box else 'in '} box "
+
+        def out_of_box(dvt: float, cards=cards, cls=cls):
+            r = score(decks_for(inject_dvt(base, cards, dvt), "tt", 27.0, benches),
+                      f"007_th_{cls}_{dvt:g}")
+            bad = bool(r["violations"])
+            print(f"  {cls} {dvt:+8.4f} mV -> {'OUT' if bad else 'in '} box "
                   f"({len(r['violations'])})", flush=True)
-            if out_of_box:
-                hi = mid
-            else:
-                lo = mid
+            return bad, {"violations": r["violations"], "values": r["values"]}
+
+        res = bisect_threshold(out_of_box, args.lo, args.hi, iters=args.iters, round_to=4)
+        trail = [{"dvt_mv": t["x"], "out_of_box": t["out_of_box"],
+                  "violations": t["detail"]["violations"], "values": t["detail"]["values"]}
+                 for t in res.trail]
+        note = res.note and f"{res.note} mV = {res.in_box_up_to / sigmas[cls]:.2f} sigma"
         (OUT / f"threshold_{cls}.json").write_text(json.dumps(
             {"class": cls, "device": dev, "cards": cards, "sigma_mv": sigmas[cls],
-             "in_box_up_to_mv": lo, "out_of_box_from_mv": hi, "note": "", "trail": trail},
-            indent=1) + "\n")
+             "in_box_up_to_mv": res.in_box_up_to, "out_of_box_from_mv": res.out_of_box_from,
+             "note": note, "trail": trail}, indent=1) + "\n")
 
 
 # --------------------------------------------------------------------------------- tables ----

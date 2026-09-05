@@ -38,6 +38,7 @@ from spicexplorer_harness import hashes, log_run, provenance, violations  # noqa
 
 from ldo import config as C  # noqa: E402
 from ldo.dut import CANDIDATE  # noqa: E402
+from spicexplorer_harness.verify import compare_card  # noqa: E402
 
 CELL = REPO / "layout" / "ldo_ihp_capless"
 ROWS = {
@@ -49,14 +50,13 @@ ROWS = {
            "raw": "layout/ldo_ihp_capless/verify/rc_netlist.sha256",
            "kind": "RC stitched, verifier's own kpex run"},
 }
-REL = 1e-9
-# Fallback for a column the 1e-9 path misses.  The two netlists differ BY CONSTRUCTION -- the
-# platform's stitcher now CONTRACTS the zero-ohm `[Pin]` edges that the run behind the committed
-# RC scorecard floored at 1 mOhm -- so the matrix is not the same matrix and the last couple of
-# significant digits are not expected to be.  A spec metric is therefore checked against the bench
-# resolution `brief.json` records; every other (diagnostic) column against 1e-4 relative, which is
-# still four orders of magnitude tighter than any decision the row supports.
-REL_DIAG = 1e-4
+# The tolerance policy is `spicexplorer_harness.verify.compare_card`: 1e-9 relative (what
+# `lint.scorecard_recompute` itself compares at), falling back to the bench resolution
+# `brief.json` records for a spec metric and to 1e-4 relative for a diagnostic column. It is a
+# two-tier policy because the two netlists differ BY CONSTRUCTION -- the platform's stitcher now
+# CONTRACTS the zero-ohm `[Pin]` edges that the run behind the committed RC scorecard floored at
+# 1 mOhm -- so the matrix is not the same matrix and the last couple of significant digits are
+# not expected to be.
 
 
 def main() -> int:
@@ -71,26 +71,9 @@ def main() -> int:
     post = mine["post"]
     res = json.loads((CELL / "brief.json").read_text())["resolution"]
 
-    hard, soft = [], []
-    for k, v in ref["post"].items():
-        got = post.get(k)
-        if not isinstance(got, (int, float)) or isinstance(got, bool):
-            hard.append((k, v, got, "not measured"))
-            continue
-        d = float(got) - float(v)
-        if abs(d) <= REL * max(1.0, abs(float(v))):
-            continue
-        tol = res.get(k)
-        lim = tol if tol is not None else REL_DIAG * max(1.0, abs(float(v)))
-        why = f"delta {d:+.6g} ({abs(d) / max(1.0, abs(float(v))):.2e} rel), " + (
-            f"bench resolution {tol:g}" if tol is not None else f"diagnostic column, limit {lim:.3g}")
-        (soft if abs(d) <= lim else hard).append((k, v, got, why))
-
-    print(f"row={a.row}  columns={len(ref['post'])}  exact(1e-9)={len(ref['post']) - len(hard) - len(soft)}"
-          f"  within-resolution={len(soft)}  outside={len(hard)}")
-    for k, v, got, why in soft + hard:
-        print(f"    {k:24s} committed {v!r}  measured {got!r}  ({why})")
-    if hard:
+    cmp = compare_card(ref["post"], post, resolution=res)
+    print(f"row={a.row}  {cmp.report()}")
+    if not cmp.reproduced:
         return 1
 
     card = {k: v for k, v in post.items() if isinstance(v, float) and not math.isnan(v)}

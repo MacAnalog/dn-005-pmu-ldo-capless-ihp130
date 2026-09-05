@@ -124,7 +124,6 @@ def draw_bench(bench: str, parts: dict, deck: Path) -> Path:
     # P3 -- the design's own cell symbol, so XDUT is DRAWN and not skipped as an unknown subckt.
     # P4 -- so a `pulse(...)` stimulus is not abbreviated on its way into the netlist.
     sch_support.register_cell_symbol(PDK, CELL, f"{CELL}.sym")
-    sch_support.assert_platform_support()
     lib = SymLibrary([Path(p) for p in library_path().split(":")])
     circuit = from_file(deck, name=f"{bench}_tb")
     doc = build_sch(circuit, pdk=PDK, lib=lib, title=f"{bench}_tb", show_device_params=True)

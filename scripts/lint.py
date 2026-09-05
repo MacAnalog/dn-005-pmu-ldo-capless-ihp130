@@ -2,7 +2,6 @@
 """`make lint`: the platform harness checks (driven by harness.yaml) plus this repo's own."""
 from __future__ import annotations
 
-import importlib
 import json
 import sys
 from pathlib import Path
@@ -13,44 +12,10 @@ sys.path.insert(0, str(REPO))
 from spicexplorer_harness import lint, load  # noqa: E402
 from spicexplorer_harness.lint import Lint  # noqa: E402
 
-
-def deck_rebuild(L: Lint) -> None:
-    """Every frozen bench of EVERY frozen dir must still rebuild from ldo.dut.Design + design.json.
-
-    The `*.spice` are bytes; ldo.dut (analog-db assemble + the sizing point) is the generator. If
-    the analog-db submodule, the class templates or the builder drift, every experiment silently
-    measures a different bench than the certified one.
-
-    It guards every `frozen:` dir, not just the reference: guarding only the reference is how a
-    deleted `VOUT_THRESH` binding left the CANDIDATE un-assemblable for a whole review round with
-    a green deck-rebuild (doc/journal/one-guarded-frozen-dir-guards-one-frozen-dir.md).
-    """
-    fix = ("a class template, the analog-db submodule pin or ldo.dut changed: revert it, or re-certify "
-           "deliberately (`python -m ldo.metrics --certify <dir> && make freeze`) -- an un-reproducible "
-           "reference means every A/B is measured against a bench nobody can rebuild")
-    for rel in L.h.frozen:
-        d = REPO / rel
-        dj = d / "design.json"
-        if not dj.exists():
-            continue  # nothing certified there yet; the frozen check reports a missing manifest
-        try:
-            # resolved through `package:`, never `from ldo.dut import ...`: the check that catches
-            # a half-finished package rename must not itself be broken BY the rename
-            Design = importlib.import_module(f"{L.h.package}.dut").Design
-            point = Design.from_dict(json.loads(dj.read_text()))
-            built = {b: point.deck(b) for b in point.benches()}
-        except Exception as exc:  # noqa: BLE001
-            L.fail("deck-rebuild", f"cannot rebuild {rel}/ from its design.json: {exc!r}",
-                   "design.json must round-trip through ldo.dut.Design.from_dict and every bench "
-                   "must assemble; fix the loader, bind the placeholder, or re-certify")
-            continue
-        for b, text in built.items():
-            p = d / f"{b}.spice"
-            if not p.exists():
-                L.fail("deck-rebuild", f"{rel}/{b}.spice is missing", fix)
-            elif p.read_text() != text:
-                L.fail("deck-rebuild",
-                       f"ldo.dut.Design.deck({b!r}) no longer reproduces {rel}/{b}.spice", fix)
+# `deck-rebuild` -- every frozen dir still rebuilds from its own design.json through
+# `ldo.dut.Design` -- used to live here. It is now a GENERIC harness check
+# (`spicexplorer_harness.lint.deck_rebuild`), resolved through `package:` by name, so this repo
+# gets it from `lint.GENERIC` and the transmitter gets the same one instead of its own copy.
 
 
 def spec_reference(L: Lint) -> None:
@@ -70,4 +35,4 @@ def spec_reference(L: Lint) -> None:
 
 
 if __name__ == "__main__":
-    sys.exit(lint.main(load(REPO), extra=(deck_rebuild, spec_reference)))
+    sys.exit(lint.main(load(REPO), extra=(spec_reference,)))

@@ -36,17 +36,12 @@ from spicexplorer_harness import hashes, log_run, provenance, violations  # noqa
 from ldo import config as C  # noqa: E402
 from ldo import metrics as M  # noqa: E402
 from ldo.dut import Design  # noqa: E402
+from spicexplorer_harness.verify import compare_card, provenance_diff  # noqa: E402
 
 AUTHOR = "ldo-design-agent"
 VERIFIER = "signoff-verifier"
-# 1e-9 relative is the tolerance the harness's own scorecard-recompute lint uses when it compares
-# a scorecard column with its signed ledger row; use the same one here so a pass here is a pass
-# there.
-REL = 1e-9
-
-
-def close(a: float, b: float) -> bool:
-    return abs(float(a) - float(b)) <= REL * max(1.0, abs(float(a)))
+# The comparison and the provenance diff are `spicexplorer_harness.verify`, so a pass here is a
+# pass in the harness's own scorecard-recompute lint: it compares at the same 1e-9 relative.
 
 
 def verify(rel_dir: str, sign: bool) -> int:
@@ -88,29 +83,16 @@ def verify(rel_dir: str, sign: bool) -> int:
 
     card = {k: v for k, v in values.items() if isinstance(v, float) and not math.isnan(v)}
     ref_card = doc["scorecard"]
-    deltas = []
-    for k, want in ref_card.items():
-        got = card.get(k)
-        if got is None:
-            deltas.append((k, want, None, "not measured"))
-        elif not close(got, want):
-            deltas.append((k, want, got, f"delta {float(got) - float(want):+.6g}"))
-    extra = sorted(set(card) - set(ref_card))
-    print(f"  scorecard columns: {len(ref_card)}  differing: {len(deltas)}  extra measured: {extra or 'none'}")
-    for k, want, got, why in deltas:
-        print(f"    {k:32s} certified {want!r}  measured {got!r}  ({why})")
+    cmp = compare_card(ref_card, card, rel_diag=0.0)   # a certified deck reproduces exactly
+    deltas = cmp.within_resolution + cmp.outside
+    print(f"  scorecard {cmp.report()}  extra measured: {cmp.extra_measured or 'none'}")
 
     # 4. the provenance block, re-derived over MY card
     prov = provenance(C.H, tag, card, corner=design.corner, script=M.SCRIPT,
                       raw=(d / "decks.sha256").relative_to(C.H.root).as_posix())
-    ref_prov = doc["provenance"]
-    prov_diff = [k for k in ("tag", "corner", "exp", "script", "script_sha", "raw", "raw_sha",
-                             "definitions", "computation_hash") if prov.get(k) != ref_prov.get(k)]
-    print(f"  provenance block re-derives: {not prov_diff}" + (f"  differing keys: {prov_diff}" if prov_diff else ""))
-    if prov_diff and "computation_hash" in prov_diff:
-        for m in prov["computation_hash"]:
-            if prov["computation_hash"][m] != ref_prov["computation_hash"].get(m):
-                print(f"    computation_hash[{m}] differs")
+    prov_diff = provenance_diff(doc["provenance"], prov)
+    print(f"  provenance block re-derives: {not prov_diff}"
+          + (f"  differing keys: {prov_diff}" if prov_diff else ""))
 
     viol = violations(C.H.spec, values)
     print(f"  spec violations: {viol or 'none'}")

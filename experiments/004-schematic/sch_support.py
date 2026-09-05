@@ -4,10 +4,10 @@ Everything here is a helper the two build scripts share. No coordinate is hand-p
 wiring stay the generator's job throughout.
 
 **The generator does the work now.** Five changes this design needed were carried as guarded local
-patches for one round, proposed upstream (``$SX_SCRATCH/ldo-schematic/platform-proposal/``) and have
-landed in ``spicexplorer_netlist2xschem`` (platform ``33850e1``). Nothing is monkey-patched here any
-more; what remains is :func:`assert_platform_support`, which checks the five behaviours are present
-so a platform regression fails loudly instead of quietly redrawing a wrong sheet:
+patches for one round and have landed in ``spicexplorer_netlist2xschem``. This module used to
+re-check them here by grepping the platform's own source; each is a regression test in that
+package now (``tests/test_hierarchy_flatten.py``), which is where a regression belongs, and
+:data:`PLATFORM_BEHAVIOURS` names the six the drawing of record depends on:
 
 * **P1/P2 -- a block's child sheet keeps its rails.** A *declared* ``.subckt`` port stays a port even
   when it is a supply, and the child inherits the parent's supply map, so each child is placed
@@ -29,11 +29,10 @@ so a platform regression fails loudly instead of quietly redrawing a wrong sheet
   silently emptied three of five blocks while the topology gate stayed green.
 
 **The flattener.** The parent sheet netlists as a hierarchy (one ``.subckt`` per block); the gate
-compares against the certified *flat* cell. ``flatten_hierarchy`` splices the blocks back inline,
-**preserving leaf instance names** (``XM1`` stays ``XM1``), so the parameter assertion can still join
-the two netlists device by device. It uses only the platform netlist parser -- the net tokens of a
-leaf line are identified by position, from the parser's own node count for that device -- so it never
-re-implements SPICE parsing.
+compares against the certified *flat* cell. Splicing the blocks back inline while **preserving
+leaf instance names** (``XM1`` stays ``XM1``) is what lets the parameter assertion join the two
+netlists device by device, and it is ``spicexplorer_netlist2xschem.hierarchy.flatten_hierarchy``
+now. :func:`flatten_hierarchy` here is the record row this experiment writes around it.
 """
 from __future__ import annotations
 
@@ -42,45 +41,27 @@ import re
 import subprocess
 from pathlib import Path
 
-from spicexplorer_netlist2xschem import analysis as _analysis
-from spicexplorer_netlist2xschem import annotation as _annotation
-from spicexplorer_netlist2xschem import emit as _emit
 from spicexplorer_netlist2xschem import hierarchy as _hierarchy
 from spicexplorer_netlist2xschem import mapping as _mapping
 from spicexplorer_netlist2xschem.render import render
 from spicexplorer_netlist2xschem.symbol_gen import BlockPin, generate_block_symbol
 
-PROPOSAL = "$SX_SCRATCH/ldo-schematic/platform-proposal/"
-
-
 # ----------------------------------------------------------------------------------------------
 # The platform behaviours this design depends on (P1-P5, P8), asserted rather than patched
 # ----------------------------------------------------------------------------------------------
-def assert_platform_support() -> list[str]:
-    """Check the generator still carries what the drawing of record needs. Raises if it does not."""
-    import inspect
-
-    checks: list[tuple[str, bool]] = [
-        ("P1 a declared supply port stays a port",
-         "DECLARED" in inspect.getsource(_analysis._port_roles)),
-        ("P2 the child inherits the parent's supply map",
-         "supply={n: r for n, r in supply.items() if n in nets}"
-         in inspect.getsource(_hierarchy._child_circuit)),
-        ("P3 a design's own cell symbol can be registered",
-         callable(getattr(_mapping, "register_subckt_symbol", None))),
-        ("P4 the netlisted value is never abbreviated",
-         _emit._display_value("x" * 40) == "x" * 40),
-        ("P5 per-child wiring mode",
-         "child_wiring" in inspect.signature(_hierarchy.build_hierarchical_sch).parameters),
-        ("P8 the annotation loader fails closed",
-         "circuit" in inspect.signature(_annotation.BlockAnnotationSet.load).parameters),
-    ]
-    missing = [name for name, ok in checks if not ok]
-    if missing:
-        raise RuntimeError(
-            "the installed spicexplorer_netlist2xschem is missing behaviour this drawing needs: "
-            + "; ".join(missing) + f" (see {PROPOSAL})")
-    return [name for name, _ in checks]
+#: The six generator behaviours the drawing of record depends on. This module used to assert
+#: them by GREPPING the platform's own source — a design repo checking platform behaviour by
+#: inspecting platform source is a symptom of that behaviour having no regression test. They are
+#: now six cases in `spicexplorer-netlist2xschem/tests/test_hierarchy_flatten.py`, so a
+#: regression fails there instead of quietly redrawing a wrong sheet here.
+PLATFORM_BEHAVIOURS = (
+    "P1 a declared supply port stays a port",
+    "P2 the child inherits the parent's supply map",
+    "P3 a design's own cell symbol can be registered",
+    "P4 the netlisted value is never abbreviated",
+    "P5 per-child wiring mode",
+    "P8 the annotation loader fails closed",
+)
 
 
 def register_cell_symbol(pdk: str, cell: str, symref: str) -> None:
@@ -313,101 +294,18 @@ def _pad_svg(svg: Path, margin: int) -> None:
 # ----------------------------------------------------------------------------------------------
 # hierarchy -> flat, leaf names preserved
 # ----------------------------------------------------------------------------------------------
-_CONT = re.compile(r"^\s*\+")
-
-
-def _logical_lines(text: str) -> list[str]:
-    """Netlist lines with ``+`` continuations joined and comment lines dropped."""
-    out: list[str] = []
-    for raw in text.splitlines():
-        if not raw.strip() or raw.lstrip().startswith("*"):
-            continue
-        if _CONT.match(raw) and out:
-            out[-1] = out[-1] + " " + raw.lstrip()[1:].strip()
-        else:
-            out.append(raw.strip())
-    return out
-
-
 def flatten_hierarchy(netlist: Path, out: Path, *, note: str = "") -> dict:
-    """Splice every block subcircuit of a hierarchical netlist back inline, keeping leaf names.
+    """The platform's flattener, as the record row this experiment writes.
 
-    Returns a record of what was spliced. A leaf-name collision between blocks raises -- it would make
-    the parameter join ambiguous. A block's own internal nets are qualified with the block instance
-    (``xbias_ref.net1``), because two children auto-name an unlabelled node identically; the
-    collision check that remains can then only fire if that qualification missed a net.
+    Splicing a block hierarchy back inline while PRESERVING leaf instance names is what lets the
+    parameter assertion join the two netlists device by device; it is `spicexplorer_netlist2xschem
+    .hierarchy.flatten_hierarchy` now, with its own cases for the two collisions it refuses and
+    for the per-sheet `net1` two children both own.
     """
-    from spicexplorer_core.spice_engine import NetlistView
-
-    text = netlist.read_text()
-    lines = _logical_lines(text)
-    view = NetlistView.from_file(str(netlist))
-
-    defs: dict[str, list[str]] = {}
-    top: list[str] = []
-    cur: str | None = None
-    for ln in lines:
-        low = ln.lower()
-        if low.startswith(".subckt "):
-            cur = ln.split()[1].lower()
-            defs[cur] = []
-        elif low.startswith(".ends"):
-            cur = None
-        elif cur is not None:
-            defs[cur].append(ln)
-        elif low.startswith("."):
-            continue           # a top-level directive is not part of the cell body
-        else:
-            top.append(ln)
-
-    body: list[str] = []
-    spliced: list[str] = []
-    seen_refs: dict[str, str] = {}
-    seen_nets: dict[str, str] = {}
-    local_nets: list[str] = []
-    for ln in top:
-        ref = ln.split()[0]
-        model = (view.get_component_value(ref) or "").lower() if ref.upper().startswith("X") else ""
-        if model not in defs:
-            body.append(ln)
-            seen_refs.setdefault(ref.upper(), "<parent>")
-            continue
-        child = view.get_subcircuit(ref)
-        formals = [p.lower() for p in (view.get_subcircuit_ports(ref) or [])]
-        actuals = [n.lower() for n in view.get_component_nodes(ref)]
-        if len(formals) != len(actuals):
-            raise SystemExit(f"{ref}: {len(formals)} ports vs {len(actuals)} nets")
-        rename = dict(zip(formals, actuals))
-        # A child's unnamed nets are auto-named per sheet, so two blocks both own a `net1`. They
-        # are local by construction (not a formal port), so each is qualified with its instance --
-        # the flat result stays unambiguous instead of silently merging two different nodes.
-        for leaf in defs[model]:
-            tok = leaf.split()
-            n = len(child.get_component_nodes(tok[0]))
-            for net in tok[1:1 + n]:
-                low = net.lower()
-                if low not in rename and low != "0":
-                    rename[low] = f"{ref.lower()}.{low}"
-                    local_nets.append(rename[low])
-        for leaf in defs[model]:
-            tok = leaf.split()
-            n = len(child.get_component_nodes(tok[0]))
-            prev = seen_refs.get(tok[0].upper())
-            if prev is not None:
-                raise SystemExit(f"leaf {tok[0]} appears in both {prev} and {ref}")
-            seen_refs[tok[0].upper()] = ref
-            for net in tok[1:1 + n]:
-                if net.lower() in rename or net == "0":   # formal, qualified, or ground
-                    continue
-                owner = seen_nets.setdefault(net.lower(), ref)
-                if owner != ref:
-                    raise SystemExit(f"internal net {net} appears in both {owner} and {ref}")
-            body.append(" ".join(tok[:1] + [rename.get(t.lower(), t) for t in tok[1:1 + n]]
-                                 + tok[1 + n:]))
-        spliced.append(f"{ref} -> {model} ({len(defs[model])} devices)")
-
-    out.write_text(f"* flattened out of {netlist.name}{(' -- ' + note) if note else ''}\n"
-                   "* block subcircuits spliced inline; leaf instance names preserved\n"
-                   + "\n".join(body) + "\n.end\n")
-    return {"out": str(out), "spliced": spliced, "devices": len(body),
-            "qualified_local_nets": sorted(set(local_nets))}
+    r = _hierarchy.flatten_hierarchy(netlist, out, note=note)
+    return {
+        "out": str(r.out),
+        "spliced": list(r.spliced),
+        "devices": r.devices,
+        "qualified_local_nets": sorted(r.qualified_local_nets),
+    }

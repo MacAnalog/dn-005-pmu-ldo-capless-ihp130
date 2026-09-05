@@ -244,22 +244,6 @@ def library_path() -> str:
                             str(SCH_DIR), str(CHILD_DIR)])
 
 
-def check_block_coverage(circuit, blocks) -> dict:
-    """Every annotated device must exist in the deck, and every device must be in a block.
-
-    Device names are part of the certified netlist, so a recertification that renames them
-    (`XR1` -> `XR1_1..8`) silently empties a block: `BlockAnnotationSet.load` drops what it cannot
-    find, the parent sheet loses that child, and the topology gate passes anyway. Loose cell-level
-    devices are declared here by name rather than defaulted, so a NEW loose device is a finding.
-    """
-    have = {d.ref.upper() for d in circuit.devices}
-    want = {r.upper() for b in blocks.blocks for r in b.devices}
-    return {"blocks_declared": len(blocks.blocks),
-            "devices_in_deck": len(have), "devices_annotated": len(want),
-            "unknown_devices": sorted(want - have),
-            "unannotated_devices": sorted(have - want - {d.upper() for d in LOOSE_DEVICES})}
-
-
 def build_hierarchy(deck: Path) -> dict:
     """Parent sheet + one child `.sch`/`.sym` per block + the cell's own symbol."""
     import sch_support
@@ -268,13 +252,15 @@ def build_hierarchy(deck: Path) -> dict:
     from spicexplorer_netlist2xschem.ingest import from_file
     from spicexplorer_netlist2xschem.sym_library import SymLibrary
 
-    applied = sch_support.assert_platform_support()
     circuit = from_file(deck, name=CELL, into="XDUT")
-    # P8: the loader itself raises on a member the circuit does not have. `check_block_coverage`
-    # stays as the belt-and-braces gate -- it also catches the other direction (a device in NO
-    # block and not one of the declared loose ones) and reports rather than raising.
+    # P8: the loader itself raises on a member the circuit does not have. `.coverage` stays as
+    # the belt-and-braces gate -- it also catches the other direction (a device in NO block and
+    # not one of the declared loose ones) and reports rather than raising. Loose cell-level
+    # devices are declared HERE by name rather than defaulted, so a NEW loose device is a
+    # finding: device names are part of the certified netlist, and a recertification that renames
+    # them (`XR1` -> `XR1_1..8`) would otherwise empty a block with the topology gate still green.
     blocks = BlockAnnotationSet.load(BLOCKS, circuit=circuit)
-    coverage = check_block_coverage(circuit, blocks)
+    coverage = blocks.coverage(circuit, loose=LOOSE_DEVICES)
     lib = SymLibrary([Path(p) for p in library_path().split(":")])
     kw = dict(pdk=PDK, lib=lib, title=CELL, show_device_params=True)
     # Children are drawn with rails and wires (`hybrid`) wherever that is CORRECT. It is not
@@ -304,8 +290,8 @@ def build_hierarchy(deck: Path) -> dict:
     coverage["ok"] = (not coverage["unknown_devices"] and not coverage["unannotated_devices"]
                       and not res.unformed_blocks
                       and res.block_count == coverage["blocks_declared"])
-    return {"parent": str(parent), "symbol": str(sym), "patches": applied,
-            "coverage": coverage, "pin_dirs_synced": pin_dirs, "child_ports_drawn": child_ports,
+    return {"parent": str(parent), "symbol": str(sym),
+            "patches": list(sch_support.PLATFORM_BEHAVIOURS), "coverage": coverage, "pin_dirs_synced": pin_dirs, "child_ports_drawn": child_ports,
             "child_wiring": {c: ("labels" if c in lost else "hybrid") for c in sorted(res.children)},
             "hybrid_lost_pins": lost,
             "blocks": res.block_count, "devices_in_blocks": res.device_count,

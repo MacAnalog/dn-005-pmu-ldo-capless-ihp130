@@ -35,7 +35,7 @@ def _map_with_a_neighbours_gate_bar() -> ObstacleMap:
     """
     m = ObstacleMap()
     m.m1_claim("fb", Y, 1.2, 2.6, GATE_BAR)
-    m.verticals.append(("ea_n", 3.0, 0.0, 10.0))   # the terminal's own column is busy
+    m.claim_vertical("ea_n", 3.0, 0.0, 10.0)   # the terminal's own column is busy
     return m
 
 
@@ -69,7 +69,7 @@ def test_without_stub_clear_the_allocator_would_short_the_two_nets():
 
 def test_column_free_still_keeps_two_nets_off_one_metal2_column():
     m = ObstacleMap()
-    m.verticals.append(("fb", 3.0, 0.0, 10.0))
+    m.claim_vertical("fb", 3.0, 0.0, 10.0)
     assert not m.column_free("vref", 3.0, 4.0, 6.0)
     assert not m.column_free("vref", 3.4, 4.0, 6.0)   # inside the 0.6 um pad+space pitch
     assert m.column_free("vref", 3.6, 4.0, 6.0)
