@@ -1,4 +1,4 @@
-* ldo_ihp_capless x noise x ihp-sg13g2 x tt -- built by lab.dut.Design
+* ldo_ihp_capless x noise x ihp-sg13g2 x tt -- built by ldo.dut.Design
 .lib cornerMOSlv.lib mos_tt
 .lib cornerRES.lib res_typ
 .lib cornerCAP.lib cap_typ
@@ -16,7 +16,7 @@ XDUT vdd vout vss ldo_ihp_capless
 .control
   set filetype=ascii
   noise v(vout) Vdd dec 10 10 10meg
-  let vn_out_rms = sqrt(onoise_total)
+  let vn_out_rms = onoise_total
   print onoise_total vn_out_rms
   write
   quit

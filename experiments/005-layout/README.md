@@ -12,13 +12,13 @@ serpentines left and the MIM array right.
 
 ## 1. Pre- vs post-layout scorecard
 
-The cell's own 13 frozen benches, both rows simulated in the same invocation (`out/scorecard.md`, `layout/postlayout.py`):
+The cell's own 13 frozen benches, both rows simulated in the same invocation (`out/scorecard.md`, `layout/postlayout.py`). Re-run 2026-09-04 after the LDO class noise bench dropped its extra `sqrt` (review-002 M2, analog-db PR #68): `vn_out_urms` is the only column that moved, from 19 140 / 19 090 to the values below.
 
 | cell | v_out_v | i_q_ua | load_reg_mv | line_reg_mv | v_dropout_mv | psrr_1k_db | v_undershoot_mv | pm_loop_deg | pm_loop_lo_deg | pm_loop_hi_deg | loopgain_db | ugf_loop_khz | ms_peak_db | psrr_1m_db | t_transient_us | vn_out_urms | v_line_pp_mv | verdict |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| pre-layout (schematic) | 1.200 | 36.28 | 0.028 | 0.059 | 106.1 | 69.95 | 104.8 | 72.42 | 72.38 | 72.31 | 49.95 | 836.5 | 7.15 | 15.30 | 0.1254 | 19140 | 51.62 | PASS |
-| **post-layout (extracted)** | 1.200 | 36.20 | 0.028 | 0.068 | 106.1 | 69.95 | 113.9 | 71.74 | 71.70 | 71.63 | 49.95 | 817.8 | 6.21 | 15.05 | 0.1496 | 19090 | 51.62 | **PASS** |
-| shift | 0 | −0.08 | 0 | +0.009 | 0 | 0 | **+9.1** | **−0.68** | −0.68 | −0.68 | 0 | −18.7 | −0.94 | −0.25 | +0.024 | −50 | 0 | |
+| pre-layout (schematic) | 1.200 | 36.28 | 0.028 | 0.059 | 106.1 | 69.95 | 104.8 | 72.42 | 72.38 | 72.31 | 49.95 | 836.5 | 7.15 | 15.30 | 0.1254 | 366.4 | 51.62 | PASS |
+| **post-layout (extracted)** | 1.200 | 36.20 | 0.028 | 0.068 | 106.1 | 69.95 | 113.9 | 71.74 | 71.70 | 71.63 | 49.95 | 817.8 | 6.21 | 15.05 | 0.1496 | 364.4 | 51.62 | **PASS** |
+| shift | 0 | −0.08 | 0 | +0.009 | 0 | 0 | **+9.1** | **−0.68** | −0.68 | −0.68 | 0 | −18.7 | −0.94 | −0.25 | +0.024 | −2.05 | 0 | |
 | spec box | [1.176, 1.224] | ≤ 50 | ≤ 5 | ≤ 2 | ≤ 200 | ≥ 40 | ≤ 150 | ≥ 60 | ≥ 60 | ≥ 60 | — | — | — | — | — | — | — | |
 
 The shifts are consistent with one cause. Extracted capacitance per net (kpex, CC mode, top nets in fF):

@@ -1,4 +1,4 @@
-* ldo_005_buffered_ref x tran_line_step x ihp-sg13g2 x tt -- built by lab.dut.Design
+* ldo_005_buffered_ref x tran_line_step x ihp-sg13g2 x tt -- built by ldo.dut.Design
 .lib cornerMOShv.lib mos_tt
 .lib cornerRES.lib res_typ
 .lib cornerCAP.lib cap_typ

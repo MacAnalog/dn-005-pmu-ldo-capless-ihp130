@@ -1,6 +1,11 @@
 # 2026-09-04 — the lint asks for a signature the certifier cannot produce
 
-KIND: journal entry | type: semantic | status: live
+KIND: journal entry | type: semantic | status: superseded
+
+[superseded 2026-09-04 — both halves landed. The harness gained
+`spicexplorer_harness.ledger.provenance()` and a `provenance.tag` fallback in `_backing_rows`
+(platform #129), and this repo's `certify()` now writes that block and logs the run from it, so
+`scorecard-recompute` is backable by a signed row. The rule below is the part worth keeping.]
 
 **Observation** (review-002-capless-ldo M1). This repo reported `make lint` as red "only for want
 of an independent signed verifier row". An independent verifier then signed **both** scorecards
@@ -22,5 +27,11 @@ gate actually goes green. A gate whose passing condition has never been demonstr
 gate; it is an assumption.
 
 **Harness follow-up (platform).** Either have `certify()` emit a top-level `tag` (plus `corner`)
-and a hash block, or have `_backing_rows` fall back to `provenance.tag`. Until then
-`scorecard-recompute` is expected-red in this repo and is named as such in the README.
+and a hash block, or have `_backing_rows` fall back to `provenance.tag`.
+
+**Resolved 2026-09-04.** Both, in the end. `ldo/metrics.py::certify()` builds the block with
+`ledger.provenance(h, tag, card, corner=…, script=…, raw=…)` and logs the certification run from
+the same block with the same `corner=` and `evidence="awaiting"`; the remaining
+`scorecard-recompute` failure now says exactly what it means — *no verifier has signed these two
+scorecards yet* — and a signed row with the same `tag`/`corner`/`exp` clears it. The gate has
+been shown to be clearable, which is what the rule above asks for.

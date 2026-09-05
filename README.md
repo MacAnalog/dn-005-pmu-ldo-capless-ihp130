@@ -50,17 +50,21 @@ open, and this branch has not closed:
 | **B1** | **The 10 mA path is 12–28× over the process metal current-density limit.** vdd rail 0.8 µm (12.5×), vout bus 0.6 µm (16.7×), and the **vout pin on a 0.2 µm track reached by one Via1 (25–28×)**. | Neither the rule check nor the connectivity check looks at current density, so a DRC-0 / LVS-matched cell carries it. Widening in place was **tried and does not work**: a 3 µm rail and output track give 117 Metal1 width/space violations against a 1.6 µm rail gap and a 0.7 µm track pitch. The fix needs upper metal (TopMetal1 is 15 mA/µm) and a floorplan that reserves room for the straps — a floorplan change, not a parameter change. Arithmetic and the failed attempt: `doc/journal/metal-current-density-is-nobodys-check.md`. **This is the one finding that changes whether the cell works.** |
 | **M3** | The schematic of record netlists `cap_cmim` with no `w`/`l` and `VREF vref vss 3`, and the equivalence check passes anyway. | The equivalence check compares topology, not parameters, so the 004 claim that the drawing "cannot drift from the design of record" is false for the three capacitors and the reference. Needs a parameter-presence assertion in `build_sch.py` and a restated claim. The drawing is a tool output — hand-editing it is overwritten by the next run. |
 | **M7** | The LVS golden netlist is written by the generator from its own device table, not derived from the certified circuit binding. | "LVS-identical to the certified netlist" is not what the flow proves. The verifier checked the two agree by hand this time (all 17 transistors, 3 resistors, 3 capacitors); nothing checks it mechanically. |
-| **M1** | `make lint` is red and **cannot be greened by any admissible signed row**. | `certify()` writes the tag inside `provenance` and no hash block; the harness's `_backing_rows` matches a top-level `tag`. Two signed rows were appended by the verifier and the lint still reports `(tag None)`. A harness fix, not a repo fix — deliberately not worked around here. `doc/journal/a-signed-row-that-can-never-match.md`. |
 | **M8** | The Metal1-short journal presents the obstacle map as the guarantee; the short actually reproduces only when the bidirectional column search is *also* reverted. | No committed sizing exercises `stub_clear` alone, so that half of the fix is an unexercised regression. Needs a committed sizing point or a `Builder` unit test. |
-| **M2** | The shared analog-db LDO class template takes an extra `sqrt` on the integrated output noise. | The template lives in a platform submodule and is out of scope to edit here. Every `vn_out_urms` in this repo is therefore √-wrong: **candidate 366 µVrms** (printed 19 142), **reference 25.4 µVrms** (printed 5 038). Noise is not in the S1–S8 box, so no verdict moves. |
+| **m5-r** | Closing m5 by DELETING `VOUT_THRESH: 1.14` from the candidate's `analyses/dropout.yaml` left the whole candidate circuit un-assemblable, and nothing noticed for a review round. | The bench really does ignore the parameter (m5 stands), but the class template still carries `${VOUT_THRESH}` in its comment header and analog-db's `assemble()` scans the rendered text, comments included. The binding is restored with the reason written beside it; `deck_rebuild` now guards **every** frozen dir, which is what would have caught it. The real fix — dropping the dead placeholder from the class template — is an analog-db change. `doc/journal/one-guarded-frozen-dir-guards-one-frozen-dir.md`. |
 | **m3** | No interdigitation, common centroid, dummies or guard rings on the matched pairs; **no mismatch or Monte Carlo run exists anywhere in this branch**. | The input pair sets the DC accuracy S1/S2/S3 rest on, and a 0.028 mV load regulation is a number mismatch would dominate. The regulation figures should be read as systematic-only until a mismatch Monte Carlo exists. |
 | **m11** | S8 constrains phase margin only; light-load gain margin is **5.75 dB** and the sensitivity peak **14.09 dB** at 0.1 mA. | Neither is in the box or the reported columns. |
 | **m4** | `zout_peak_db` is the rise of output impedance from DC, not peaking; it reads 100.2 dB on a 72°-phase-margin loop (the reference reads 5.88 dB on the identical definition). | Report-only and not used for S8, but it is printed in every scorecard and reads as an alarm. Renaming it changes a bench definition, which would re-freeze the decks — deferred deliberately. |
 
-Closed from that review in this branch: **M4/M5** (the post-layout row now comes from the frozen
-path, 13 of 13 benches), **M6** (the bias finding restated as a threshold with its cost),
+Closed from that review in this branch: **M1** (the harness fix landed — platform #129 —
+and `certify()` now writes the helper's provenance block, so `make lint` is red only for the two
+scorecards no verifier has signed yet), **M2** (the analog-db template dropped the second `sqrt`
+— analog-db PR #68 — and both frozen dirs are re-certified on the corrected bench: **candidate
+366.4 µVrms**, **reference 25.38 µVrms**; noise is not in the S1–S8 box, so no verdict moved),
+**M4/M5** (the post-layout row now comes from the frozen path, 13 of 13 benches), **M6** (the bias
+finding restated as a threshold with its cost),
 **m1** (density rules run on demand — 12 fill/density items, listed in [005](experiments/005-layout/README.md)),
-**m5**, **m6**, **m7**, **m10**, **m12**.
+**m6**, **m7**, **m10**, **m12**. **m5** closed the finding and opened `m5-r` above.
 
 ## Setup
 
@@ -84,7 +88,7 @@ See [doc/environment.md](doc/environment.md) for the PDK pin and the lane's gotc
 | `doc/` | target spec, design reference (constraints), benches, environment, experiment log, journal + index, the memory model |
 | `ldo/` | `config` (paths, PDK), `sim` (lane), `dut` (the sizing point → deck), `metrics` (measure, check, log) |
 | `scripts/lint.py` | repo-specific checks on top of the harness (frozen decks rebuild from `ldo/`) |
-| `decks/reference/` | the certified reference benches + `scorecard.json`, sha-locked |
+| `decks/reference/` | the certified reference benches + `scorecard.json` (provenance block) + `decks.sha256`, sha-locked |
 | `decks/candidate/` | the **design of record's** 13 certified benches + `scorecard.json`, sha-locked |
 | `circuits/ldo_ihp_capless/` | the candidate as an analog-db circuit dir (manifest, datasheet, analyses, IHP binding + `sizing.yaml` = the design of record) |
 | `layout/` | `gen_ldo.py` (parameterized gdsfactory generator; sizing read from `sizing.yaml`), `signoff.py` (build/render/DRC/LVS/PEX), `postlayout.py` (frozen benches on the extracted netlist) |

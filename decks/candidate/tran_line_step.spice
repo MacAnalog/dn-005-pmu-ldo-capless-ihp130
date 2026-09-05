@@ -1,4 +1,4 @@
-* ldo_ihp_capless x tran_line_step x ihp-sg13g2 x tt -- built by lab.dut.Design
+* ldo_ihp_capless x tran_line_step x ihp-sg13g2 x tt -- built by ldo.dut.Design
 .lib cornerMOSlv.lib mos_tt
 .lib cornerRES.lib res_typ
 .lib cornerCAP.lib cap_typ

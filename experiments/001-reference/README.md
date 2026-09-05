@@ -32,7 +32,7 @@ Conditions **as committed in analog-db** (not the challenge's): `.lib cornerMOSh
 | — | gain margin | `gm_loop_db` | dB | **41.56** |  |
 | — | sensitivity peak Ms | `ms_peak_db` | dB | **4.345** | ≥ 1/(2 sin(PM/2)) = 2.07 dB: consistent |
 | — | closed-loop Zout peaking | `zout_peak_db` | dB | **5.88** | proxy only |
-| — | integrated output noise 10 Hz–10 MHz | `vn_out_urms` | µVrms | ~~5038~~ **25.4** |  see note |
+| — | integrated output noise 10 Hz–10 MHz | `vn_out_urms` | µVrms | **25.38** | re-certified 2026-09-04 on the corrected bench |
 | — | line-step deviation 3.1 → 3.5 V | `v_line_pp_mv` | mVpp | **3.449** |  |
 
 Against this repo's box (1.5 V / 1.2 V / capless, `harness.yaml`) the reference fails S1 (it
@@ -40,13 +40,18 @@ regulates to 1.6 V), S3 by the literal bound (4.32 mV, but over a 1 V sweep — 
 ~1.1 mV over our 0.25 V range, which passes), S5 (759 µA vs ≤ 50 µA) and S8 (46° vs ≥ 60°).
 S1 and S5 are the point of the challenge; S8 is the price of its three-stage loop.
 
+The noise row was `5038 µVrms` in the first certification. That was the LDO class bench taking
+`sqrt(onoise_total)` when ngspice's `onoise_total` is already the integrated noise in V rms
+(review-002 M2). analog-db PR #68 dropped the extra root; the row above is the re-certification
+on the corrected bench, and it is the ONLY number in this table that moved.
+
 ## 2. Method — exact commands
 
 ```bash
 export PDK_ROOT=$HOME/local/pdks PDK=ihp-sg13g2
 export SPICE_USERINIT_DIR=$PDK_ROOT/ihp-sg13g2/libs.tech/ngspice SX_SCRATCH=$HOME/sx-scratch
 uv sync && make doctor
-.venv/bin/python -m ldo.metrics --certify     # builds decks/reference/*.spice, runs them, writes scorecard.json
+.venv/bin/python -m ldo.metrics --certify     # builds decks/reference/*.spice, runs them, writes scorecard.json + decks.sha256
 make freeze                                    # SHA256SUMS
 make check                                     # lint (incl. deck rebuild) + re-simulate the frozen decks, compare
 make baseline                                  # print the scorecard from the frozen decks (no compare)
