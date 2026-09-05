@@ -20,16 +20,23 @@ carries the certified cell's 50 devices, 33 nets and all 239 of its parameter ro
 back to the certified deck they were drawn from
 ([006](experiments/006-visual-benches/README.md)) and laid out twice — the second drawing
 ([005](experiments/005-layout/README.md), [`layout/ldo_ihp_capless/REPORT.md`](layout/ldo_ihp_capless/REPORT.md))
-is the layout of record: current density 27/27 segments, DRC 0, LVS matched at two sizing points,
-kpex CC + RC, 13/13 benches inside the box. Every number below is the analog-db LDO class benches
-via `ldo.metrics.evaluate`; the reference row is quoted from its own certification.
+is the layout of record: current density 30/30 segments, DRC 0, LVS matched at two sizing points,
+40/40 knob endpoints, kpex CC + RC, 13/13 benches inside the box. **The post-layout row of record
+is the stitched RC extraction**, independently signed off in
+[`layout/ldo_ihp_capless/SIGNOFF.md`](layout/ldo_ihp_capless/SIGNOFF.md) (2026-09-05): dropout
+134.66 mV of a 200 mV bound (65.3 mV margin), 8/8 spec lines PASS. The CC extraction (same layout,
+every wire resistance zeroed) is kept as the ideal-metal comparison row, not the record — its
+dropout (104.7 mV) understates the drawn metal's IR drop by design. Every number below is the
+analog-db LDO class benches via `ldo.metrics.evaluate`; the reference row is quoted from its own
+certification.
 
 | | S1 v_out (V) | S2 load reg (mV) | S3 line reg (mV) | S4 dropout (mV) | S5 Iq (µA) | S6 PSRR 1 kHz (dB) | S7 undershoot (mV) | S8 PM (deg) | verdict |
 |---|---|---|---|---|---|---|---|---|---|
 | **spec box** | [1.176, 1.224] | ≤ 5 | ≤ 2 | ≤ 200 | ≤ 50 | ≥ 40 | ≤ 150 | ≥ 60 | |
 | reference `ldo_005` (certified, 3.3 V / 1 µF) | 1.609 | 1.274 | 4.32 | 169.7 | 758.7 | 44.53 | 1.957 | 46.39 | not at this challenge's point |
 | sized, tt / 27 °C (design of record) | 1.199 | 0.026 | 0.056 | 104.7 | **33.81** | 70.01 | 115.1 | 72.51 | **PASS** |
-| post-layout, extracted, tt / 27 °C | 1.199 | 0.026 | 0.056 | 104.7 | **33.81** | 70.11 | 127.6 | 68.76 | **PASS** |
+| post-layout, RC extraction (record), tt / 27 °C | 1.199 | 0.027 | 0.056 | **134.7** | **33.77** | 70.06 | 129.5 | 69.33 | **PASS** |
+| post-layout, CC extraction (ideal-metal comparison), tt / 27 °C | 1.199 | 0.026 | 0.056 | 104.7 | **33.81** | 70.09 | 127.6 | 69.30 | **PASS** |
 | worst corner (5 MOS × −40/27/125 °C) | 1.198 | 0.056 | 0.248 | 135.0 | **61.9** @ ff/125 | 59.66 | **310.8** @ ss/−40 | 70.35 | 12/15 PASS |
 
 **Re-certified 2026-09-05** on the *drawn* device set (layout review F19): the pass array as 76
@@ -57,16 +64,25 @@ An independent verifier re-derived every committed number from the sources on 20
 first drawing's post-layout row to within 0.05 mV. The headline above stands as measured. Its
 findings, with the four the second drawing addressed marked *(closed)* — those four are closed by
 the **designer**, so they need a `layout-reviewer` pass before anyone should treat them as
-verified (rule 7). The post-layout row above carries **no signature**: `layout/postlayout.py`
-logs it `evidence="awaiting"` into the (per-checkout, git-ignored) ledger, and the previous
-verifier's signed `005_postlayout_post` row belongs to the *first* drawing:
+verified (rule 7). **Updated 2026-09-05**: a second independent pass,
+[`layout/ldo_ihp_capless/SIGNOFF.md`](layout/ldo_ihp_capless/SIGNOFF.md), re-measured the current
+(`it13`) drawing from raw artefacts and signed both post-layout extractions —
+`verify_postlayout_post` (CC, the ideal-metal comparison row) and `verify_postlayout_rc` (RC, now
+the **post-layout row of record**) — so the row below no longer carries `evidence="awaiting"` in
+that checkout. The previous verifier's signed `005_postlayout_post` row still belongs to the
+*first* drawing:
 
 | id | what | why it is still open |
 |---|---|---|
-| **B1** | *(closed 2026-09-04, second drawing)* **The 10 mA path is 12–28× over the process metal current-density limit.** | Redrawn on TopMetal1 (2 µm straps, 15 mA/µm) fed by 6 µm Metal2 combs and 48-cut via risers, with the pass array folded to 76 fingers (`xmp_nf_mult = 4`) so a shared source/drain column carries 0.263 mA against the 0.36 mA flat limit — `w`/`m` in `sizing.yaml` untouched, so it is not a re-sizing. **27 of 27 segments pass, worst 0.836×**, and the check is now a *blocking* sign-off stage (`spicexplorer_signoff.current_density` over budgets the generator emits from its own drawn geometry), not a hand calculation. Cost: +19.6 % area, S7 +22.7 mV, S8 −3.7°, all inside the box. [005 §1](experiments/005-layout/README.md), `doc/journal/a-floorplan-is-bought-not-found.md`. |
+| **B1** | *(closed 2026-09-04, second drawing)* **The 10 mA path is 12–28× over the process metal current-density limit.** | Redrawn on TopMetal1 (2 µm straps, 15 mA/µm) fed by 6 µm Metal2 combs and 48-cut via risers, with the pass array folded to 76 fingers (`xmp_nf_mult = 4`) so a shared source/drain column carries 0.263 mA against the 0.36 mA flat limit — `w`/`m` in `sizing.yaml` untouched, so it is not a re-sizing. **30 of 30 segments pass, worst 0.836×** (the round-5 drawing added two rows for the split `vss`
+returns; still 0.836× worst-case), and the check is now a *blocking* sign-off stage (`spicexplorer_signoff.current_density` over budgets the generator emits from its own drawn geometry), not a hand calculation. Cost: +19.6 % area, S7 +22.7 mV, S8 −3.7°, all inside the box. [005 §1](experiments/005-layout/README.md), `doc/journal/a-floorplan-is-bought-not-found.md`. |
 | **M3** | *(green at the recertified cell; verifier re-measure pending)* The schematic of record netlists `cap_cmim` with no `w`/`l` and `VREF vref vss 3`, and the equivalence check passes anyway. | **Green: the drawing is the certified netlist, devices AND sizes** — closing the finding is the verifier's call (rule 7), and that re-measure is pending. `build_sch.py::check_parameters` joins the certified netlist and the drawing's netlist device by device and compares **every parameter by number** (symbols resolved against the deck's own `.param` bindings, SI suffixes normalised through the platform's parsers); `w`/`l` may never be defaulted, `VREF` is checked against `vref_val` = 0.6 V by name, and the step **exits non-zero** rather than reporting. It reads **239 of 239 rows green** over the recertified cell's 50 devices (`bf3a4f8`), with `VREF` at 0.6 V: both causes were emitter defects and are fixed upstream (`spicexplorer-platform @1775a67`). The same assertion runs on the flat drawing and on the five-block hierarchy that replaced it, and the value half of it, extended to the benches in [006](experiments/006-visual-benches/README.md), then caught a further emitter defect that truncated a `pulse(...)` stimulus in the netlist of two bench sheets. The honest claim remains that the drawing **cannot drift unnoticed** — the netlist stays the design of record. [004 §2](experiments/004-schematic/README.md), `doc/journal/an-isomorphism-carries-no-sizes.md`. |
 | **M7** | *(closed 2026-09-04)* The LVS golden netlist was written by the generator from its own device table. | `layout/netlist_ref.py` parses the certified binding once and hands out **both** the device list the generator places **and** the LVS reference, so there is no second table to drift. The only thing the reference adds is the layout's dummy devices — needed because the IHP deck extracts a shorted dummy as a device and `--purge` does not remove it (measured) — and the emitter **asserts each dummy has all four terminals on one rail**, so a dummy card can only ever be inert while a real device's size still comes from the certified file. `gen_ldo.py` no longer carries a device table at all. |
-| **M8** | *(closed 2026-09-04)* Half the Metal1-short fix (`stub_clear`) was an unexercised regression. | The obstacle map moved to `layout/router.py` (no gdsfactory, so it runs in the repo venv) and `layout/test_builder.py` builds the collision by hand — **thirteen cases**, and the reviewer ran the negative control rather than taking the claim: with `claim_box` stubbed out to a no-op, **4 of 9 router cases fail** and the suite exits 1, `test_without_the_claim_the_allocator_walks_into_the_comb` reporting *"alloc returned 44.1, inside the comb"*. `layout/signoff.py` runs the suite as its first, blocking stage, so the guard is exercised every round rather than waiting for a sizing point to happen to produce the collision. The second drawing then found the same class of bug one layer up — `gate` merged into `vout` on a Metal2 power-comb spine, DRC 0 again — and the fix is **structural**: the map is layer-aware and `claim_box()` records any drawn rectangle, so the power combs are obstacles to Metal2 and simply are not on Metal3's layer. The hard-coded `to_track_m3` bypass is **deleted**, and the class is gone by measurement (`col_vias` 3 and 4, which extracted `gate|vout` before, both LVS-match in the 40-endpoint walk). `xmp_nf_mult` is no longer a layout knob — it is a sizing knob in `sizing.yaml`, where an off-grid value now raises instead of silently drawing a different device. |
+| **M8** | *(closed 2026-09-04)* Half the Metal1-short fix (`stub_clear`) was an unexercised regression. | The obstacle map moved to `layout/router.py` (no gdsfactory, so it runs in the repo venv) and `layout/test_builder.py` builds the collision by hand — **twenty-one cases in the current suite**
+(ten of them the router obstacle-map cases this finding is about; the rest were added later for
+the RC/PEX netlist-selection findings, F24/F26/F27), and the reviewer ran the negative control
+rather than taking the claim: with `claim_box` stubbed out to a no-op, **4 of 9 router cases
+fail** and the suite exits 1, `test_without_the_claim_the_allocator_walks_into_the_comb` reporting *"alloc returned 44.1, inside the comb"*. `layout/signoff.py` runs the suite as its first, blocking stage, so the guard is exercised every round rather than waiting for a sizing point to happen to produce the collision. The second drawing then found the same class of bug one layer up — `gate` merged into `vout` on a Metal2 power-comb spine, DRC 0 again — and the fix is **structural**: the map is layer-aware and `claim_box()` records any drawn rectangle, so the power combs are obstacles to Metal2 and simply are not on Metal3's layer. The hard-coded `to_track_m3` bypass is **deleted**, and the class is gone by measurement (`col_vias` 3 and 4, which extracted `gate|vout` before, both LVS-match in the 40-endpoint walk). `xmp_nf_mult` is no longer a layout knob — it is a sizing knob in `sizing.yaml`, where an off-grid value now raises instead of silently drawing a different device. |
 | **m5-r** | Closing m5 by DELETING `VOUT_THRESH: 1.14` from the candidate's `analyses/dropout.yaml` left the whole candidate circuit un-assemblable, and nothing noticed for a review round. | The bench really does ignore the parameter (m5 stands), but the class template still carries `${VOUT_THRESH}` in its comment header and analog-db's `assemble()` scans the rendered text, comments included. The binding is restored with the reason written beside it; `deck_rebuild` now guards **every** frozen dir, which is what would have caught it. The real fix — dropping the dead placeholder from the class template — is an analog-db change. `doc/journal/one-guarded-frozen-dir-guards-one-frozen-dir.md`. |
 | **m3** | *(layout part closed 2026-09-04; the mismatch run is still open)* No interdigitation, common centroid, dummies or guard rings on the matched pairs; **no mismatch or Monte Carlo run exists anywhere in this branch**. | The second drawing gives each matching class the pattern its measured headroom asks for: `ea_in_pair` and `ea_nmos_load` **A B B A** common-centroid (each member split in two half-width instances), the `fb_divider` as **[A B B A] × 4** serpentine segments with both centroids on the block centre, `bias_n_group` interdigitated about one axis, the rest same-row/same-orientation — with a tied dummy at each end of all eight groups (16 MOS + 2 resistor dummies, declared in the LVS reference) and **5 closed guard rings** replacing the periodic point taps. What is **not** closed: routing is not matched half-for-half (the channel allocator finds each terminal a free column), and **no mismatch Monte Carlo exists**. What is now measured, on the extracted cell rather than argued from the brief's coefficients: [007](experiments/007-post-layout-corners/README.md) injects each class's offset into `layout/ldo_ihp_capless/asbuilt/core_pex.sp` and finds the dVT at which the box opens, so the two sub-σ classes carry a **measured** out-of-box threshold instead of an estimate: **+15.0 mV (9.1 σ)** for `ea_nmos_load` and **+20.0 mV (17.9 σ)** for `bias_p_group`, i.e. no measurable yield loss at tt/27. 007 also carries the control that keeps that from being a null result — delete the extracted capacitance and the brief's cliff reappears exactly where the brief puts it (+2.0 mV → S7 198.0 mV, out of the box), and the single net `ea_o1` removes it again. The distribution itself is still not simulated (the PDK's mismatch sections cannot be selected without editing the certified `corners.yaml`), and routing is still not matched half-for-half — although the reviewer's own translation-XOR reads **0.000 µm² on all seven classes** at device bbox + 1.2 µm, with equal via counts. |
 | **m11** | S8 constrains phase margin only; light-load gain margin is **5.75 dB** and the sensitivity peak **14.09 dB** at 0.1 mA. | Neither is in the box or the reported columns. |
@@ -81,8 +97,15 @@ scorecards no verifier has signed yet), **M2** (the analog-db template dropped t
 finding restated as a threshold with its cost),
 **m1** (density rules run on demand — 12 fill/density items, listed in [005](experiments/005-layout/README.md)),
 **m6**, **m7**, **m10**, **m12**. **m5** closed the finding and opened `m5-r` above. **B1**, **M7**,
-**M8** and the layout half of **m3** are closed in the second drawing (rows above), designer-signed
-and awaiting review.
+**M8** and the layout half of **m3** were closed in the second drawing (rows above), designer-signed;
+`SIGNOFF.md` (2026-09-05) has since independently re-measured DRC, LVS, current density and both
+PEX extractions on the `it13` drawing from raw artefacts and signed them (its Claims 1, 2, 3), so
+those four no longer need a `layout-reviewer` pass to be trusted at the record row — a
+`layout-reviewer` pass is still open for the floorplan/routing review proper (REPORT §10 item 1).
+The mismatch and corner halves of **m3** are addressed but not fully closed: `SIGNOFF.md` Claim 5
+independently reproduces the three decisive corner rows (signed) and Claim 4 reproduces both
+mismatch box edges and rules **the designer's numbers describe the cell as built**, but a proper
+Monte Carlo and a joint corners × mismatch sweep are still open (PLAN §6b.1).
 
 ## Setup
 

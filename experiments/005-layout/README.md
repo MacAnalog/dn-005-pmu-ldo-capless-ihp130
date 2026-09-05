@@ -36,7 +36,7 @@ The first drawing was rejected on its floorplan, not on its verdicts. What chang
 | wells | periodic point taps every 12 um | **5 closed guard rings** (3 n-well islands + 2 p-substrate) |
 | LVS reference | the generator's own hand-typed device table | derived from the certified netlist (`layout/netlist_ref.py`) |
 | obstacle map | committed, exercised by no case | `layout/router.py` + `layout/test_builder.py`, run first and blocking |
-| PEX | CC only, 121 C / 10 R | CC 182 C / 21 R **and** RC 182 C / 8 418 R |
+| PEX | CC only, 121 C / 10 R | CC 182 C / 21 R **and** RC 182 C / 8 418 R raw *(superseded — see §1 note below; the round-5/6 `it13` drawing's RC row is 186 C, 5482 R measured after the platform's zero-ohm-tie fix)* |
 | sizing points verified | record + 002 hand | record + 002 hand |
 
 **Where the +19.6 % went**, in order: the closed rings and the `ring_gap`/`isl_gap` three n-well
@@ -127,11 +127,20 @@ and each has a single named parasitic. Per-net C against the brief's budgets —
 34.0 fF (1.22x), everything else <= 0.10x — is tabulated in
 [`REPORT.md` §7](../../layout/ldo_ihp_capless/REPORT.md).
 
-**RC mode does not converge in these benches**: 11 of 13 abort with `Warning: singular matrix:
-check node xdut.n_25.n_2.17` — dangling nodes in the R mesh of the `rhigh` serpentines — and the
-op point then fails. The two transient benches that do converge reproduce the CC row to the last
-digit (127.6 mV, 0.2005 us, 55.63 mV), so extracted wire resistance moves nothing this cell is
-measured on. A `.nodeset` was not attempted.
+**RC mode did not converge in these benches, at this (`it09`/`it10`) drawing**: 11 of 13 abort
+with `Warning: singular matrix: check node xdut.n_25.n_2.17` — dangling nodes in the R mesh of the
+`rhigh` serpentines — and the op point then fails. The two transient benches that do converge
+reproduce the CC row to the last digit (127.6 mV, 0.2005 us, 55.63 mV), so at this drawing
+extracted wire resistance moved nothing this cell is measured on. A `.nodeset` was not attempted.
+
+**Superseded.** The mesh-island defect behind this was fixed upstream
+(`spicexplorer-platform` `feat/harness-spec-v2` @ `6c07a02`), and the round-5/6 `it13` drawing's
+RC extraction runs **13/13 benches to convergence** once kpex's residual zero-ohm `[Pin]` ties are
+contracted/floored — see `layout/ldo_ihp_capless/REPORT.md` §5 and the independent re-measure in
+`layout/ldo_ihp_capless/SIGNOFF.md` §3. RC is now the **post-layout row of record** (dropout
+134.66 mV against CC's 104.7 mV — the drawn `vdd`/`vout` IR drop that a capacitance-only
+extraction cannot see); it no longer aborts, and the "11 of 13 abort" line above describes the
+earlier drawing's mesh-island defect, not the current one.
 
 Nine snapshotted rounds with before|after diffs:
 [`layout/ldo_ihp_capless/iterations/`](../../layout/ldo_ihp_capless/iterations/), tabulated in

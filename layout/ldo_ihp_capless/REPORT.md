@@ -14,7 +14,8 @@ previous drawing or the reviewer is quoted it is named as such.
 | 3 (`review-002` fixes) | `it09` | the second drawing: TopMetal1 power path, common-centroid rows, closed rings | DRC 0, LVS matched, CC 182 C |
 | — | `it10` | the certified deck re-issued on the drawn device set (F19) | Iq 36.28 -> 33.81 uA |
 | 4 (`review-003` fixes) | `it11`, `it12` | layer-aware obstacle map + Metal3 gate track (F7/F3), `BOUNDS` walked 40/40 (F2), `pwr_w` 2.0 -> 4.0 (F1), Kelvin `vss` return (F9) | DRC 0, LVS matched, CC 186 C, 18/18 metrics |
-| **5 (`review-004` fixes, this report)** | **`it13`** | **the only geometry change is a pin-purpose square under each of the 17 port labels** (F25, PLAN A14) — kpex now emits a `[Pin]` node and anchors **15/15** named ports on the drawn port instead of a proxy. Proved inert: DRC 0, LVS matched, CD 30/30, **40/40 knob endpoints re-walked on `it13` itself**, and the **CC netlist is byte-identical** to `it12`'s, so every number in sections 6–8 is unchanged. Everything else this round is code, measurement or text: **F27** the benches now measure the netlist the extractor named (§5), **F26** the sign-off record carries `mesh_connected` + the anchor census and gates on them, **F24** `signoff.json` merges instead of replacing, **F22** `router.py`/`netlist_ref.py` travel with each snapshot, **F9** the `vss` return is *solved*, not modelled, and two numbers this report printed are corrected (§6.4, §10.4), **F3** reframed (§6.1, PLAN §6b), **F16** answered by `experiments/007-post-layout-corners` — including the control that reproduces the brief's mismatch cliff once the extracted capacitance is deleted — and **the RC row is now measured**: kpex's zero-ohm `[Pin]` ties made ngspice return a non-solution, `postlayout.floor_zero_r()` fixes it, and the stitched RC netlist passes all 13 benches with dropout +30 mV against CC (§5), **F20** §8 gains a *step* column, **F23** the run-dependent RC bench counts are replaced by the node-set statement, **F21** the README M8 row rewritten. | DRC 0, LVS matched, 40/40 endpoints (re-walked on `it13`), CC 186 C / 21 R, RC 186 C / 5 484 R measured (8 583 raw), 13 benches 18/18 metrics on **both** |
+| **5 (`review-004` fixes, this report)** | **`it13`** | **the only geometry change is a pin-purpose square under each of the 17 port labels** (F25, PLAN A14) — kpex now emits a `[Pin]` node and anchors **15/15** named ports on the drawn port instead of a proxy. Proved inert: DRC 0, LVS matched, CD 30/30, **40/40 knob endpoints re-walked on `it13` itself**, and the **CC netlist is byte-identical** to `it12`'s, so every number in sections 6–8 is unchanged. Everything else this round is code, measurement or text: **F27** the benches now measure the netlist the extractor named (§5), **F26** the sign-off record carries `mesh_connected` + the anchor census and gates on them, **F24** `signoff.json` merges instead of replacing, **F22** `router.py`/`netlist_ref.py` travel with each snapshot, **F9** the `vss` return is *solved*, not modelled, and two numbers this report printed are corrected (§6.4, §10.4), **F3** reframed (§6.1, PLAN §6b), **F16** answered by `experiments/007-post-layout-corners` — including the control that reproduces the brief's mismatch cliff once the extracted capacitance is deleted — and **the RC row is now measured**: kpex's zero-ohm `[Pin]` ties made ngspice return a non-solution, `postlayout.floor_zero_r()` fixes it, and the stitched RC netlist passes all 13 benches with dropout +30 mV against CC (§5), **F20** §8 gains a *step* column, **F23** the run-dependent RC bench counts are replaced by the node-set statement, **F21** the README M8 row rewritten. | DRC 0, LVS matched, 40/40 endpoints (re-walked on `it13`), CC 186 C / 21 R, RC 186 C / 5 484 R measured (8 583 raw) — **superseded, see round 6**, 13 benches 18/18 metrics on **both** |
+| **6 (independent sign-off, `SIGNOFF.md` @ `50442a8`)** | — (no geometry change; verifier re-measure + this reconciliation) | The verifier re-derived every number in rounds 1–5 from raw artefacts and **moved the post-layout row of record from CC to the stitched RC row**: `scorecard_post_rc.json` reproduces on the verifier's own rebuilt GDS and extraction, 3101/3101 zero-Ω `[Pin]` ties contracted (0 left), 15/15 named ports anchored on a pin, and the verifier's own card census is **5482 R** (5461 `Rext_` + 21 `rhigh`), not this report's 5484 — the two-card difference is between an older floored run and the contracted one and changes no verdict. CC is re-labelled the **ideal-metal comparison row**. The verifier also confirms the +30 mV dropout is physical (§5, §6.3) and files the pooled dropout budget as **missed**, not met (§10.7). | RC signed as record: dropout **134.66 mV** / 200 mV (65.3 mV margin), 8/8 spec lines PASS; pooled series-R budget **29.99 mV of a 23.83 mV allowance — 1.26×, MISSED** |
 
 **Verdict.** Current density 30/30 segments (worst 0.836x), **DRC 0**, **LVS matched**, and LVS
 matched with DRC 0 at **both ends of all 20 documented knob ranges** (40/40 endpoints), kpex CC
@@ -22,10 +23,14 @@ matched with DRC 0 at **both ends of all 20 documented knob ranges** (40/40 endp
 S1–S8 box, 18/18 metrics — at tt/27**. Outside tt/27, measured this round for the first time
 (§10.6, `experiments/007-post-layout-corners`): **S5 fails at ff/125 in the schematic row and the
 extracted row alike** (58.37 uA of a 50 uA line) and **S7 leaves the box at 125 C in four of the
-five corners post-layout**. Signature: **none** — `layout/postlayout.py` logs the post-layout
-scorecard as one ledger row with `evidence="awaiting"`, whose signature is the verifier's own
-re-measure (rule 7), never the designer's. `runs/` is git-ignored and per checkout, so that row
-does not travel with this commit: re-run `layout/postlayout.py --pex <work>/pex` to reproduce it.
+five corners post-layout**. Signature at the time this report was written: **none** —
+`layout/postlayout.py` logs the post-layout scorecard as one ledger row with `evidence="awaiting"`,
+whose signature is the verifier's own re-measure (rule 7), never the designer's. **Superseded by
+round 6:** `SIGNOFF.md` has since re-measured both the CC and the stitched RC extraction from raw
+artefacts and signed `verify_postlayout_post` and `verify_postlayout_rc`; the RC row is now the
+signed post-layout row of record (§5, §10.7). `runs/` is git-ignored and per checkout, so a signed
+ledger row does not travel with this commit: re-run `layout/postlayout.py --pex <work>/pex` to
+reproduce it locally.
 
 **What is NOT closed — and F3 is not what it looked like.** The brief's **12 fF** `gate` budget
 is a **gate-only** number: measured with every other parasitic zeroed it steps between 12 and
@@ -219,10 +224,15 @@ fails the build rather than the review.
 
 ## 5. PEX
 
+**Superseded by round 6.** `SIGNOFF.md` moved the post-layout row of record from CC to the
+stitched RC row (its own re-extraction, re-measured from raw artefacts) — see the note after this
+table. The row below is left as this report measured it; read "row of record" in the CC line as
+historical.
+
 | mode | halo | netlist measured | C | R | mesh | benches |
 |---|---|---|---|---|---|---|
-| **CC** — the row of record | tech default, SG13G2 8 um sidewall | `…_k25d_pex_netlist.spice` (there is no other) | 186 | 21 | n/a | 13/13 ran, **0 spec violations** |
-| **RC** — once, for this report | same | **`…_k25d_pex_netlist_stitched.spice`** | 186 | 8 583 raw → **5 484 measured** (5 463 `Rext` + 21 device; the stitcher collapses 3 099 zero-ohm merge cards, and §5 item 3 floors the 2 it leaves) | **connected**: 220/243 device pins, **0 open nets**, 19 stub nets, 15/15 named ports anchored on a `[Pin]` node | 13/13 ran, **0 spec violations** |
+| **CC** — **the ideal-metal comparison row** (was called "the row of record" here; superseded, see round 6 above) | tech default, SG13G2 8 um sidewall | `…_k25d_pex_netlist.spice` (there is no other) | 186 | 21 | n/a | 13/13 ran, **0 spec violations** |
+| **RC** — **the post-layout row of record** (moved here in round 6; measured once in this round) | same | **`…_k25d_pex_netlist_stitched.spice`** | 186 | 8 583 raw → **5 484 measured** by this report (5 463 `Rext` + 21 device; the stitcher collapses 3 099 zero-ohm merge cards, and §5 item 3 floors the 2 it leaves) — **the verifier's independent re-extraction counts 5482 R (5461 `Rext_` + 21 `rhigh`) after contracting all 3101 zero-ohm ties instead of flooring 2 of them; this report's 5484 is superseded, not wrong — it is the floored count, one card different from the contracted one** | **connected**: 220/243 device pins, **0 open nets**, 19 stub nets, 15/15 named ports anchored on a `[Pin]` node | 13/13 ran, **0 spec violations** |
 
 **Which file is measured is now a decision, not a glob** (review-004 F27). kpex writes the raw
 netlist *and*, for RC, a stitched one — and `PexResult.netlist_path` names the stitched one. The
@@ -305,10 +315,21 @@ above. Two things followed from this round's own runs:
 
    Everything except dropout is inside the noise of the CC row. **Dropout is not**: +30 mV is the
    IR drop of the drawn `vdd`→pass→`vout` metal at 10 mA, which a CC extraction cannot see, and it
-   is larger than any budget in section 7. Per this round's instruction the **record row stays
-   CC** and the difference is reported, not adopted — S4's margin is 95.3 mV on the CC row and
-   65.3 mV on the RC row, both passing, and which row is the row of record is the coordinator's
-   call, not this report's. `scorecard_post_rc.json` carries the RC row verbatim.
+   is larger than any budget in section 7. At the time of this report the **record row stayed
+   CC** and the difference was reported, not adopted — S4's margin is 95.3 mV on the CC row and
+   65.3 mV on the RC row, both passing, and which row is the row of record was left to the
+   coordinator. `scorecard_post_rc.json` carries the RC row verbatim.
+
+   **Round 6 (superseding the paragraph above).** The coordinator's round-3 platform result and
+   the independent `SIGNOFF.md` pass both moved the record: **the post-layout row of record is
+   now the stitched RC row**, re-measured by the verifier on its own rebuilt GDS and extraction —
+   3101/3101 zero-ohm `[Pin]` ties contracted (0 left), 15/15 named ports anchored on a pin, 13/13
+   benches reproduce `scorecard_post_rc.json` to 1e-9 relative on every spec metric, 8/8 spec
+   lines PASS. CC is now the **ideal-metal comparison row** — the same layout with every wire
+   resistance set to zero, kept because it is the only row that isolates the extracted
+   capacitance from the extracted resistance. The +30 mV is confirmed physical, not an artefact
+   of the extraction (§6.3), and the brief's pooled dropout budget is **missed**, not met, at the
+   record row (§10.7).
 
 **Series resistance now has two independent numbers, and they agree where they overlap.** §6.3 and
 §6.4 solve the drawn metal by hand (`layout/rail_solve.py`); the RC row measures it in circuit.
@@ -518,6 +539,32 @@ model counts only the two straps between pin and riser; the mesh also carries th
 themselves, the via stacks, the 39 pass-device column feeds and the source/drain contact rails —
 the parts of the path this section never modelled. The hand model is therefore a **lower** bound
 on the dropout term, not an estimate, and §7's `vdd`/`vout` budget rows should be read that way.
+
+**Round 6 — the +30 mV is physical, and the platform's investigation names where it lives.**
+`SIGNOFF.md` re-measured the record row at **134.663 mV** (**+29.99 mV** over CC's 104.671) and
+established, from its own re-extraction, that no zero-ohm card or floor is behind it: the RC mesh
+now has zero zero-ohm ties (all 3101 contracted), and the CC row — same layout, same capacitance,
+no wire resistance — sits 29.99 mV lower, so the whole delta is series resistance. At the 10 mA
+dropout point that is **29.99 mV / 10 mA = 3.00 Ω** of pooled `vdd` + `vout` metal — the size of a
+real strap-and-via stack, not a numerical residue. The coordinator's round-3 decomposition of that
+3.00 Ω, **quoted here and not re-derived by this report**: **15.67 mV** from `vdd` → the 39 pass
+sources plus **15.21 mV** from the drains → `vout` (= 30.88 mV ≈ 10 mA × 3.088 Ω), **85 %** of it
+the shared **TopMetal1 strap** (0.59 Ω) and the **Via2–TopVia1 stack** (0.75 Ω) — neither of which
+divides by the 39 parallel columns the hand model above assumes — **contacts 4 %**, and the two
+former zero-ohm cards worth 0.00 mV.
+
+**The pooled dropout budget is MISSED, not met, at the record row.** `brief.json`'s
+`dropout_pool` rule, `10.34 × R(vdd) + 8.65 × R(vout) ≤ 23.83 mV` (a quarter of the S4 margin), is
+scored against the RC measurement at **29.99 mV — 1.26× the 23.83 mV allowance** (the brief's own
+linear form, fed the coordinator's 1.567/1.521 Ω split, gives 29.35 mV, 1.23× — both readings
+miss). Each **individual** net's series-R budget is still met (`R(vdd)` 1.57 Ω of a 2.31 Ω
+allowance, `R(vout)` 1.52 Ω of 2.76 Ω); it is the **shared pool** they both draw on that is
+over. S4 itself is not at risk — 134.66 mV against 200 mV is 65.3 mV of margin, 33 % — this is a
+design-discipline budget miss, not a spec failure, filed as an open finding in §10.7 with its fix
+path: widen the shared TopMetal1 strap and/or the Via2–TopVia1 stack, the two elements that do not
+divide by the column count. Any redraw that changes those elements also changes the extracted
+capacitance at `ea_o1` (currently 64 fF), which is what the mismatch box edges in §8/§4 of
+`SIGNOFF.md` rest on — a redraw here must re-bisect those edges, not just re-check S4.
 
 The brief also settles F8 as a measurement rather than an estimate: with the divider sensing at
 the **pass drain** the same metal gives **S2 = 10.22 mV against a 5 mV spec — out of the box** —
@@ -830,20 +877,34 @@ at seven width/spacing combinations; `Builder.ring` draws the ring instead.
    passes all 13 benches once kpex's two zero-ohm `[Pin]` ties are given a finite value
    (`postlayout.floor_zero_r()`), and its only material difference from the CC row of record is
    **S4 dropout 104.7 -> 134.7 mV** — the drawn `vdd`/`vout` IR drop at 10 mA, which no CC
-   extraction can see. That is larger than any budget in §7, so per the round's instruction the
-   record row **stays CC** and the choice is the coordinator's. Two things follow for whoever
-   takes it: §6.3's hand model (+11.0 mV) is a *lower* bound on the same quantity, and §6.4's
-   lumped `vss` return (-2.76 dB of PSRR) is loose by 2.7 dB against the mesh's -0.03 dB.
-   Open for the platform: kpex emits 3 101 zero-ohm cards on this cell and the stitcher leaves 2
-   — the file does not simulate as written, and the platform's own 70.04 dB run hit the same two
-   cards, so either its path merges them before ngspice or its options differ. Worth asking.
-8. **`--density` was not re-run**, so whether the 12-rule waived set grew with the new floorplan is
+   extraction can see. **CLOSED (round 6).** `SIGNOFF.md` re-verified this independently on its
+   own rebuilt GDS: the +30 mV is physical (§6.3), and the coordinator has since ruled that the
+   **post-layout row of record is the stitched RC row**, not CC — CC is re-labelled the
+   ideal-metal comparison row. §6.3's hand model (+11.0 mV) reads as a *lower* bound on the same
+   quantity, and §6.4's lumped `vss` return (-2.76 dB of PSRR) is loose by 2.7 dB against the
+   mesh's -0.03 dB. **Open item for the platform, also CLOSED**: kpex emitting 3 101 zero-ohm
+   cards where the stitcher leaves 2 unmerged is fixed upstream
+   (`spicexplorer-platform` `feat/harness-spec-v2` @ `6c07a02`) and re-verified by `SIGNOFF.md`
+   §3.1 — all 3101 are now contracted, 0 zero-ohm cards remain, and the stitched file simulates as
+   written with no floor needed.
+8. **New open finding — the pooled dropout series-R budget is missed at the record row** (round 6,
+   `SIGNOFF.md` §3.4, and §6.3 above). `brief.json`'s pooled rule (`10.34 × R(vdd) + 8.65 ×
+   R(vout) ≤ 23.83 mV`, a quarter of the S4 margin) reads **29.99 mV at the RC record — 1.26× the
+   allowance** — while each net's *individual* budget is still met and S4 itself passes with 65.3
+   mV of margin (134.66 / 200 mV). The miss is in the shared **TopMetal1 strap** (0.59 Ω) and the
+   **Via2–TopVia1 stack** (0.75 Ω), 85 % of the pooled 3.00 Ω, neither of which divides by the 39
+   parallel pass-device columns. **Fix path**: widen the shared strap and/or multiply the via
+   array — a designer action, not a re-measurement. **Caution for whoever redraws it**: both fixes
+   touch metal that sits over/near `ea_o1`, whose 64 fF of drawn-by-accident capacitance is what
+   the mismatch box edges in `SIGNOFF.md` §4 (9.109 σ / 17.889 σ) and PLAN §6b ruling 1 rest on —
+   a redraw here must **re-bisect** those edges, not assume they hold.
+9. **`--density` was not re-run**, so whether the 12-rule waived set grew with the new floorplan is
    unverified (F18).
-9. **The MIM plate swap (F15) is not done.** It is a certified-netlist edit and a re-freeze worth
+10. **The MIM plate swap (F15) is not done.** It is a certified-netlist edit and a re-freeze worth
    ~ +0.3 deg by the reviewer's hand model.
-10. **The labelled renders are stale** (§1) — `labels.yaml` and `experiments/005-layout/figs`
+11. **The labelled renders are stale** (§1) — `labels.yaml` and `experiments/005-layout/figs`
     belong to another lane and were deliberately not touched.
-11. **Density/fill and sealring remain out of scope** (PLAN A7), so DRC 0 is conditional.
+12. **Density/fill and sealring remain out of scope** (PLAN A7), so DRC 0 is conditional.
 
 ## Summary
 
@@ -900,8 +961,21 @@ wrong mechanism, so the fix (a connection) is nothing like the fix the finding p
 **Next steps.** An independent `layout-reviewer` pass on this drawing. The two owner rulings in
 PLAN §6b, which 007 has now turned into **one** decision — certify the `ea_o1` capacitance the
 cell's cold-corner margin and its mismatch margin both rest on, or accept that both move with the
-floorplan. A coordinator call on whether the row of record becomes the RC row (+30 mV of dropout,
-still 65 mV inside S4) now that RC measures. The Monte Carlo, which needs the schematic lane to
-add the PDK's mismatch sections to `corners.yaml`. And the platform question in §10.7: kpex's
-zero-ohm cards do not simulate as written, so the emitted file should merge them or the reader
-must floor them — this repo now floors them.
+floorplan. The Monte Carlo, which needs the schematic lane to
+add the PDK's mismatch sections to `corners.yaml`. Widen the shared TopMetal1 strap and/or the
+Via2–TopVia1 stack to close the pooled dropout budget miss (§10 item 8), and re-bisect the
+mismatch box edges afterward since they rest on `ea_o1`'s drawn-by-accident capacitance.
+
+**Round 6 addendum (independent sign-off, `SIGNOFF.md` @ `50442a8`).** Both open items above that
+were pending a coordinator/platform call are now resolved: the platform's zero-ohm `[Pin]` fix is
+verified upstream and the record row question is decided — **the post-layout row of record is now
+the stitched RC row**, not CC, re-measured end to end by the verifier on its own rebuilt GDS
+(3101/3101 zero-ohm ties contracted, 15/15 ports on a pin, dropout **134.66 mV** of a 200 mV bound,
+8/8 spec lines PASS). What that reopens is new, not closed: the brief's pooled dropout series-R
+budget is **missed** at the record row (29.99 mV of a 23.83 mV allowance, 1.26×) even though S4
+itself passes with 65.3 mV of margin — filed above as item 8, with the strap/via fix path and the
+re-bisection caveat. CC is retained as the ideal-metal comparison row. The verifier's mismatch
+re-measure also confirms the designer's box-edge numbers for the row of record (9.109 σ /
+17.889 σ) while agreeing the reviewer's 0.61/1.07 σ and 11 %/9 % are correct readings of
+`brief.json`'s own `headroom_sigma` fields and one-sided tails for the **schematic**-priced
+circuit, not the as-built one (`SIGNOFF.md` §4.3) — see PLAN §6b for the reconciled ruling text.

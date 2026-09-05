@@ -366,6 +366,61 @@ cannot resolve them.
    The layout draws the best common-centroid available and reports the achieved sigma-multiple
    per class in REPORT §8.
 
+   **Independent verdict on the mismatch dispute (`SIGNOFF.md`, round 5/6, quoted).** Both
+   rulings above stand as owner rulings — the verifier does not resolve them, it re-measured the
+   dispute they sit on. Its verdict: *"For the row of record, the designer is right."* The
+   mismatch distances on the cell that was drawn, extracted and signed are **9.109 σ**
+   (`ea_nmos_load`, +15.0 mV box edge / 1.6468 mV·σ) and **17.889 σ** (`bias_p_group`, +20.0 mV /
+   1.1180 mV·σ); at ±3 σ every one of the eight spec lines holds with the same margins it has at
+   nominal, and no measurable yield is lost to either class at tt/27 °C. *"The reviewer is right
+   about the circuit the brief priced"*, and his arithmetic is not wrong anywhere: the **0.61 σ**
+   and **1.07 σ** the reviewer quotes are `brief.json`'s own `headroom_sigma` fields verbatim (a
+   budget-consumption ratio, not a distance to failure), and the **11 % / 9 %** are the one-sided
+   tails of `out_of_box_dvt_mv`/σ (2.0/1.6468 = 1.2145 σ → 11.23 %; 1.5/1.118 = 1.3417 σ → 8.98 %)
+   — both re-derived independently by the verifier and both correct **for the schematic-priced
+   circuit**, where `out_of_box_dvt_mv` was measured with no layout capacitance. The disagreement
+   was never arithmetic: the extraction changed the circuit, and the brief was not re-derived on
+   the extracted cell. The verifier's own qualifier carries forward unchanged: the record row's
+   mismatch margin rests on `ea_o1`'s 64 fF, which is drawn-by-accident capacitance, not a
+   certified component — so ruling 1 (certify `ea_o1`) and this ruling remain one decision, and a
+   redraw that changes `ea_o1`'s capacitance (A15 below is one candidate that could) must
+   re-bisect both box edges rather than assume they hold.
+
+3. **A15 — new open finding: the pooled `vdd`/`vout` dropout series-R budget is missed at the
+   record row** (`SIGNOFF.md` §3.4, round 6). `brief.json`'s `dropout_pool` rule
+   (`10.34 × R(vdd) + 8.65 × R(vout) ≤ 23.83 mV`, a quarter of the S4 margin) was met on the
+   per-net hand model (§6.3: 0.598 Ω + 0.556 Ω, 10.98 mV, 46 % of the pool) but is **missed** on
+   the stitched RC mesh — now the post-layout row of record — at **29.99 mV, 1.26× the
+   allowance**. Each net's *individual* series-R budget is still met (`R(vdd)` 1.57 Ω of 2.31 Ω,
+   `R(vout)` 1.52 Ω of 2.76 Ω); the shared pool they both draw on is not. S4 itself is not at risk
+   — 134.66 mV against 200 mV, 65.3 mV of margin — this is a design-discipline miss, not a spec
+   failure. The 3.00 Ω pooled at the record row is 85 % the shared **TopMetal1 strap** (0.59 Ω)
+   and the **Via2–TopVia1 stack** (0.75 Ω) — neither divides by the 39 parallel pass-device
+   columns the hand model assumes — and 4 % contacts. **Fix path**: widen the shared strap and/or
+   multiply the via array; not drawn here (rule 7, report never fix). **Caution**: both candidate
+   fixes touch metal at or near `ea_o1`, so a redraw must re-bisect the mismatch box edges in
+   ruling 2 above, not assume the 64 fF and the 9.109 σ / 17.889 σ margins survive unchanged.
+
+### 6b.1 Open items, consolidated
+
+Carried from REPORT §10 and REVIEW.md, none of which changes a passing verdict at the record row:
+
+- **A15** (above) — pooled dropout series-R budget miss; fix path is a strap/via redraw, which
+  must re-bisect the mismatch edges in ruling 2.
+- **F13** — `vref` labelled 71 µm inside the cell (not on its declared left edge) and `vdd` now
+  carries two labels (Metal1 + TopMetal1) where one is expected; one label per pin, on the
+  declared edge.
+- **F18** — DRC has never been run with `--density` on this floorplan, so whether the twelve-rule
+  waived set grew with the wider straps and the larger cell is unverified.
+- **F15** — the MIM plate swap (`XCFF`/`XCC` bottom-plate assignment vs brief §9) is accepted and
+  deferred to the next certified-netlist re-freeze; worth ≈ +0.3° of phase margin by hand.
+- **Proper Monte Carlo** — the PDK's own `*_mismatch.lib` sections are not yet selected into
+  `corners.yaml` (a schematic-lane change); the two sub-σ classes are currently priced by
+  single-class injection only, not by distribution.
+- **Corners × mismatch jointly** — 007 runs corners and mismatch as separate sweeps at tt/27 and
+  at the corner grid respectively; neither party has run a class's mismatch offset *at* a failing
+  corner (e.g. ss/−40 or ff/125), which is where both effects could compound.
+
 ## 7. What this plan does NOT do
 
 Density/fill, sealring, pads, ESD, antenna diodes, inductance/EM-solver claims. The **scorecard
