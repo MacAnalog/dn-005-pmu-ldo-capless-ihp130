@@ -33,6 +33,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import re
 import subprocess
 import sys
@@ -228,6 +229,10 @@ DUT_PORTS = ["vdd", "vout", "vss"]
 DUT_SIDES = {"vdd": "top", "vout": "right", "vss": "bottom"}
 DUT_DIRS = {"vdd": "inout", "vout": "out", "vss": "inout"}
 CHILD_DIR = SCH_DIR / "blocks"
+# Cell-level devices that deliberately stay outside every block: the reference, the
+# loop-break marker the three ac_loopgain decks drive as `@v.xdut.vlp[acmag]`, and the
+# on-chip output capacitor.
+LOOSE_DEVICES = ["VREF", "VLP", "XCOUT"]
 
 
 def library_path() -> str:
@@ -237,6 +242,22 @@ def library_path() -> str:
     from spicexplorer_netlist2xschem.sym_library import default_search_paths
     return os.pathsep.join([*(str(p) for p in default_search_paths()),
                             str(SCH_DIR), str(CHILD_DIR)])
+
+
+def check_block_coverage(circuit, blocks) -> dict:
+    """Every annotated device must exist in the deck, and every device must be in a block.
+
+    Device names are part of the certified netlist, so a recertification that renames them
+    (`XR1` -> `XR1_1..8`) silently empties a block: `BlockAnnotationSet.load` drops what it cannot
+    find, the parent sheet loses that child, and the topology gate passes anyway. Loose cell-level
+    devices are declared here by name rather than defaulted, so a NEW loose device is a finding.
+    """
+    have = {d.ref.upper() for d in circuit.devices}
+    want = {r.upper() for b in blocks.blocks for r in b.devices}
+    return {"blocks_declared": len(blocks.blocks),
+            "devices_in_deck": len(have), "devices_annotated": len(want),
+            "unknown_devices": sorted(want - have),
+            "unannotated_devices": sorted(have - want - {d.upper() for d in LOOSE_DEVICES})}
 
 
 def build_hierarchy(deck: Path) -> dict:
@@ -250,16 +271,39 @@ def build_hierarchy(deck: Path) -> dict:
     applied = sch_support.apply_platform_proposals()
     circuit = from_file(deck, name=CELL, into="XDUT")
     blocks = BlockAnnotationSet.load(BLOCKS)
+    coverage = check_block_coverage(circuit, blocks)
     lib = SymLibrary([Path(p) for p in library_path().split(":")])
-    res = sch_support.build_hierarchy(circuit, blocks, pdk=PDK, lib=lib, title=CELL,
-                                      show_device_params=True)
+    kw = dict(pdk=PDK, lib=lib, title=CELL, show_device_params=True)
+    # Children are drawn with rails and wires (`hybrid`) wherever that is CORRECT. It is not
+    # always: hybrid lets a net's trunk wire CROSS a pin's stub without a junction, and xschem
+    # connects only at a junction, so the pin silently lands on an unnamed net. Each block is
+    # netlisted on its own and the ones that lost a pin are redrawn label-only, which cannot lose
+    # one. Measured per block, so a block keeps the readable drawing unless it is provably wrong.
+    sch_support.CHILD_WIRING = "hybrid"
+    res = sch_support.build_hierarchy(circuit, blocks, **kw)
+    probe = Path(os.environ.get("SX_SCRATCH", str(OUT))) / "ldo-schematic/child-wiring-probe"
+    lost = sch_support.blocks_losing_a_pin(res.children, res.symbols, probe, library_path())
+    if lost:
+        sch_support.CHILD_WIRING = "labels"
+        alt = sch_support.build_hierarchy(circuit, blocks, **kw)
+        for fname in lost:
+            res.children[fname] = alt.children[fname]
     parent = write_hierarchy(res, SCH_DIR, parent_name=CELL)
     sch_support.append_port_symbols(parent, [(p, DUT_DIRS[p]) for p in DUT_PORTS])
+    child_ports = sch_support.append_child_port_symbols(CHILD_DIR)
     pin_dirs = sch_support.sync_symbol_pin_dirs(CHILD_DIR)
     sym = sch_support.write_cell_symbol(SCH_DIR / f"{CELL}.sym", CELL, DUT_PORTS,
                                         DUT_SIDES, DUT_DIRS)
+    # A block whose devices all vanished from the deck is silently dropped by the annotation
+    # loader, and the equivalence gate still passes on the collapsed drawing -- it measures the
+    # netlist, not the readability. So the block count is asserted here as well.
+    coverage["blocks_formed"] = res.block_count
+    coverage["ok"] = (not coverage["unknown_devices"] and not coverage["unannotated_devices"]
+                      and res.block_count == coverage["blocks_declared"])
     return {"parent": str(parent), "symbol": str(sym), "patches": applied,
-            "pin_dirs_synced": pin_dirs,
+            "coverage": coverage, "pin_dirs_synced": pin_dirs, "child_ports_drawn": child_ports,
+            "child_wiring": {c: ("labels" if c in lost else "hybrid") for c in sorted(res.children)},
+            "hybrid_lost_pins": lost,
             "blocks": res.block_count, "devices_in_blocks": res.device_count,
             "children": sorted(res.children), "warnings": list(res.warnings),
             "block_pins": {k: list(v) for k, v in res.block_pins.items()}}
@@ -299,6 +343,21 @@ def gate(sch: Path, work: Path, deck: Path, rcfile: Path, *, hierarchical: bool)
     return rec
 
 
+def build_flat(deck: Path, out: Path) -> Path:
+    """The one-sheet drawing of the same cell, built in-process with the same shims."""
+    import sch_support
+    from spicexplorer_netlist2xschem.emit import build_sch
+    from spicexplorer_netlist2xschem.ingest import from_file
+    from spicexplorer_netlist2xschem.sym_library import SymLibrary
+
+    sch_support.apply_platform_proposals()
+    circuit = from_file(deck, name=CELL, into="XDUT")
+    lib = SymLibrary([Path(p) for p in library_path().split(":")])
+    doc = build_sch(circuit, pdk=PDK, lib=lib, title=CELL, show_device_params=True)
+    out.write_text(doc.text)
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--deck", default=str(DECK))
@@ -334,19 +393,27 @@ def main() -> int:
         return 0 if rec["ok"] else 1
 
     rec: dict = {"deck": str(deck)}
-    # --- 1. the flat sheet, exactly as before ---------------------------------------------------
-    # Built through the CLI, in its own process, so the patches this script applies for the
-    # hierarchy cannot reach it: the flat drawing stays the stock generator's output.
-    flat_sch = SCH_DIR / f"{CELL}_flat.sch"
+    # --- 1. the flat sheet -- the control for the hierarchy -------------------------------------
+    # The stock generator is first run through the CLI, in its own process, so the shims this
+    # script applies cannot reach it. That run is EVIDENCE, not the drawing: it is gated
+    # non-fatally below and its findings are the case for the platform proposals. The flat sheet
+    # the repo keeps is then built in-process with the same shims as the hierarchy, so the two
+    # drawings differ only in structure.
+    ctrl_dir = (Path(a.workdir).resolve() if a.workdir else OUT) / "unpatched"
+    ctrl_dir.mkdir(parents=True, exist_ok=True)
+    ctrl_sch = ctrl_dir / f"{CELL}_flat_unpatched.sch"
     cmd = [sys.executable, "-m", "spicexplorer_netlist2xschem.cli", str(deck),
-           "--into", "XDUT", "--name", CELL, "-o", str(flat_sch), "--show-params"]
+           "--into", "XDUT", "--name", CELL, "-o", str(ctrl_sch), "--show-params"]
     print("$", " ".join(cmd), flush=True)
     r = subprocess.run(cmd, capture_output=True, text=True)
     print((r.stdout + r.stderr)[-1200:])
-    if not flat_sch.is_file():
+    if not ctrl_sch.is_file():
         raise SystemExit("no flat .sch produced")
     rec["skipped"] = [ln.split(":")[0].replace("skipping ", "").strip()
                       for ln in (r.stdout + r.stderr).splitlines() if ln.startswith("skipping ")]
+
+    flat_sch = SCH_DIR / f"{CELL}_flat.sch"
+    build_flat(deck, flat_sch)
 
     # --- 2. the hierarchy -- the drawing of record ----------------------------------------------
     rec["hierarchy"] = build_hierarchy(deck)
@@ -358,7 +425,14 @@ def main() -> int:
     # making -- a .sch is a drawing file, not a netlist, so it is never handed to circuitgraph.
     rec["gate_hierarchical"] = gate(parent, OUT, deck, rcfile, hierarchical=True)
     rec["gate_flat"] = gate(flat_sch, OUT, deck, rcfile, hierarchical=False)
-    ok = rec["gate_hierarchical"]["ok"] and rec["gate_flat"]["ok"] and not rec["skipped"]
+    ok = (rec["gate_hierarchical"]["ok"] and rec["gate_flat"]["ok"] and not rec["skipped"]
+          and rec["hierarchy"]["coverage"]["ok"])
+    # Report-only: the same gate on the unpatched generator's own sheet. Its findings are the
+    # measured case for the platform proposals, so they are recorded, not asserted.
+    ctrl = gate(ctrl_sch, ctrl_dir, deck, rcfile, hierarchical=False)
+    rec["unpatched_cli_control"] = {"sch": ctrl["sch"], "ok": ctrl["ok"],
+                                    "equivalence": ctrl["equivalence"],
+                                    "findings": ctrl["parameters"]["findings"]}
 
     # --- 4. the figures -------------------------------------------------------------------------
     rec["figs"] = {}

@@ -4,43 +4,48 @@ K {}
 V {}
 S {}
 E {}
-T {bias_ref} -210 -200 0 0 0.4 0.4 {}
-C {sg13g2_pr/rhigh.sym} -10 260 0 0 {name=RB model=rhigh spiceprefix=X body=vss w=r_w l=r_bias_l}
-C {sg13g2_pr/sg13_lv_nmos.sym} -170 260 0 1 {name=MB0 model=sg13_lv_nmos spiceprefix=X w=x_dut_xmb0_w l=x_dut_xmb0_l}
-C {sg13g2_pr/sg13_lv_nmos.sym} 170 260 0 0 {name=MB1 model=sg13_lv_nmos spiceprefix=X w=x_dut_xmb1_w l=x_dut_xmb0_l}
-C {sg13g2_pr/sg13_lv_pmos.sym} 170 0 0 0 {name=MBP model=sg13_lv_pmos spiceprefix=X w=x_dut_xmbp_w l=x_dut_xmbp_l}
-N -250 260 -250 354 {}
-N -190 170 -190 230 {}
-N -190 290 -190 400 {}
-N -150 190 -150 260 {}
-N -10 200 -10 230 {}
-N -10 290 -10 350 {}
-N 120 200 120 260 {}
-N 150 0 150 70 {}
-N 190 -140 190 -30 {}
-N 190 30 190 230 {}
-N 190 290 190 400 {}
-N 250 0 250 94 {}
-N 250 260 250 354 {}
-N -385 -140 385 -140 {}
-N 90 0 150 0 {}
-N 190 0 250 0 {}
-N 150 70 190 70 {}
-N -190 190 -150 190 {}
-N -190 200 120 200 {}
-N -250 260 -190 260 {}
-N 120 260 150 260 {}
-N 190 260 250 260 {}
-N -385 400 385 400 {}
-C {devices/lab_wire.sym} -385 -140 0 0 {name=l0 lab=vdd}
-C {devices/lab_wire.sym} -385 400 0 0 {name=l1 lab=vss}
-C {devices/lab_wire.sym} -190 170 0 1 {name=l2 lab=nbias}
-C {devices/lab_wire.sym} 90 0 0 0 {name=l3 lab=pbias}
-C {devices/lab_wire.sym} 250 94 2 0 {name=l4 lab=vdd}
-C {devices/lab_wire.sym} -250 354 2 0 {name=l5 lab=vss}
-C {devices/lab_wire.sym} 250 354 2 0 {name=l6 lab=vss}
-C {devices/lab_wire.sym} -10 350 2 0 {name=l7 lab=vdd}
-C {devices/iopin.sym} -190 540 0 0 {name=p0 lab=vdd}
-C {devices/iopin.sym} 190 540 0 0 {name=p1 lab=vss}
-C {devices/opin.sym} 525 0 0 0 {name=p2 lab=pbias}
-C {devices/opin.sym} 525 230 0 0 {name=p3 lab=nbias}
+T {bias_ref} -635 -200 0 0 0.4 0.4 {}
+C {sg13g2_pr/rhigh.sym} 85 260 0 0 {name=RB_1 model=rhigh spiceprefix=X body=vss w=r_w l="\{r_bias_l/5\}"}
+C {sg13g2_pr/rhigh.sym} 85 345 0 0 {name=RB_2 model=rhigh spiceprefix=X body=vss w=r_w l="\{r_bias_l/5\}"}
+C {sg13g2_pr/rhigh.sym} 245 345 0 0 {name=RB_3 model=rhigh spiceprefix=X body=vss w=r_w l="\{r_bias_l/5\}"}
+C {sg13g2_pr/rhigh.sym} 405 345 0 0 {name=RB_4 model=rhigh spiceprefix=X body=vss w=r_w l="\{r_bias_l/5\}"}
+C {sg13g2_pr/rhigh.sym} -170 345 1 0 {name=RB_5 model=rhigh spiceprefix=X body=vss w=r_w l="\{r_bias_l/5\}"}
+C {sg13g2_pr/sg13_lv_nmos.sym} -255 260 0 1 {name=MB0A model=sg13_lv_nmos spiceprefix=X w="\{x_dut_xmb0_w/2\}" l=x_dut_xmb0_l}
+C {sg13g2_pr/sg13_lv_nmos.sym} -595 260 0 1 {name=MB0B model=sg13_lv_nmos spiceprefix=X w="\{x_dut_xmb0_w/2\}" l=x_dut_xmb0_l}
+C {sg13g2_pr/sg13_lv_nmos.sym} 645 260 0 0 {name=MB1A model=sg13_lv_nmos spiceprefix=X w="\{x_dut_xmb1_w/2\}" l=x_dut_xmb0_l}
+C {sg13g2_pr/sg13_lv_nmos.sym} 425 260 0 0 {name=MB1B model=sg13_lv_nmos spiceprefix=X w="\{x_dut_xmb1_w/2\}" l=x_dut_xmb0_l}
+C {sg13g2_pr/sg13_lv_pmos.sym} 255 0 0 0 {name=MBP model=sg13_lv_pmos spiceprefix=X w=x_dut_xmbp_w l=x_dut_xmbp_l}
+C {devices/lab_wire.sym} 85 290 0 0 {name=l0 lab=vdd}
+C {devices/lab_wire.sym} 85 230 0 0 {name=l1 lab=n_rb_1}
+C {devices/lab_wire.sym} 85 375 0 0 {name=l2 lab=n_rb_1}
+C {devices/lab_wire.sym} 85 315 0 0 {name=l3 lab=n_rb_2}
+C {devices/lab_wire.sym} 245 375 0 0 {name=l4 lab=n_rb_2}
+C {devices/lab_wire.sym} 245 315 0 0 {name=l5 lab=n_rb_3}
+C {devices/lab_wire.sym} 405 375 0 0 {name=l6 lab=n_rb_3}
+C {devices/lab_wire.sym} 405 315 0 0 {name=l7 lab=n_rb_4}
+C {devices/lab_wire.sym} -200 345 0 0 {name=l8 lab=n_rb_4}
+C {devices/lab_wire.sym} -140 345 0 0 {name=l9 lab=nbias}
+C {devices/lab_wire.sym} -275 230 0 0 {name=l10 lab=nbias}
+C {devices/lab_wire.sym} -235 260 0 0 {name=l11 lab=nbias}
+C {devices/lab_wire.sym} -275 290 0 0 {name=l12 lab=vss}
+C {devices/lab_wire.sym} -275 260 0 0 {name=l13 lab=vss}
+C {devices/lab_wire.sym} -615 230 0 0 {name=l14 lab=nbias}
+C {devices/lab_wire.sym} -575 260 0 0 {name=l15 lab=nbias}
+C {devices/lab_wire.sym} -615 290 0 0 {name=l16 lab=vss}
+C {devices/lab_wire.sym} -615 260 0 0 {name=l17 lab=vss}
+C {devices/lab_wire.sym} 665 230 0 0 {name=l18 lab=pbias}
+C {devices/lab_wire.sym} 625 260 0 0 {name=l19 lab=nbias}
+C {devices/lab_wire.sym} 665 290 0 0 {name=l20 lab=vss}
+C {devices/lab_wire.sym} 665 260 0 0 {name=l21 lab=vss}
+C {devices/lab_wire.sym} 445 230 0 0 {name=l22 lab=pbias}
+C {devices/lab_wire.sym} 405 260 0 0 {name=l23 lab=nbias}
+C {devices/lab_wire.sym} 445 290 0 0 {name=l24 lab=vss}
+C {devices/lab_wire.sym} 445 260 0 0 {name=l25 lab=vss}
+C {devices/lab_wire.sym} 275 30 0 0 {name=l26 lab=pbias}
+C {devices/lab_wire.sym} 235 0 0 0 {name=l27 lab=pbias}
+C {devices/lab_wire.sym} 275 -30 0 0 {name=l28 lab=vdd}
+C {devices/lab_wire.sym} 275 0 0 0 {name=l29 lab=vdd}
+C {devices/opin.sym} -615 535 0 0 {name=p_nbias lab=nbias}
+C {devices/opin.sym} -395 535 0 0 {name=p_pbias lab=pbias}
+C {devices/iopin.sym} -175 535 0 0 {name=p_vdd lab=vdd}
+C {devices/iopin.sym} 45 535 0 0 {name=p_vss lab=vss}

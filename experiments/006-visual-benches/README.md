@@ -10,10 +10,10 @@ from its deck, or if the drawing cannot reproduce the certified measurement.
 **Control:** the frozen decks themselves, byte for byte (`decks/candidate/*.spice`, SHA-locked).
 Nothing on a sheet is retyped: the bench elements are ingested from the deck and placed by the
 generator, and the directive and `.control` text is lifted from the deck verbatim.
-**Verdict:** **CONFIRMED.** All **13 of 13** sheets netlist back to their decks with no drift, and
-the `ac_loopgain` sheet, simulated from *its own netlist*, returns all **7 of 7** certified measures
-to every printed digit — loop gain 49.94548 dB and phase margin 72.41882°, against
-`decks/candidate/scorecard.json`.
+**Verdict:** **CONFIRMED**, re-run against the **recertified** decks (`bf3a4f8`). All **13 of 13**
+sheets netlist back to their decks with no drift, and the `ac_loopgain` sheet, simulated from *its
+own netlist*, returns all **7 of 7** certified measures to every printed digit — loop gain
+50.22434 dB and phase margin 72.5064°, against `decks/candidate/scorecard.json`.
 
 ## 1. What is drawn and what stays text
 
@@ -49,26 +49,27 @@ only in their load current, so a single family sheet could not match all three. 
 - **the directive and `.control` text equal line by line**, whitespace-normalised, in order.
 
 The DUT's own body is *not* re-proved here: it is a hierarchy on the sheet and flat in the deck, and
-[004](../004-schematic/README.md) is where that comparison is made (25 components, 15 nets, 114
+[004](../004-schematic/README.md) is where that comparison is made (50 components, 33 nets, 239
 parameter rows). What 006 adds is everything around it.
 
 | family | deck | sheet | figure | compared | gate |
 |---|---|---|---|---|---|
-| operating point | `dc_op` | `dc_op_tb.sch` | `figs/dc_op_tb.png` | 3 instances, 7 nets, 6 values, 46 text lines | **PASS** |
-| load regulation | `load_regulation` | `load_regulation_tb.sch` | `figs/load_regulation_tb.png` | 4 instances, 9 nets, 8 values, 47 text lines | **PASS** |
-| line regulation | `line_regulation` | `line_regulation_tb.sch` | `figs/line_regulation_tb.png` | 4 instances, 9 nets, 8 values, 46 text lines | **PASS** |
-| dropout | `dropout` | `dropout_tb.sch` | `figs/dropout_tb.png` | 4 instances, 9 nets, 8 values, 69 text lines | **PASS** |
-| loop gain / phase margin (Middlebrook) | `ac_loopgain` | `ac_loopgain_tb.sch` | `figs/ac_loopgain_tb.png` | 5 instances, 11 nets, 11 values, 57 text lines | **PASS** |
-| loop gain / phase margin (Middlebrook) | `ac_loopgain_lo` | `ac_loopgain_lo_tb.sch` | `figs/ac_loopgain_lo_tb.png` | 5 instances, 11 nets, 11 values, 57 text lines | **PASS** |
-| loop gain / phase margin (Middlebrook) | `ac_loopgain_hi` | `ac_loopgain_hi_tb.sch` | `figs/ac_loopgain_hi_tb.png` | 5 instances, 11 nets, 11 values, 57 text lines | **PASS** |
-| closed-loop output impedance | `loop_stability` | `loop_stability_tb.sch` | `figs/loop_stability_tb.png` | 6 instances, 13 nets, 13 values, 47 text lines | **PASS** |
-| PSRR | `psrr` | `psrr_tb.sch` | `figs/psrr_tb.png` | 5 instances, 11 nets, 11 values, 46 text lines | **PASS** |
-| PSRR | `psrr_1m` | `psrr_1m_tb.sch` | `figs/psrr_1m_tb.png` | 5 instances, 11 nets, 11 values, 46 text lines | **PASS** |
-| output noise | `noise` | `noise_tb.sch` | `figs/noise_tb.png` | 5 instances, 11 nets, 11 values, 45 text lines | **PASS** |
-| load-step transient | `tran_load_step` | `tran_load_step_tb.sch` | `figs/tran_load_step_tb.png` | 5 instances, 11 nets, 11 values, 50 text lines | **PASS** |
-| line-step transient | `tran_line_step` | `tran_line_step_tb.sch` | `figs/tran_line_step_tb.png` | 5 instances, 11 nets, 11 values, 46 text lines | **PASS** |
+| operating point | `dc_op` | `dc_op_tb.sch` | `figs/dc_op_tb.png` | 3 instances, 7 nets, 6 values, 47 text lines | **PASS** |
+| load regulation | `load_regulation` | `load_regulation_tb.sch` | `figs/load_regulation_tb.png` | 4 instances, 9 nets, 8 values, 48 text lines | **PASS** |
+| line regulation | `line_regulation` | `line_regulation_tb.sch` | `figs/line_regulation_tb.png` | 4 instances, 9 nets, 8 values, 47 text lines | **PASS** |
+| dropout | `dropout` | `dropout_tb.sch` | `figs/dropout_tb.png` | 4 instances, 9 nets, 8 values, 70 text lines | **PASS** |
+| loop gain / phase margin (Middlebrook) | `ac_loopgain` | `ac_loopgain_tb.sch` | `figs/ac_loopgain_tb.png` | 5 instances, 11 nets, 11 values, 58 text lines | **PASS** |
+| loop gain / phase margin (Middlebrook) | `ac_loopgain_lo` | `ac_loopgain_lo_tb.sch` | `figs/ac_loopgain_lo_tb.png` | 5 instances, 11 nets, 11 values, 58 text lines | **PASS** |
+| loop gain / phase margin (Middlebrook) | `ac_loopgain_hi` | `ac_loopgain_hi_tb.sch` | `figs/ac_loopgain_hi_tb.png` | 5 instances, 11 nets, 11 values, 58 text lines | **PASS** |
+| closed-loop output impedance | `loop_stability` | `loop_stability_tb.sch` | `figs/loop_stability_tb.png` | 6 instances, 13 nets, 13 values, 48 text lines | **PASS** |
+| PSRR | `psrr` | `psrr_tb.sch` | `figs/psrr_tb.png` | 5 instances, 11 nets, 11 values, 47 text lines | **PASS** |
+| PSRR | `psrr_1m` | `psrr_1m_tb.sch` | `figs/psrr_1m_tb.png` | 5 instances, 11 nets, 11 values, 47 text lines | **PASS** |
+| output noise | `noise` | `noise_tb.sch` | `figs/noise_tb.png` | 5 instances, 11 nets, 11 values, 46 text lines | **PASS** |
+| load-step transient | `tran_load_step` | `tran_load_step_tb.sch` | `figs/tran_load_step_tb.png` | 5 instances, 11 nets, 11 values, 51 text lines | **PASS** |
+| line-step transient | `tran_line_step` | `tran_line_step_tb.sch` | `figs/tran_line_step_tb.png` | 5 instances, 11 nets, 11 values, 47 text lines | **PASS** |
 
-**The gate bit, on its first full run.** Two sheets failed it: the drawing's netlist carried
+**The gate bit, on its first full run** (against the decks as they stood then, whose load step is
+unchanged by the recertification). Two sheets failed it: the drawing's netlist carried
 `ILOAD vout 0 …00n 10u 20u)` where the deck has
 `Iload vout 0 pulse(0.1m 10m 1u 100n 100n 10u 20u)`. The cause was in the emitter, which abbreviated
 any attribute value over 24 characters to its tail and wrote that into the instance's `value=` — the
@@ -85,13 +86,13 @@ not a rebuild — and its measures are compared with `decks/candidate/scorecard.
 
 | measure | certified | from the drawing |
 |---|---|---|
-| `loopgain_db` | 49.94548 | 49.94548 |
-| `pm_loop` | 72.41882 | 72.41882 |
-| `ugf_loop` | 836501.2 | 836501.2 |
-| `gm_at_180` | −6.426522 | −6.426522 |
-| `gm_loop_db` | 6.426522 | 6.426522 |
-| `ms_peak` | 7.149795 | 7.149795 |
-| `tloop_ph_dc` | 179.9755 | 179.9755 |
+| `loopgain_db` | 50.22434 | 50.22434 |
+| `pm_loop` | 72.5064 | 72.5064 |
+| `ugf_loop` | 801499.9 | 801499.9 |
+| `gm_at_180` | −6.13316 | −6.13316 |
+| `gm_loop_db` | 6.13316 | 6.13316 |
+| `ms_peak` | 7.812823 | 7.812823 |
+| `tloop_ph_dc` | 179.9738 | 179.9738 |
 
 All seven agree at every printed digit. The Middlebrook injection is what makes this a real check of
 the hierarchy: `.control` reaches into the cell as `@v.xdut.vlp[acmag]` and reads `v(xdut.lp_brk)`,

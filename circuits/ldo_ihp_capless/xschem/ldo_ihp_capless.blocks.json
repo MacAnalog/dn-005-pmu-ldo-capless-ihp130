@@ -4,9 +4,15 @@
     {
       "block_id": "bias_ref",
       "devices": [
-        "XRB",
-        "XMB0",
-        "XMB1",
+        "XRB_1",
+        "XRB_2",
+        "XRB_3",
+        "XRB_4",
+        "XRB_5",
+        "XMB0A",
+        "XMB0B",
+        "XMB1A",
+        "XMB1B",
         "XMBP"
       ],
       "label": "bias - resistor-referenced",
@@ -22,10 +28,14 @@
       "block_id": "ea_stage1",
       "devices": [
         "XMT",
-        "XM1",
-        "XM2",
-        "XM3",
-        "XM4"
+        "XM1A",
+        "XM1B",
+        "XM2A",
+        "XM2B",
+        "XM3A",
+        "XM3B",
+        "XM4A",
+        "XM4B"
       ],
       "label": "error amp stage 1 - 5T OTA, PMOS input",
       "family": "amplifier",
@@ -63,7 +73,8 @@
         "XMB",
         "XMCP",
         "XMD",
-        "XMS",
+        "XMSA",
+        "XMSB",
         "XMP"
       ],
       "label": "FVF double-mirror output stage",
@@ -79,8 +90,22 @@
     {
       "block_id": "fb_divider",
       "devices": [
-        "XR1",
-        "XR2",
+        "XR1_1",
+        "XR1_2",
+        "XR1_3",
+        "XR1_4",
+        "XR1_5",
+        "XR1_6",
+        "XR1_7",
+        "XR1_8",
+        "XR2_1",
+        "XR2_2",
+        "XR2_3",
+        "XR2_4",
+        "XR2_5",
+        "XR2_6",
+        "XR2_7",
+        "XR2_8",
         "XCFF"
       ],
       "label": "1:1 feedback divider + feed-forward cap",

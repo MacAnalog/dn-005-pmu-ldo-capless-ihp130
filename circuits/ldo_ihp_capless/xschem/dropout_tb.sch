@@ -68,6 +68,7 @@ C {devices/code_shown.sym} -60 570 0 0 {name=DIRECTIVES only_toplevel=false valu
 .param x_dut_xmp_w=10u
 .param x_dut_xmp_l=0.13u
 .param x_dut_xmp_m=19
+.param x_dut_xmp_nf_mult=4
 .param c_out_w=58u
 .param c_out_m=4"}
 C {devices/code_shown.sym} 316 570 0 0 {name=CONTROL only_toplevel=false value=".control

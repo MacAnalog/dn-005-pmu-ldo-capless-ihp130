@@ -24,6 +24,13 @@ loudly instead of silently patching a patch.
   (``w=x_dut_xmp_w``) the values are short and it never shows; for a transient stimulus
   (``pulse(1.4 1.65 1u 100n 100n 10u 20u)``, 36 characters) the drawing's netlist silently loses the
   front of the source. A shortening meant for the drawing has to stay in the drawing.
+* **P5 -- hybrid wiring drops a pin on a child sheet.** With the default ``wiring="hybrid"`` the
+  child sheets of two blocks came out with a device connected to an unnamed stub: ``XMB0A net1 net1
+  vss vss`` in ``bias_ref`` (certified ``nbias nbias vss vss``) and ``XM3A net1 net1 vss vss`` in
+  ``ea_stage1`` (certified ``ea_n ea_n vss vss``). Both are the FIRST half of a duplicated
+  diode-connected pair the recertified deck introduced (``XMB0`` -> ``XMB0A``/``XMB0B``); the flat
+  sheet of the same devices is correct, so the defect is in the child path only. The gate catches it
+  (net count 35 vs 33), so children are built ``wiring="labels"`` until it is fixed upstream.
 * **P3 -- a design's own cell symbol on a bench sheet.** ``mapping.symref_for`` resolves a subcircuit
   instance through a PDK table, so a bench's ``XDUT ... ldo_ihp_capless`` has no symbol and is
   dropped from the drawing. The design's own generated symbol is registered in that table.
@@ -37,6 +44,7 @@ re-implements SPICE parsing.
 """
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -50,6 +58,11 @@ from spicexplorer_netlist2xschem.render import render
 from spicexplorer_netlist2xschem.symbol_gen import BlockPin, generate_block_symbol
 
 PROPOSAL = "$SX_SCRATCH/ldo-schematic/platform-proposal/"
+
+# The wiring mode the P5 shim gives every CHILD sheet. "hybrid" (drawn rails and wires) is the
+# readable one and the default; a block whose hybrid sheet is measured to have lost a pin is
+# rebuilt "labels" (see ``blocks_losing_a_pin``).
+CHILD_WIRING = "hybrid"
 
 _PARENT_SUPPLY: dict[str, str] = {}
 _APPLIED = False
@@ -95,12 +108,25 @@ def apply_platform_proposals() -> list[str]:
 
     _emit._display_value = lambda value: str(value)  # P4
 
+    import inspect
+    if "child_wiring" in inspect.signature(_hierarchy.build_hierarchical_sch).parameters:
+        raise RuntimeError("build_hierarchical_sch now takes child_wiring; P5 is upstream")
+    if _hierarchy.build_sch is not _emit.build_sch:
+        raise RuntimeError("hierarchy.build_sch is not emit.build_sch; P5 may be upstream now")
+    _orig_build = _hierarchy.build_sch
+
+    def _child_build_sch(circuit, **kw):  # P5
+        kw.setdefault("wiring", CHILD_WIRING)
+        return _orig_build(circuit, **kw)
+
+    _hierarchy.build_sch = _child_build_sch
     _analysis._port_roles = _port_roles
     _hierarchy._child_circuit = _child_circuit
     _APPLIED = True
     return ["P1 analysis._port_roles: a declared supply port stays a port",
             "P2 hierarchy._child_circuit: the child inherits the parent's supply map",
-            "P4 emit._display_value: the netlisted value is never abbreviated"]
+            "P4 emit._display_value: the netlisted value is never abbreviated",
+            "P5 hierarchy child sheets are wired label-only (hybrid loses a pin, see below)"]
 
 
 def _child_source(fn) -> str:
@@ -201,6 +227,54 @@ def append_port_symbols(sch: Path, ports: list[tuple[str, str]], pitch: int = 22
     sch.write_text(text.rstrip("\n") + "\n" + "\n".join(rows) + "\n")
 
 
+def blocks_losing_a_pin(children: dict[str, str], symbols: dict[str, str], rcfile_dir: Path,
+                        library_path: str) -> dict[str, list[str]]:
+    """Netlist each child sheet on its own and report any pin left on an auto-named net.
+
+    xschem names an unconnected piece of wire ``netN``. The certified deck names every node, so a
+    ``netN`` in a child's netlist is a pin the drawing failed to connect -- measured, per block,
+    instead of assumed.
+    """
+    from spicexplorer_netlist2xschem.render import write_xschemrc
+
+    probe = rcfile_dir
+    probe.mkdir(parents=True, exist_ok=True)
+    for fname, text in {**symbols, **children}.items():
+        (probe / fname).write_text(text)
+    rc = write_xschemrc(probe, os.pathsep.join([library_path, str(probe)]))
+    lost: dict[str, list[str]] = {}
+    for fname in sorted(children):
+        netlist, _log = xschem_netlist(probe / fname, rc, probe)
+        auto = sorted({m for ln in netlist.read_text().splitlines()
+                       for m in re.findall(r"\bnet\d+\b", ln)})
+        if auto:
+            lost[fname] = auto
+    return lost
+
+
+def append_child_port_symbols(blocks_dir: Path) -> dict[str, list[str]]:
+    """Draw each child sheet's own ports, in its symbol's pin order (P5c).
+
+    ``wiring="labels"`` (P5) leaves a boundary net as a plain label, so the child sheet declares no
+    interface and xschem reports the block symbol's pins against a schematic with none. Each
+    sheet's ports and their directions are taken from the symbol the generator wrote for that same
+    block -- so the two cannot disagree -- and drawn with the same helper the parent uses.
+    """
+    added: dict[str, list[str]] = {}
+    for sch in sorted(blocks_dir.glob("*.sch")):
+        sym = sch.with_suffix(".sym")
+        if not sym.is_file() or "pin.sym}" in sch.read_text():
+            continue
+        pins = [(m.group(1), m.group(2)) for m in
+                (re.search(r"\{name=(\S+) dir=(\S+)\}", ln) for ln in sym.read_text().splitlines())
+                if m]
+        if not pins:
+            continue
+        append_port_symbols(sch, pins)
+        added[sch.name] = [f"{n} ({d})" for n, d in pins]
+    return added
+
+
 _SCH_PIN_DIR = {"ipin": "in", "opin": "out", "iopin": "inout"}
 
 
@@ -290,8 +364,11 @@ def _pad_svg(svg: Path, margin: int) -> None:
         size, x, y, body = float(t_m.group(1)), float(t_m.group(2)), float(t_m.group(3)), t_m.group(4)
         right = max(right, x + 0.62 * size * len(body))   # 0.62 em/char: xschem's monospace-ish face
         bottom = max(bottom, y + size)
-    pad_r = max(margin, right - w + margin)
-    pad_b = max(margin, bottom - h + margin)
+    # Some labels (the port symbols' own text) carry their font size in a different attribute
+    # order and are not measured by the pattern above, so the right/bottom pad never falls below a
+    # few characters' worth of overhang.
+    pad_r = max(3 * margin, right - w + margin)
+    pad_b = max(2 * margin, bottom - h + margin)
     head = (f'<svg{m.group(1)}width="{w + margin + pad_r:g}"{m.group(3)}'
             f'height="{h + margin + pad_b:g}"{m.group(5)}>'
             f'<g transform="translate({margin},{margin})">')
@@ -352,6 +429,7 @@ def flatten_hierarchy(netlist: Path, out: Path, *, note: str = "") -> dict:
     spliced: list[str] = []
     seen_refs: dict[str, str] = {}
     seen_nets: dict[str, str] = {}
+    local_nets: list[str] = []
     for ln in top:
         ref = ln.split()[0]
         model = (view.get_component_value(ref) or "").lower() if ref.upper().startswith("X") else ""
@@ -365,6 +443,17 @@ def flatten_hierarchy(netlist: Path, out: Path, *, note: str = "") -> dict:
         if len(formals) != len(actuals):
             raise SystemExit(f"{ref}: {len(formals)} ports vs {len(actuals)} nets")
         rename = dict(zip(formals, actuals))
+        # A child's unnamed nets are auto-named per sheet, so two blocks both own a `net1`. They
+        # are local by construction (not a formal port), so each is qualified with its instance --
+        # the flat result stays unambiguous instead of silently merging two different nodes.
+        for leaf in defs[model]:
+            tok = leaf.split()
+            n = len(child.get_component_nodes(tok[0]))
+            for net in tok[1:1 + n]:
+                low = net.lower()
+                if low not in rename and low != "0":
+                    rename[low] = f"{ref.lower()}.{low}"
+                    local_nets.append(rename[low])
         for leaf in defs[model]:
             tok = leaf.split()
             n = len(child.get_component_nodes(tok[0]))
@@ -385,4 +474,5 @@ def flatten_hierarchy(netlist: Path, out: Path, *, note: str = "") -> dict:
     out.write_text(f"* flattened out of {netlist.name}{(' -- ' + note) if note else ''}\n"
                    "* block subcircuits spliced inline; leaf instance names preserved\n"
                    + "\n".join(body) + "\n.end\n")
-    return {"out": str(out), "spliced": spliced, "devices": len(body)}
+    return {"out": str(out), "spliced": spliced, "devices": len(body),
+            "qualified_local_nets": sorted(set(local_nets))}
