@@ -124,7 +124,7 @@ BOUNDS: dict[str, tuple[float, float]] = {
     "ch_margin": (0.8, 2.0), "rail_w": (0.5, 2.0), "rail_gap": (1.4, 2.5),
     "ring_w": (0.5, 1.5), "ring_gap": (0.6, 3.0), "isl_gap": (1.3, 6.0), "n_dummy": (0, 2),
     "pwr_w": (1.64, 6.0), "pwr_stitch": (8, 24), "pwr_riser_vias": (28, 72),
-    "pwr_band_w": (5.0, 12.0), "xmp_nf_mult": (3, 8), "col_vias": (1, 4),
+    "pwr_band_w": (5.0, 12.0), "xmp_nf_mult": (1, 8), "col_vias": (1, 4),
     "mim_gap": (2.5, 8.0), "res_pitch": (1.8, 4.0), "r_segs": (2, 8), "rb_segs": (1, 6),
     "blk_gap": (4.0, 15.0), "tap_pitch": (6.0, 18.0),
 }
@@ -651,22 +651,6 @@ def _wire_row(b: Builder, insts: dict[str, list[Dev]], net, pmos: bool, y_rail: 
                 b.to_track(sn, xs, ys)
 
 
-def _seg_len(l_total: float, segs: int, what: str) -> float:
-    """A serpentine segment length that keeps the `rhigh` cell on grid.
-
-    A `dy` that is not a multiple of 0.01 um makes the PDK cell's own geometry off-grid: at
-    `l = 138.5 um / 4 = 34.625 um` the rule deck reported 14 OffGrid / Sal.e / Rhi.d violations
-    *inside* the rhigh cell.  Rather than silently rounding (which would change the resistance and
-    fail LVS), refuse — the segment count is a knob and the caller can move it.
-    """
-    seg = l_total / segs
-    if abs(round(seg, 2) - seg) > 1e-9:
-        raise AssertionError(
-            f"{what}: {l_total:g} um / {segs} = {seg:g} um is not a multiple of 0.01 um; the "
-            f"rhigh cell goes off-grid there — pick another segment count")
-    return _s(seg)
-
-
 def build_full(p: LayoutParams = LayoutParams(),
                sizing: dict[str, object] | None = None) -> tuple[gf.Component, Builder]:
     sz = {**SIZING, **(sizing or {})}
@@ -786,9 +770,7 @@ def build_full(p: LayoutParams = LayoutParams(),
     rb_l = _um(sz[PC["XRB"].params["l"]])
     ccw = _um(sz[PC["XCC"].params["w"]])
     cffw = _um(sz[PC["XCFF"].params["w"]])
-    if p.r_segs % 2:
-        raise AssertionError("r_segs must be even: the A B B A pattern is built from pairs")
-    seg_l = _seg_len(r_l, p.r_segs, "XR1/XR2")
+    seg_l = _s(r_l / p.r_segs)
     # XR1 / XR2: one common-centroid block, [A B B A] repeated, both centroids at the block
     # centre, with a tied dummy segment at each end.  brief §6 makes this the tightest matching
     # class in the cell (1.71 sigma) and brief §9 asks for ABBA specifically.
@@ -858,7 +840,6 @@ def build_full(p: LayoutParams = LayoutParams(),
     b.to_track("vss", r2b[0], r2b[1])
     # XRB beside the divider block, equally far from XMP (brief §9: its tc1 sets every current)
     x_rb = _s(x_res1 + n_cols * p.res_pitch + 1.0)
-    _seg_len(rb_l, p.rb_segs, "XRB")
     rba, rbb, _ = b.serpentine(r_w, rb_l, p.rb_segs, x_rb, y_res, pitch=1.6)
     b.to_track("vdd", rba[0], rba[1])
     b.to_track("nbias", rbb[0], rbb[1])

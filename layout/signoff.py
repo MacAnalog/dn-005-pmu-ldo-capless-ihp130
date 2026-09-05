@@ -1,4 +1,4 @@
-"""005 — layout sign-off driver: GDS -> render -> DRC -> LVS -> PEX -> post-layout scorecard.
+"""005 — layout sign-off driver: guards -> GDS -> current density -> DRC -> LVS -> PEX.
 
 Every stage is the platform's own runner (`spicexplorer_signoff`, `spicexplorer_layout`); this
 file only sequences them and writes the verdicts a reviewer reads. Two interpreters are
@@ -31,6 +31,17 @@ Two PDK-runset quirks are handled here, both journalled:
 2. **kpex cannot extract IHP MIM caps** -- ``strip_mim_for_pex`` removes the MIM device layers
    and the C cards; the schematic MIM capacitors are spliced back for the benches.
 
+Two stages exist because `review-002` said "silence from a check that did not run is not
+evidence":
+
+* **guards** — `layout/test_builder.py`, the case M8 asked for: a Metal1 stub collision that only
+  the obstacle map prevents.  It runs first and blocks, so the guard is exercised every round.
+* **current density** — `spicexplorer_signoff.current_density` over the budget list the
+  GENERATOR emits from its own drawn geometry (`gen_ldo.power_budgets`), never a retyped table.
+  Electromigration is not a rule-deck check and not a connectivity check, so without this stage a
+  cell can pass DRC, LVS, PEX and every bench at 12-28x over the metal limit — which the cell of
+  record did (B1, `doc/journal/metal-current-density-is-nobodys-check.md`).
+
     LDO_EXP=005 uv run --no-sync python layout/signoff.py --all
 """
 from __future__ import annotations
@@ -59,16 +70,49 @@ def _run(cmd: list[str], **kw) -> subprocess.CompletedProcess:
 
 # ---------------------------------------------------------------- build ----
 
-def build(out: Path) -> dict:
-    """GDS + LVS reference netlist at the sizing of record (gen_ldo reads sizing.yaml itself)."""
+def guards() -> dict:
+    """The generator's own regression case (review-002 M8).  A blocker: a router guard that no
+    case exercises rots, and this one is the difference between a shorted netlist and a clean
+    one."""
+    r = _run([sys.executable, str(Path(__file__).resolve().parent / "test_builder.py")])
+    ok = r.returncode == 0
+    print(" ", (r.stdout or r.stderr).strip().splitlines()[-1] if (r.stdout or r.stderr) else "")
+    return {"passed": ok, "log": (r.stdout + r.stderr)[-2000:]}
+
+
+def current_density(power_json: Path) -> dict:
+    """Score every current-carrying segment the generator drew against the PDK's own limits."""
+    from spicexplorer_signoff.current_density import Budget, check_current_density, limit_for
+
+    rows = json.loads(power_json.read_text())
+    r = check_current_density([Budget(**d) for d in rows], pdk="ihp-sg13g2")
+    table = []
+    for d in rows:
+        lim = limit_for(d["layer"], width_um=d["width_um"], n_vias=d["n_vias"])
+        table.append({**d, "limit_a": lim[0] if lim else None, "rule": lim[1] if lim else None,
+                      "over": round(d["current_a"] / lim[0], 4) if lim else None})
+    worst = max((t["over"] for t in table if t["over"] is not None), default=None)
+    print(f"  current density: passed={r.passed} checked={r.n_checked} worst={worst}")
+    return {"passed": bool(r.passed), "n_checked": int(r.n_checked),
+            "n_violations": int(r.n_violations), "worst_over": worst,
+            "reason": r.reason, "segments": table,
+            "violations": [v.__dict__ for v in r.violations]}
+
+
+def build(out: Path, sizing: Path | None = None) -> dict:
+    """GDS + LVS reference + power-path budget at the sizing of record (or `sizing`)."""
     out.mkdir(parents=True, exist_ok=True)
     gds, lvs = out / f"{CELL}.gds", out / f"{CELL}_lvs.spice"
-    r = _run([GF_PYTHON, GEN, "-o", gds, "--lvs", lvs])
+    cmd = [GF_PYTHON, GEN, "-o", gds, "--lvs", lvs, "--power", out / "power_path.json"]
+    if sizing:
+        cmd += ["--sizing", str(sizing)]
+    r = _run(cmd)
     if r.returncode != 0 or not gds.is_file():
         raise SystemExit(f"generator failed:\n{r.stdout}\n{r.stderr}")
     m = re.search(r"area um2: (\d+)", r.stdout)
     print(" ", r.stdout.strip().splitlines()[0])
-    return {"gds": str(gds), "lvs_netlist": str(lvs), "area_um2": int(m.group(1)) if m else None,
+    return {"gds": str(gds), "lvs_netlist": str(lvs), "power_path": str(out / "power_path.json"),
+            "area_um2": int(m.group(1)) if m else None, "sizing": str(sizing) if sizing else None,
             "stdout": r.stdout.strip()}
 
 
@@ -93,10 +137,15 @@ def drc(gds: Path, out: Path, no_density: bool = True) -> dict:
     # non-empty -- so a clean cell hid the bug until the first real violation (review-002 B1
     # attempt). Count per rule instead: which rules fired is what a reviewer reads.
     per_rule: dict[str, int] = {}
+    hits: dict[str, list] = {}
     for v in r.violations:
-        per_rule[str(getattr(v, "rule", "?"))] = per_rule.get(str(getattr(v, "rule", "?")), 0) + 1
+        k = str(getattr(v, "rule", "?"))
+        per_rule[k] = per_rule.get(k, 0) + int(getattr(v, "count", 1))
+        hits[k] = [[float(x), float(y)] for x, y in (getattr(v, "locations", None) or [])][:60]
+    for k, n in sorted(per_rule.items(), key=lambda kv: -kv[1]):
+        print(f"    {k:18s} {n:4d}  e.g. {hits.get(k, [])[:3]}")
     return {"passed": bool(r.passed), "available": bool(r.available), "no_density": bool(no_density),
-            "n_violations": int(r.n_violations), "violations_per_rule": per_rule,
+            "n_violations": int(r.n_violations), "violations_per_rule": per_rule, "hits": hits,
             "report": r.report_path, "reason": r.reason}
 
 
@@ -126,14 +175,14 @@ def pex_schematic(lvs_text: str, sub: str = "vss") -> str:
     return "\n".join(out) + "\n"
 
 
-def pex(gds: Path, lvs_netlist: Path, out: Path) -> dict:
+def pex(gds: Path, lvs_netlist: Path, out: Path, mode: str = "CC") -> dict:
     from spicexplorer_signoff.pex import run_pex, strip_mim_for_pex
 
     pex_gds = gds.with_name(f"{CELL}_pex.gds")
     strip_mim_for_pex(gds, pex_gds)
     sch = gds.with_name(f"{CELL}_pex_schematic.spice")
     sch.write_text(pex_schematic(lvs_netlist.read_text()))
-    r = run_pex(pex_gds, CELL, sch, out, mode="CC")
+    r = run_pex(pex_gds, CELL, sch, out, mode=mode)
     print(f"  PEX: ok={r.ok} n_C={r.n_c} n_R={r.n_r}")
     top = sorted(((v, k) for k, v in (r.per_net_c_ff or {}).items()), reverse=True)[:12]
     return {"ok": bool(r.ok), "available": bool(r.available), "mode": r.mode,
@@ -142,11 +191,35 @@ def pex(gds: Path, lvs_netlist: Path, out: Path) -> dict:
             "log_tail": (r.log or "")[-1500:] if not r.ok else ""}
 
 
+def _snapshot(iter_dir: Path, out: Path, rec: dict, note: str, detail: str) -> None:
+    """Record the round -- generator, render, per-rule DRC counts + hits, verdicts, knobs."""
+    from spicexplorer_layout.iterations import snapshot
+
+    drc = rec.get("drc")
+    if drc:
+        drc = {"passed": drc["passed"], "n_violations": drc["n_violations"],
+               "violations": [{"rule": k, "count": v, "locations": drc.get("hits", {}).get(k, [])}
+                              for k, v in (drc.get("violations_per_rule") or {}).items()]}
+    e = snapshot(iter_dir, note=note or "(no note)", detail=detail,
+                 gen_path=GEN, gds=(out / f"{CELL}.gds") if (out / f"{CELL}.gds").is_file() else None,
+                 params={"area_um2": (rec.get("build") or {}).get("area_um2"),
+                         "current_density_worst_over": (rec.get("current_density") or {}).get("worst_over")},
+                 drc=drc, lvs=rec.get("lvs"), pex=rec.get("pex"),
+                 area_um2=(rec.get("build") or {}).get("area_um2"), keep_gds=False)
+    print("snapshot:", e.id)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=str(WORK))
-    ap.add_argument("--stages", default="build,render,drc,lvs,pex")
+    ap.add_argument("--stages", default="guards,build,render,cd,drc,lvs,pex")
+    ap.add_argument("--sizing", default=None, help="JSON sizing overrides (a second sizing point)")
+    ap.add_argument("--snapshot", default=None, help="iterations dir to record this round into")
+    ap.add_argument("--note", default="", help="the round's one-line headline for the snapshot")
+    ap.add_argument("--detail", default="", help="the round's long-form notes for the snapshot")
     ap.add_argument("--all", action="store_true")
+    ap.add_argument("--pex-mode", default="CC", choices=["CC", "RC", "R"],
+                    help="PEX policy: CC in the loop, RC once for the report")
     ap.add_argument("--density", action="store_true",
                     help="run the density/fill rule tables too (review-002 m1)")
     a = ap.parse_args()
@@ -156,19 +229,34 @@ def main() -> int:
     rec: dict = {}
     gds, netlist = out / f"{CELL}.gds", out / f"{CELL}_lvs.spice"
 
+    if "guards" in stages:
+        print("guards:")
+        rec["guards"] = guards()
+        if not rec["guards"]["passed"]:
+            (out / "signoff.json").write_text(json.dumps(rec, indent=1) + "\n")
+            raise SystemExit("router guards failed — see layout/test_builder.py")
     if "build" in stages:
-        print("build:"); rec["build"] = build(out)
+        print("build:"); rec["build"] = build(out, Path(a.sizing) if a.sizing else None)
     if "render" in stages:
         print("render:"); rec["render"] = render(gds, out / f"{CELL}.png")
+    if "cd" in stages:
+        print("current density:")
+        rec["current_density"] = current_density(out / "power_path.json")
+        if not rec["current_density"]["passed"]:
+            (out / "signoff.json").write_text(json.dumps(rec, indent=1) + "\n")
+            raise SystemExit("current-density stage failed — a segment is over the process limit")
     if "drc" in stages:
         print("drc:"); rec["drc"] = drc(gds, out / "drc", no_density=not a.density)
     if "lvs" in stages:
         print("lvs:"); rec["lvs"] = lvs(gds, netlist, out / "lvs")
     if "pex" in stages:
-        print("pex:"); rec["pex"] = pex(gds, netlist, out / "pex")
+        print("pex:"); rec["pex"] = pex(gds, netlist, out / f"pex_{a.pex_mode.lower()}"
+                                        if a.pex_mode != "CC" else out / "pex", mode=a.pex_mode)
 
     (out / "signoff.json").write_text(json.dumps(rec, indent=1) + "\n")
     print("\nwrote", out / "signoff.json")
+    if a.snapshot:
+        _snapshot(Path(a.snapshot), out, rec, a.note, a.detail)
     return 0
 
 

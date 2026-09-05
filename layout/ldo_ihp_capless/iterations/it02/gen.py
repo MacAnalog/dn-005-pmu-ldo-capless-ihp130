@@ -124,7 +124,7 @@ BOUNDS: dict[str, tuple[float, float]] = {
     "ch_margin": (0.8, 2.0), "rail_w": (0.5, 2.0), "rail_gap": (1.4, 2.5),
     "ring_w": (0.5, 1.5), "ring_gap": (0.6, 3.0), "isl_gap": (1.3, 6.0), "n_dummy": (0, 2),
     "pwr_w": (1.64, 6.0), "pwr_stitch": (8, 24), "pwr_riser_vias": (28, 72),
-    "pwr_band_w": (5.0, 12.0), "xmp_nf_mult": (3, 8), "col_vias": (1, 4),
+    "pwr_band_w": (5.0, 12.0), "xmp_nf_mult": (1, 8), "col_vias": (1, 4),
     "mim_gap": (2.5, 8.0), "res_pitch": (1.8, 4.0), "r_segs": (2, 8), "rb_segs": (1, 6),
     "blk_gap": (4.0, 15.0), "tap_pitch": (6.0, 18.0),
 }
@@ -277,27 +277,6 @@ class Builder(ObstacleMap):
         self.vstack(x, y1, "Metal1", "Metal2")
         self.v("Metal2drawing", x, y0, y1, W_M2)
         self.verticals.append((net, _s(x), _s(min(y0, y1)), _s(max(y0, y1))))
-
-    def to_track_m3(self, net: str, x: float, y: float, step: float = 0.6) -> float:
-        """Same as :meth:`to_track` but the vertical is **Metal3**.
-
-        The pass device's gate leaves its island at the array's left edge, where the vout Metal2
-        comb spine runs: a Metal2 column there merges `gate` into `vout` -- one legal polygon, so
-        DRC says nothing and only LVS sees it.  Metal3 hops the spine (and the guard rings).
-        """
-        yt = self.rail_y.get(net, self.track_y.get(net))
-        if yt is None:
-            raise KeyError(f"no track or rail for net {net}")
-        xx = self.alloc(net, x, y, yt, step)
-        if xx != _s(x):
-            self.m1h(y, x, xx)
-            self.m1_claim(net, y, x, xx)
-        self.vstack(xx, y, "Metal1", "Metal3", VPAD)
-        self.vstack(xx, yt, "Metal1", "Metal3", VPAD)
-        self.v("Metal3drawing", xx, y, yt, 0.3)
-        self.verticals.append((net, _s(xx), _s(min(y, yt)), _s(max(y, yt))))
-        self.track_pts.setdefault(net, []).append(xx)  # type: ignore[arg-type]
-        return xx
 
     def to_track(self, net: str, x: float, y: float, step: float = 0.6) -> float:
         """Connect the Metal1 point (x, y) to the channel track / rail of ``net``."""
@@ -479,7 +458,7 @@ class Builder(ObstacleMap):
         return first, last, xs
 
     def mim(self, unit: float, x0: float, y0: float, mirror: bool = False,
-            top_to: float | None = None, escape: float = 0.0) -> tuple[tuple[float, float], tuple[float, float], tuple[float, float, float, float]]:
+            top_to: float | None = None) -> tuple[tuple[float, float], tuple[float, float], tuple[float, float, float, float]]:
         """One MIM unit, Metal5 plate lower-left at (x0, y0).
 
         Bottom (Metal5) plate pad on the LEFT and top plate strap to the RIGHT -- ONE
@@ -495,39 +474,23 @@ class Builder(ObstacleMap):
         yc = _s((b.bottom + b.top) / 2)
         sgn = -1.0 if not mirror else 1.0
         xb = _s((b.left - 1.2) if not mirror else (b.right + 1.2))
-        self.vstack(xb, yc, "Metal1", "Metal5", 1.3)   # Metal1, so a shifted stub still lands
+        self.vstack(xb, yc, "Metal2", "Metal5", 1.3)
         self.h("Metal5drawing", yc, xb, (b.left + 0.3) if not mirror else (b.right - 0.3), 0.6)
         xt = _s((b.right + 2.4) if not mirror else (b.left - 2.4))
         if top_to is not None:
             xt = _s(top_to)
-        self.vstack(xt, yc, "Metal1", "TopMetal1", 1.3)
+        self.vstack(xt, yc, "Metal2", "TopMetal1", 1.3)
         self.h("TopMetal1drawing", yc, ref.ports["PLUS"].center[0], xt, TM1_MIN_W)
         del sgn
-        # The plate pad carries its own 1.3 um Metal1/Metal2 stack and a 3x3 Via1 array; claim it
-        # so no routing pad lands beside it (three rounds of V1.a/V1.b/M1.b/M2.b came from that),
-        # and hand the caller a Metal1 arm `escape` um clear of it to route from.
-        for xp in (xb, xt):
-            self.m1_claim_box(f"@mim{len(self.m1_rows)}", xp - 0.85, yc - 0.85, xp + 0.85, yc + 0.85)
-        if escape > 0:
-            # INWARD, under the plate: outward runs into the cell edge (round 7 shorted
-            # ea_o1/fb/vss on the left-edge vss strap); under a Metal5 plate the Metal1 is free
-            xb_e = _s(xb + (-escape if mirror else escape))
-            xt_e = _s(xt + (escape if mirror else -escape))
-            self.m1h(yc, xb, xb_e, 0.4)
-            self.m1h(yc, xt, xt_e, 0.4)
-            return (xb_e, yc), (xt_e, yc), (b.left, b.bottom, b.right, b.top)
         return (xb, yc), (xt, yc), (b.left, b.bottom, b.right, b.top)
 
-    def climb(self, net: str, x: float, y0: float, y1: float, w: float = 0.3) -> None:
+    def climb(self, net: str, x: float, y0: float, y1: float, w: float = 0.6) -> None:
         """Take ``net`` from its Metal1 y up to the TopMetal1 strap at ``y1`` on a Metal2 column
         clear of every device row.  Only ever used for Iq-class currents."""
-        self.vstack(x, y0, "Metal1", "Metal2", VPAD)
+        self.vstack(x, y0, "Metal1", "Metal2", 0.8)
         self.v("Metal2drawing", x, y0, y1, w)
         self.vstack(x, y1, "Metal2", "TopMetal1", 1.3)
         self.verticals.append((net, _s(x), _s(min(y0, y1)), _s(max(y0, y1))))
-        # register the landing x, or the channel track is not drawn out to it and the net splits
-        if net in self.track_pts and abs(y0 - self.track_y.get(net, 1e9)) < 1e-6:
-            self.track_pts[net].append(_s(x))
 
     # -- power path --------------------------------------------------------
     def budget(self, net: str, note: str, current_a: float, layer: str,
@@ -651,22 +614,6 @@ def _wire_row(b: Builder, insts: dict[str, list[Dev]], net, pmos: bool, y_rail: 
                 b.to_track(sn, xs, ys)
 
 
-def _seg_len(l_total: float, segs: int, what: str) -> float:
-    """A serpentine segment length that keeps the `rhigh` cell on grid.
-
-    A `dy` that is not a multiple of 0.01 um makes the PDK cell's own geometry off-grid: at
-    `l = 138.5 um / 4 = 34.625 um` the rule deck reported 14 OffGrid / Sal.e / Rhi.d violations
-    *inside* the rhigh cell.  Rather than silently rounding (which would change the resistance and
-    fail LVS), refuse — the segment count is a knob and the caller can move it.
-    """
-    seg = l_total / segs
-    if abs(round(seg, 2) - seg) > 1e-9:
-        raise AssertionError(
-            f"{what}: {l_total:g} um / {segs} = {seg:g} um is not a multiple of 0.01 um; the "
-            f"rhigh cell goes off-grid there — pick another segment count")
-    return _s(seg)
-
-
 def build_full(p: LayoutParams = LayoutParams(),
                sizing: dict[str, object] | None = None) -> tuple[gf.Component, Builder]:
     sz = {**SIZING, **(sizing or {})}
@@ -681,7 +628,6 @@ def build_full(p: LayoutParams = LayoutParams(),
     # ================= row A: NMOS, sources on the vss rail =================
     y_vss = 0.0
     b.rail_y["vss"] = y_vss
-    b.m1_claim("vss", y_vss, -1e4, 1e4, p.rail_w)
     yA = _s(y_vss + p.rail_gap)
     instA, allA, xA_end = _place_row(b, ROW_A, W, L, 0.6, yA, False, "vss", y_vss, "A")
     boxA = _row_box(allA)
@@ -701,7 +647,6 @@ def build_full(p: LayoutParams = LayoutParams(),
     yB = _s(y_ch1 + p.ring_w + 0.14 + p.ring_gap + GATE + GPAD / 2 + 0.45)
     y_vdd = _s(yB + wfB + p.rail_gap)
     b.rail_y["vdd"] = y_vdd
-    b.m1_claim("vdd", y_vdd, -1e4, 1e4, p.rail_w)
     instQ, allQ, xQ_end = _place_row(b, ROW_B_QUIET, W, L, 0.6, yB, True, "vdd", y_vdd, "Q")
     # both rings plus NW.b (0.62 between two nwells on the same net) and Act.b (0.21) fit in
     # this gap: at 0.20 the two islands merged into ONE well and Act.b fired six times
@@ -755,7 +700,7 @@ def build_full(p: LayoutParams = LayoutParams(),
     # the vout bus: brief §3 measures gate-to-vout at 10-24x cheaper than gate-to-rail.
     xg = _s(dP.ax0 - 0.75)
     ygp = b.gate_pad(dP, xg, "gate")
-    b.to_track_m3("gate", xg, ygp, step=-0.6)
+    b.to_track("gate", xg, ygp, step=-0.6)
 
     x_r = _s((dP.ax0 + dP.ax1) / 2)
     b.riser("vdd", x_r, y_s_band, "Metal2", "TopMetal1", p.pwr_riser_vias, 2, p.pwr_band_w, I_VDD)
@@ -786,9 +731,7 @@ def build_full(p: LayoutParams = LayoutParams(),
     rb_l = _um(sz[PC["XRB"].params["l"]])
     ccw = _um(sz[PC["XCC"].params["w"]])
     cffw = _um(sz[PC["XCFF"].params["w"]])
-    if p.r_segs % 2:
-        raise AssertionError("r_segs must be even: the A B B A pattern is built from pairs")
-    seg_l = _seg_len(r_l, p.r_segs, "XR1/XR2")
+    seg_l = _s(r_l / p.r_segs)
     # XR1 / XR2: one common-centroid block, [A B B A] repeated, both centroids at the block
     # centre, with a tied dummy segment at each end.  brief §6 makes this the tightest matching
     # class in the cell (1.71 sigma) and brief §9 asks for ABBA specifically.
@@ -803,19 +746,13 @@ def build_full(p: LayoutParams = LayoutParams(),
     for i in range(n_cols):
         xx = _s(x_res1 + i * p.res_pitch)
         lo, hi, _ = b.serpentine(r_w, seg_l, 1, xx, y_res)
-        # the rhigh end pads are Metal1: claim them, or a stub walking the port row shorts the
-        # comb into itself (round 2 extracted XR2 as 212.5 + 85 + 42.5 um with `fb` in the middle)
-        for k, (px, py) in enumerate((lo, hi)):
-            b.m1_claim(f"@r{i}{k}", py, px - 0.45, px + 0.45, 0.9)
         if i < p.n_dummy or i >= n_cols - p.n_dummy:
             # a dummy segment: both ends shorted together and tied to vss
             b.m1v(lo[0], lo[1], hi[1], 0.3)
             b.dummies.append(NR.Dummy(f"RD{i}", "r", "vss", r_w, seg_l))
-            b.m1_retag(f"@r{i}0", "vss")
-            b.m1_retag(f"@r{i}1", "vss")
             b.to_track("vss", lo[0], lo[1])
             continue
-        ports[order[i - p.n_dummy]].append((lo, hi, i))
+        ports[order[i - p.n_dummy]].append((lo, hi))
 
     def _chain(entries, on_m2: bool):
         """Series-connect one arm's segments.  One arm links on Metal1 (offset out of the way),
@@ -826,59 +763,42 @@ def build_full(p: LayoutParams = LayoutParams(),
         for j in range(len(entries) - 1):
             at_bot = (j % 2 == 0)
             p0, p1 = entries[j][0 if at_bot else 1], entries[j + 1][0 if at_bot else 1]
-            for e, k in ((entries[j], 0 if at_bot else 1), (entries[j + 1], 0 if at_bot else 1)):
-                b.m1_retag(f"@r{e[2]}{k}", f"@arm{id(entries)}")
             if on_m2:
-                # Metal3, not Metal2: the arm's links run the length of the comb at the port y,
-                # and the fb / lp_brk Metal2 columns that leave the comb cross exactly there --
-                # round 3 extracted XR2 as vss-212.5-fb-85-$16-42.5-fb, a loop back into fb.
-                b.vstack(p0[0], p0[1], "Metal1", "Metal3", VPAD)
-                b.vstack(p1[0], p1[1], "Metal1", "Metal3", VPAD)
-                for px in (p0[0], p1[0]):
-                    b.verticals.append((f"@arm{id(entries)}", _s(px), _s(p0[1] - 0.3), _s(p0[1] + 0.3)))
-                b.h("Metal3drawing", p0[1], p0[0], p1[0], 0.3)
+                b.vstack(p0[0], p0[1], "Metal1", "Metal2", 0.38)
+                b.vstack(p1[0], p1[1], "Metal1", "Metal2", 0.38)
+                b.h("Metal2drawing", p0[1], p0[0], p1[0], 0.3)
             else:
                 y = y_lo if at_bot else y_hi
                 b.m1v(p0[0], p0[1], y, 0.3)
                 b.m1v(p1[0], p1[1], y, 0.3)
                 b.m1h(y, p0[0], p1[0], 0.3)
-                b.m1_claim(f"@arm{id(entries)}", y, p0[0], p1[0], 0.3)
-        k_last = 1 if (len(entries) - 2) % 2 == 0 else 0
-        return ((entries[0][1], (entries[0][2], 1)),
-                (entries[-1][k_last], (entries[-1][2], k_last)))
+        first_free = entries[0][1]                       # link j=0 is at the bottom
+        last_free = entries[-1][1] if (len(entries) - 2) % 2 == 0 else entries[-1][0]
+        return first_free, last_free
 
-    (r1a, i1a), (r1b, i1b) = _chain(ports["XR1"], on_m2=False)
-    (r2a, i2a), (r2b, i2b) = _chain(ports["XR2"], on_m2=True)
-    for tag, nname in ((f"@r{i1a[0]}{i1a[1]}", "lp_brk"), (f"@r{i1b[0]}{i1b[1]}", "fb"),
-                       (f"@r{i2a[0]}{i2a[1]}", "fb"), (f"@r{i2b[0]}{i2b[1]}", "vss")):
-        b.m1_retag(tag, nname)
+    r1a, r1b = _chain(ports["XR1"], on_m2=False)
+    r2a, r2b = _chain(ports["XR2"], on_m2=True)
     b.to_track("lp_brk", r1a[0], r1a[1])       # XR1: lp_brk (divider top) -> fb
     b.to_track("fb", r1b[0], r1b[1])
     b.to_track("fb", r2a[0], r2a[1])           # XR2: fb -> vss
     b.to_track("vss", r2b[0], r2b[1])
     # XRB beside the divider block, equally far from XMP (brief §9: its tc1 sets every current)
     x_rb = _s(x_res1 + n_cols * p.res_pitch + 1.0)
-    _seg_len(rb_l, p.rb_segs, "XRB")
     rba, rbb, _ = b.serpentine(r_w, rb_l, p.rb_segs, x_rb, y_res, pitch=1.6)
     b.to_track("vdd", rba[0], rba[1])
     b.to_track("nbias", rbb[0], rbb[1])
 
     # XCC (Miller) and XCFF (feed-forward): same orientation, same plate-connection side.
-    # Which node is the TOP plate is NOT a layout choice: `cap_cmim` is a polarised device in the
-    # LVS deck and the certified card fixes it -- nodes[0] is the top (PLUS) plate, nodes[1] the
-    # Metal5 bottom (MINUS).  Round 4 followed brief §9 instead ("put the terminal that has a
-    # budget on top") and LVS reported CFF and CC mismatched with fb/lp_brk and ea_o1/ea_out
-    # swapped.  Swapping the plates moves the bottom-plate parasitic to the other node, i.e. it is
-    # a design change, so the drawing follows the netlist and the brief's preference is recorded
-    # as a re-sizing question, not applied here.
+    # brief §9: kpex extracts the Metal5 BOTTOM plate and not the top, so the terminal that HAS a
+    # budget goes on top -- XCFF top = `fb` (27.9 fF), XCC bottom = `ea_out` (the lower-Z side).
     y_cc = _s(y_res - p.mim_gap - ccw - 3.0)
-    bt, tp, bbcc = b.mim(ccw, _s(x_res1 + 1.4), y_cc, escape=2.0)
-    b.to_track(PC["XCC"].nodes[1], *bt)
-    b.to_track(PC["XCC"].nodes[0], *tp)
+    bt, tp, bbcc = b.mim(ccw, _s(x_res1 + 1.4), y_cc)
+    b.to_track("ea_out", *bt)
+    b.to_track("ea_o1", *tp)
     y_cff = _s(bbcc[1] - p.mim_gap - cffw - 1.0)
-    bt, tp, bbff = b.mim(cffw, _s(x_res1 + 1.4), y_cff, escape=2.0)
-    b.to_track(PC["XCFF"].nodes[1], *bt)
-    b.to_track(PC["XCFF"].nodes[0], *tp)
+    bt, tp, bbff = b.mim(cffw, _s(x_res1 + 1.4), y_cff)
+    b.to_track("lp_brk", *bt)
+    b.to_track("fb", *tp)
     x_pass_r = _s(max(bbcc[2] + 3.2, x_rb + p.rb_segs * 1.6 + 1.0))
 
     # ================= XCOUT: a 2x2 common-centroid unit array under the stack ==========
@@ -903,7 +823,7 @@ def build_full(p: LayoutParams = LayoutParams(),
         x0 = _s(x_cout0 + col * pitch_x)
         y0 = _s(y_cout_top - (row + 1) * unit_h + p.mim_gap / 2)
         bt, _tp, _bb = b.mim(cw, x0, y0, mirror=mir, top_to=vout_spine_x)
-        vss_pads.append(bt)   # PC["XCOUT"].nodes[1] == "vss"; nodes[0] == "vout" is the top plate
+        vss_pads.append(bt)
     x_cout_r = _s(x_cout0 + (cols_ - 1) * pitch_x + cw + 3.0)
 
     # ================= rails, straps, pin frame ===============================
@@ -916,7 +836,8 @@ def build_full(p: LayoutParams = LayoutParams(),
     b.m1h(y_bot, x_left, x_right, p.rail_w)
     b.m1v(_s(x_left + p.rail_w / 2), y_bot, y_vss, p.rail_w)
     for (xb, yb) in vss_pads:                     # XCOUT bottom plates -> the bottom rail
-        b.m1v(xb, yb, y_bot, 0.6)               # the plate pad already reaches Metal1
+        b.vstack(xb, yb, "Metal1", "Metal2", 0.8)
+        b.m1v(xb, yb, y_bot, 0.6)
     # vdd: the Metal1 rail climbs to the TopMetal1 strap on the left, clear of every device
     b.climb("vdd", _s(x_left + 2.6), y_vdd, y_s_band)
     b.h("TopMetal1drawing", y_s_band, x_left, x_right, p.pwr_w)

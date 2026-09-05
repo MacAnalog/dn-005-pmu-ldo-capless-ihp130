@@ -158,6 +158,19 @@ def main() -> int:
         row["_violations"] = M.violations(C.H.spec, row)
         print(f"  {d}: {len(row['_violations'])} violation(s)")
 
+    # One `evaluate` row per scorecard, so `make runs --kind evaluate` can find them. The
+    # post-layout row is a DELIVERY CLAIM, so it is logged `evidence="awaiting"` exactly as
+    # `metrics.certify()` logs a certification: the signature is the verifier's own re-measure
+    # (rule 7, designer != verifier), never the designer's. The pre-layout row is the control and
+    # stays `scratch` -- the certified pre-layout scorecard lives in decks/candidate/.
+    M.log_run(C.H, f"{a.tag}_pre", {k: v for k, v in pre.items() if not k.startswith("_")},
+              violations=pre["_violations"], design=CANDIDATE.as_dict(),
+              extra={"benches": {b: r["status"] for b, r in pre_rec.items()}, "netlist": "schematic"})
+    M.log_run(C.H, f"{a.tag}_post", {k: v for k, v in post.items() if not k.startswith("_")},
+              violations=post["_violations"], design=CANDIDATE.as_dict(), evidence="awaiting",
+              extra={"benches": {b: r["status"] for b, r in post_rec.items()},
+                     "netlist": "extracted", "pex_netlist": str(hits[-1])})
+
     table = M.table({"pre-layout (schematic)": pre, "post-layout (extracted)": post},
                     cols=M.COLS_CANDIDATE)
     (OUT / "scorecard.md").write_text(table + "\n")

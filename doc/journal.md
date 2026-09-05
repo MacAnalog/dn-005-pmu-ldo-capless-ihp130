@@ -4,6 +4,7 @@ KIND: REFERENCE (index; `make lint` keeps it complete, newest first)
 
 | date | entry | type | status | hook |
 |---|---|---|---|---|
+| 2026-09-04 | [a-floorplan-is-bought-not-found.md](journal/a-floorplan-is-bought-not-found.md) | semantic | live | closing the current-density and matching findings cost +19.6 % area and pushed `gate`/`fb` over their pre-drawing budgets — a parasitic budget is a ranking with a scale, not a gate; the physical limit is the gate |
 | 2026-09-04 | [one-guarded-frozen-dir-guards-one-frozen-dir.md](journal/one-guarded-frozen-dir-guards-one-frozen-dir.md) | procedural | live | deleting an "unused" `VOUT_THRESH` left every candidate deck unbuildable and `deck_rebuild` guarded only decks/reference, so nothing caught it — a placeholder in a template comment still binds, and a lint runs over the whole `frozen:` set |
 | 2026-09-04 | [vacuous-equivalence-passes.md](journal/vacuous-equivalence-passes.md) | procedural | live | compare_netlists returned equivalent=True having matched 0 then 1 components; report components_matched beside every verdict and compare the cell flat |
 | 2026-09-04 | [netlist2xschem-skips-3-terminal-resistors.md](journal/netlist2xschem-skips-3-terminal-resistors.md) | procedural | live | IHP rhigh/rppd/rsil are 3-terminal subckts, the res symbol has 2 pins: they vanish from the drawing and the run still exits 0 — diff the device count |
