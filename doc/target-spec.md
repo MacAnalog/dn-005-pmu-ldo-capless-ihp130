@@ -24,7 +24,7 @@
 
 | # | requirement | target | reference baseline | checked by | where the bound comes from |
 |---|---|---|---|---|---|
-| S1 | regulated output at Vin 1.5 V, no load | 1.2 V ± 2 % → in [1.176, 1.224] V | 1.609 V (at Vin 3.3 V; its own 1.6 V target) | `lab.metrics.evaluate` (`dc_op`) | `engur2023-dualrange-fvf` runs at exactly 1.5 V → 1.2 V; ±2 % is the reference's own regulation error (S2+S3) doubled |
+| S1 | regulated output at Vin 1.5 V, no load | 1.2 V ± 2 % → in [1.176, 1.224] V | 1.609 V (at Vin 3.3 V; its own 1.6 V target) | `ldo.metrics.evaluate` (`dc_op`) | `engur2023-dualrange-fvf` runs at exactly 1.5 V → 1.2 V; ±2 % is the reference's own regulation error (S2+S3) doubled |
 | S2 | load regulation, 0.1 → 10 mA | ≤ 5 mV | **1.27 mV** (0 → 10 mA) | `load_regulation` | match the reference (1.27 mV over 0 → 10 mA) with margin; `perez2018` −0.82 mV/mA and `ieee9180856-adaptive-fb` 0.0014 mV/mA bracket it |
 | S3 | line regulation, Vin 1.4 → 1.65 V at 1 mA | ≤ 2 mV | **4.32 mV** (Vin 2.6 → 3.6 V) | `line_regulation` | reference 4.32 mV/V → 1.1 mV over our 0.25 V range; literature 0.08–0.49 mV/V (`perez2018`, `zhang2023`) |
 | S4 | dropout at 10 mA | ≤ 200 mV | 170 mV at 1 mA (hv pass device) | `dropout` | `ni2022` 200 mV, `zhang2023` 100 mV at 10 mA, `perez2018` 140 mV at 50 mA; the reference's hv number does not transfer |

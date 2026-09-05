@@ -246,12 +246,12 @@ describes, with the work directory and every scratch artefact under `$SX_SCRATCH
 
 ```
 # gates
-make lint ; python -m lab.metrics --check ; python scripts/naming_guard.py --scan .
+make lint ; python -m ldo.metrics --check ; python scripts/naming_guard.py --scan .
 
 # 3.1 / 3.3 — rebuild and re-measure (candidate at tt/27 and three corners)
-python -c "from lab.metrics import evaluate; from lab.dut import CANDIDATE; \
+python -c "from ldo.metrics import evaluate; from ldo.dut import CANDIDATE; \
            evaluate(CANDIDATE, 'REVIEW_candidate_tt_27')"
-python -c "from lab.metrics import evaluate; from lab.dut import CANDIDATE; \
+python -c "from ldo.metrics import evaluate; from ldo.dut import CANDIDATE; \
            [evaluate(CANDIDATE.at(c,t), f'REVIEW_record_{c}_{t:g}C') \
             for c,t in (('ss',-40.),('ff',125.),('tt',125.))]"
 
@@ -279,7 +279,7 @@ python -c "from spicexplorer_core.spice_engine.sim_log import fatal_lines, class
 
 1. Fix the supply and output metallization (B1) and add a current-density stage to the sign-off
    chain. Nothing else on this list changes whether the cell works.
-2. Replace `lab/sim.py`'s fatal scan with the platform's classifier (M5); the post-layout row then
+2. Replace `ldo/sim.py`'s fatal scan with the platform's classifier (M5); the post-layout row then
    comes from the frozen path and M4 disappears with it.
 3. Fix the scorecard/ledger key mismatch (M1) so signing means something, then re-sign.
 4. Correct the output-noise metric in the shared class template (M2) and re-issue the affected

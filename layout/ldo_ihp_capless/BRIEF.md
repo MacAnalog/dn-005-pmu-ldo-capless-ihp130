@@ -3,7 +3,7 @@
 **KIND: REFERENCE.** Measured parasitic, matching, leakage and current-density budgets for the
 capless FVF LDO, handed from the schematic side to layout. Every number below came out of the
 **frozen candidate benches** (`decks/candidate/*.spice`, sha-locked) with one perturbation
-spliced into the DUT subckt and all 13 benches re-run through `lab.metrics.run_decks`. Nothing
+spliced into the DUT subckt and all 13 benches re-run through `ldo.metrics.run_decks`. Nothing
 here is a rule of thumb; where a quantity could not be measured it says so.
 
 | | |
@@ -461,7 +461,7 @@ make runs ARGS="--exp 005 --kind bench"       # every brief_* row of the campaig
 
 The campaign driver is `$SX_SCRATCH/ldo-brief/{pert,campaign,analyse,report,emit}.py`:
 `pert.build(mutator)` reads each frozen deck **byte for byte**, rewrites only the
-`.subckt ldo_ihp_capless ... .ends` block, and hands the 13 decks to `lab.metrics.run_decks`, so
+`.subckt ldo_ihp_capless ... .ends` block, and hands the 13 decks to `ldo.metrics.run_decks`, so
 the perturbed runs use the same measurement definitions as the certified scorecard and land in
 the same ledger. The operating point is `op.py` (0 V ammeters into every drain, `print all`); the
 divider mismatch sigma is `mc/mc_2k.spice` (2000 `mc_source` samples on `res_typ_mismatch`); the
@@ -474,7 +474,7 @@ same subckt modulo element names, and the `load_regulation` run of the 0.1 Ohm `
 **numerically identical** (`load_reg = 0.001018`). Two sign conventions differ and are stated
 above: the platform injects current *into* the net and puts the source so the device sees
 `net + dv`. The only piece the platform lacks for this repo is a `measure()` that runs all 13
-frozen decks: that is `lab.metrics.run_decks` over `splice_subckt`, and it is what
+frozen decks: that is `ldo.metrics.run_decks` over `splice_subckt`, and it is what
 `sensitivity.sweep` would take as its callable. **The driver is not durable** — it lives under
 `$SX_SCRATCH/ldo-brief/`, which is evidence scratch, not the repo. Under rule 10 this brief only
 *proposes*, and does not apply, two procedural changes: adopt `pert.py` + `campaign.py` as

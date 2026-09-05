@@ -1,6 +1,6 @@
 """003 — sizing: drive the frozen class benches of the candidate through `spicexplorer-optimize`.
 
-Decks are BUILT from `lab.dut.CANDIDATE` with NO overrides, so every knob is defined exactly once
+Decks are BUILT from `ldo.dut.CANDIDATE` with NO overrides, so every knob is defined exactly once
 (the sizing.yaml `.param` default) and the optimizer's by-name `.param` rewrite hits the live
 line. The project YAML's `dut_params` are the sizing knobs (SI units), `init` = the hand point
 (seeded as trial 0), `target_specs` = the S1-S8 box with margin + S8 at 0.1/10 mA; the objective
@@ -20,8 +20,8 @@ from pathlib import Path
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from lab import config as C  # noqa: E402
-from lab.dut import CANDIDATE  # noqa: E402
+from ldo import config as C  # noqa: E402
+from ldo.dut import CANDIDATE  # noqa: E402
 from spicexplorer_core.eng import parse_value  # noqa: E402
 
 OPT = C.WORK / "opt"
@@ -78,7 +78,7 @@ def write_project(budget: int, seed: int) -> Path:
         "ws_root": str(decks), "netlist": "dc_op.spice", "outdir": "run", "tech_spec": {"name": "ihp-sg13g2", "constraints": {}},
         "dut_params": dut_params,
         "testbenches": [{"name": b, "params": [], "netlist": f"{b}.spice", "enable": True,
-                         "description": f"frozen class bench {b} built by lab.dut.CANDIDATE"} for b in BENCHES],
+                         "description": f"frozen class bench {b} built by ldo.dut.CANDIDATE"} for b in BENCHES],
         "optimizer_config": {"type": "nevergrad", "random_seed": seed, "budget": budget, "name": "NGOpt",
                              "seed_from_init": True,
                              "lin_variable_bounds": {"min": 0, "max": 100}, "log_variable_bounds": {"min": 1, "max": 100},

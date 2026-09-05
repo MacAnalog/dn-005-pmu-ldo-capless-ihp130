@@ -5,8 +5,8 @@
 | | |
 |---|---|
 | **Paper(s)** | none — this is the carried-forward analog-db reference, not a technique |
-| **Hypothesis** | The committed IHP binding of `ldo_005_buffered_ref` runs all ten LDO-class benches through this repo's `lab/` (platform `NGSpice_Wrapper` + analog-db `assemble()`) and reproduces the analog-db scoreboard baseline `67ea759104` (ngspice-45) to the drift tolerances in `lab.metrics.TOL`. Falsified if any bench fails to run or any number moves. |
-| **Control** | the frozen deck bytes: `scripts/lint.py::deck_rebuild` proves `lab.dut.Design.deck()` regenerates them; `make check` re-simulates them |
+| **Hypothesis** | The committed IHP binding of `ldo_005_buffered_ref` runs all ten LDO-class benches through this repo's `ldo/` (platform `NGSpice_Wrapper` + analog-db `assemble()`) and reproduces the analog-db scoreboard baseline `67ea759104` (ngspice-45) to the drift tolerances in `ldo.metrics.TOL`. Falsified if any bench fails to run or any number moves. |
+| **Control** | the frozen deck bytes: `scripts/lint.py::deck_rebuild` proves `ldo.dut.Design.deck()` regenerates them; `make check` re-simulates them |
 | **Verdict** | **CONFIRMED.** 10/10 benches ran (2.5 s wall, 10 parallel ngspice); every scorecard number equals the analog-db baseline to the printed digits. |
 
 ## 1. Result — the numbers every candidate is scored against
@@ -46,14 +46,14 @@ S1 and S5 are the point of the challenge; S8 is the price of its three-stage loo
 export PDK_ROOT=$HOME/local/pdks PDK=ihp-sg13g2
 export SPICE_USERINIT_DIR=$PDK_ROOT/ihp-sg13g2/libs.tech/ngspice SX_SCRATCH=$HOME/sx-scratch
 uv sync && make doctor
-.venv/bin/python -m lab.metrics --certify     # builds decks/reference/*.spice, runs them, writes scorecard.json
+.venv/bin/python -m ldo.metrics --certify     # builds decks/reference/*.spice, runs them, writes scorecard.json
 make freeze                                    # SHA256SUMS
 make check                                     # lint (incl. deck rebuild) + re-simulate the frozen decks, compare
 make baseline                                  # print the scorecard from the frozen decks (no compare)
 ```
 
 Deck provenance: analog-db submodule at the platform's pinned commit (see `decks/reference/build-sheet.md`);
-`lab.dut.Design(circuit="ldo_005_buffered_ref", pdk="ihp-sg13g2", corner="tt", sizing={})`.
+`ldo.dut.Design(circuit="ldo_005_buffered_ref", pdk="ihp-sg13g2", corner="tt", sizing={})`.
 
 ## 3. What this does and does not certify
 

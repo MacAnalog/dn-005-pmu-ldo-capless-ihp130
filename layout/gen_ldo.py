@@ -22,7 +22,7 @@ that terminal (gate pad left of the device, drain pad right of it, source pad fu
 no two nets ever share a column.  The pass-gate net runs one Metal2 vertical from XMD/XMS to the
 XMP gate bar (doc/journal/fvf-gate-cap-is-slew.md: keep that net short).
 
-Sizes come from the sizing dict (``lab.dut.Design.knobs()`` units: SI strings such as ``"8u"``,
+Sizes come from the sizing dict (``ldo.dut.Design.knobs()`` units: SI strings such as ``"8u"``,
 or floats in metres from the optimizer's ``design.json``); ``SIZING`` below = sizing.yaml
 defaults.  Layout knobs (``LayoutParams``) are the free constants a layout optimizer may move.
 """

@@ -21,7 +21,7 @@ record is `doc/target-spec.md`; its machine twin is the `spec:` block in `harnes
 | measure something | `doc/benches.md` — the analog-db LDO class benches are the definitions; the key map from canonical names to spec keys |
 | touch the DUT / model it | `doc/design-reference.md` — device map, the reference's structure, the constraints every candidate must respect |
 | pick a paper / technique | `pdf/INDEX.md` |
-| run simulations | `lab/` module docstrings + `doc/environment.md` (native ngspice lane, PDK pin, gotchas) |
+| run simulations | `ldo/` module docstrings + `doc/environment.md` (native ngspice lane, PDK pin, gotchas) |
 | start an experiment | copy `experiments/_template/`; add one row to `doc/experiment-log.md` |
 | learn from / add a lesson | `doc/journal.md` (index); one file per entry in `doc/journal/`; supersede, never delete |
 | know what to read/write when | `doc/memory/README.md` — the four memory tiers and the write-risk ordering |
@@ -31,20 +31,20 @@ record is `doc/target-spec.md`; its machine twin is the `spec:` block in `harnes
 `spicexplorer-harness` (platform package, an editable path dependency — `uv sync` once per
 checkout) does the generic work, driven by `harness.yaml`; `Makefile` wraps it.
 
-- `make doctor` — is the simulation lane alive? (`lab/sim.py`: ngspice + the PDK model libs)
+- `make doctor` — is the simulation lane alive? (`ldo/sim.py`: ngspice + the PDK model libs)
 - `make pack K="psrr iq"` — assemble **working memory** for a task. Run at task start;
   re-run with `S="loop gain fell to 0 dB"` on any new failure signature before diagnosing.
 - `make lint` — repo invariants (`harness.yaml` drives them). Failure messages carry their fix.
 - `make check` — lint + the reference reproduces its certified scorecard.
 - `make runs ARGS="--fails | --best i_q_ua | --exp 001 | --kind bench"` — query the run ledger
-  (`runs/ledger.ndjson`; every `lab.metrics.evaluate()` appends a row).
+  (`runs/ledger.ndjson`; every `ldo.metrics.evaluate()` appends a row).
 - `make freeze` — write `SHA256SUMS` into the frozen dirs after certifying a reference.
 - `make baseline` — simulate the frozen reference decks and print the scorecard.
 
 ## Rules (mechanically enforced where possible; the rest is contract)
 
 1. **Reference first.** A number that has not passed the frozen definitions is a claim.
-2. **Decks are built, never text-edited.** A sizing point is a `lab.dut.Design`; every deck is
+2. **Decks are built, never text-edited.** A sizing point is an `ldo.dut.Design`; every deck is
    generated from it (analog-db class template + the circuit's lowered netlist + the sizing).
    Frozen dirs are sha-locked.
 3. Every experiment: **falsifiable hypothesis first**; a control whenever a knob moves.
@@ -58,7 +58,7 @@ checkout) does the generic work, driven by `harness.yaml`; `Makefile` wraps it.
 9. **Sim economy.** Expensive runs (corners, Monte Carlo, long transients) only after the cheap
    scorecard passes the box.
 10. **Write-risk ordering.** Episodic writes are automatic; semantic writes need provenance and
-    supersede-don't-delete; procedural writes (`lab/`, `scripts/`, agent defs, this file) are
+    supersede-don't-delete; procedural writes (`ldo/`, `scripts/`, agent defs, this file) are
     human-reviewed — agents propose diffs, never self-apply them.
 
 ## Agents and methods

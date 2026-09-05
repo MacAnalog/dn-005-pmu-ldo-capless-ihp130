@@ -97,7 +97,7 @@ class Design:
         head = body[: -len(".end")]
         over = "".join(f".param {k}={v}\n" for k, v in self.sizing)
         where = self.corner if self.temp is None else f"{self.corner} x {self.temp:g}C"
-        return (f"* {self.circuit} x {bench} x {self.pdk} x {where} -- built by lab.dut.Design\n"
+        return (f"* {self.circuit} x {bench} x {self.pdk} x {where} -- built by ldo.dut.Design\n"
                 + head + over + ".end\n")
 
     def as_dict(self) -> dict:

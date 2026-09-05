@@ -27,10 +27,10 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lab import config as C  # noqa: E402
-from lab import metrics as M  # noqa: E402
-from lab import sim  # noqa: E402
-from lab.dut import CANDIDATE  # noqa: E402
+from ldo import config as C  # noqa: E402
+from ldo import metrics as M  # noqa: E402
+from ldo import sim  # noqa: E402
+from ldo.dut import CANDIDATE  # noqa: E402
 
 CELL = "ldo_ihp_capless"
 OUT = Path(__file__).resolve().parents[1] / "experiments" / "005-layout" / "out"
@@ -101,13 +101,13 @@ def pex_subckt(pex_netlist: Path) -> str:
 
 
 def run_frozen(decks: dict[str, str], tag: str) -> tuple[dict, dict]:
-    """Score `decks` through the FROZEN measurement path -- `lab.sim.run` + `lab.metrics.promote`,
-    the same two calls `lab.metrics.evaluate` makes for the pre-layout row.
+    """Score `decks` through the FROZEN measurement path -- `ldo.sim.run` + `ldo.metrics.promote`,
+    the same two calls `ldo.metrics.evaluate` makes for the pre-layout row.
 
     This used to be `run_tolerant`, a local rule that re-parsed the log whenever the only fatal
     line was ngspice's benign `Warning: singular matrix` from gmin stepping. That override existed
-    because `lab/sim.py` carried its own fatal-line table which ranked the bare substring above
-    the warning prefix; the platform's classifier, which `lab/sim.py` now calls, already gets this
+    because `ldo/sim.py` carried its own fatal-line table which ranked the bare substring above
+    the warning prefix; the platform's classifier, which `ldo/sim.py` now calls, already gets this
     right. Rule 2 says the frozen definitions certify, so the post-layout row and the pre-layout
     row it is compared against must come from one path -- with the override in place they did not
     (review-002 M4/M5)."""

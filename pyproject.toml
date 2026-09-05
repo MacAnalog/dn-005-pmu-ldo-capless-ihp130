@@ -7,9 +7,9 @@ dependencies = [
     "numpy>=1.26",
     "matplotlib>=3.8",
     "spicexplorer-harness",     # ledger, lints, context pack, spec-as-data (harness.yaml)
-    "spicexplorer-core",        # NGSpice_Wrapper: the platform's ngspice lane (lab/sim.py)
+    "spicexplorer-core",        # NGSpice_Wrapper: the platform's ngspice lane (ldo/sim.py)
     "spicexplorer",             # backends.analog_db loaders (sizing, datasheet metrics, corners)
-    "spicexplorer-analog-db",   # the LDO class benches + the reference circuit (lab/dut.py)
+    "spicexplorer-analog-db",   # the LDO class benches + the reference circuit (ldo/dut.py)
     # transitive platform members, named directly so uv applies the path sources below to them
     "spicexplorer-waveview",
     "spicexplorer-circuitgraph",

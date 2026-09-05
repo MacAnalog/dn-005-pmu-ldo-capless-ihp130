@@ -2,7 +2,7 @@
 
 **Paper(s):** none (topology from 002)
 **Hypothesis:** starting from the gm/ID-derived hand point of 002 (the double-mirror fold, all of S1–S8 at tt except S5), `spicexplorer-optimize` (Nevergrad NGOpt, the S1–S8 box with margin as constraints, S8 also at 0.1/10 mA, Iq as the objective) finds a point ≤ 35 µA that still meets the whole box at tt/27 °C, and that point holds S1–S8 over the five MOS corners × −40/27/125 °C with at most S8 falling below 60° at ss/−40 °C. Falsified if the optimizer cannot cut Iq by ≥ 20 % without a constraint violation, or if the corner table shows a hard-box violation at tt-adjacent corners.
-**Control:** the hand point itself (trial 0, seeded through `seed_from_init`) scored by the same project; and the reference row quoted from `decks/reference/scorecard.json`. Every candidate row is the full 13-bench `lab.metrics.evaluate` scorecard, not the optimizer's own reading.
+**Control:** the hand point itself (trial 0, seeded through `seed_from_init`) scored by the same project; and the reference row quoted from `decks/reference/scorecard.json`. Every candidate row is the full 13-bench `ldo.metrics.evaluate` scorecard, not the optimizer's own reading.
 **Verdict:** PARTLY CONFIRMED. The optimizer cut Iq **50.17 → 36.28 µA (−27.7 %)** and passes the whole box at tt/27 °C with margin on every line (§1) — so the ≥ 20 % clause holds, but the **≤ 35 µA target is missed by 1.28 µA**; the hypothesis is not retracted, it is scored as missed. The corner clause is **FALSIFIED, and not in the predicted place**: 12 of 15 corners pass, but the failures are **S7 at ss/−40 and ss/27 (311 and 255 mV)** and **S5 at ff/125 (61.9 µA)** — not S8, which never drops below 70.3° anywhere (§3). Both failures are the same mechanism, and it is not sizing: the resistor-referenced bias spreads Iq **2.4× across corners** (25.6–61.9 µA), and S5 and S7 pull that one knob in opposite directions (§3). Two further findings that only the frozen benches could produce: rounding the optimizer's winner onto a layout grid **breaks S7 twice over** (§2) — once by moving the pass device off its minimum length, once by landing `c_ff_w` on a cliff.
 
 **Figures** (`figs.py`, regenerated from `out/*.json`; every one carries its spec bound):
@@ -12,7 +12,7 @@
 
 ## 1. The design of record at tt / 27 °C
 
-Every row is the full 13-bench `lab.metrics.evaluate` scorecard (`out/points_all.md`, ledger tags `003_control_tt_27`, `003_raw_tt_27`, `003_rounded_tt_27`, `003_record_tt_27`). The reference row is quoted, not re-run (`decks/reference/scorecard.json`; hv / 3.3 V / 1.6 V / 1 µF, the yardstick for S2/S3/S6 only).
+Every row is the full 13-bench `ldo.metrics.evaluate` scorecard (`out/points_all.md`, ledger tags `003_control_tt_27`, `003_raw_tt_27`, `003_rounded_tt_27`, `003_record_tt_27`). The reference row is quoted, not re-run (`decks/reference/scorecard.json`; hv / 3.3 V / 1.6 V / 1 µF, the yardstick for S2/S3/S6 only).
 
 | cell | v_out_v | i_q_ua | load_reg_mv | line_reg_mv | v_dropout_mv | psrr_1k_db | v_undershoot_mv | pm_loop_deg | pm_loop_lo_deg | pm_loop_hi_deg | loopgain_db | ugf_loop_khz | verdict |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -23,7 +23,7 @@ Every row is the full 13-bench `lab.metrics.evaluate` scorecard (`out/points_all
 | **design of record** — rounded, `c_ff_w` off the cliff | 1.200 | **36.28** | 0.028 | 0.059 | 106.1 | 69.95 | 104.8 | 72.42 | 72.38 | 72.31 | 49.95 | 836 | **PASS** |
 | spec box | [1.176, 1.224] | ≤ 50 | ≤ 5 | ≤ 2 | ≤ 200 | ≥ 40 | ≤ 150 | ≥ 60 | ≥ 60 | ≥ 60 | — | — | |
 
-The design of record is the `sizing.yaml` defaults, so a bare `lab.dut.CANDIDATE` renders it; it is certified into `decks/candidate/` with `SHA256SUMS` (13/13 benches ok, 0 violations). Against the reference it is what the challenge asked for: **the same regulation and PSRR class at 4.8 % of the quiescent current** (36.3 µA against 758.7), with load regulation 45× better, line regulation 73× better, PSRR 25 dB better and phase margin 26° better — at 1.5 V into an on-chip 21 pF instead of 3.3 V into 1 µF.
+The design of record is the `sizing.yaml` defaults, so a bare `ldo.dut.CANDIDATE` renders it; it is certified into `decks/candidate/` with `SHA256SUMS` (13/13 benches ok, 0 violations). Against the reference it is what the challenge asked for: **the same regulation and PSRR class at 4.8 % of the quiescent current** (36.3 µA against 758.7), with load regulation 45× better, line regulation 73× better, PSRR 25 dB better and phase margin 26° better — at 1.5 V into an on-chip 21 pF instead of 3.3 V into 1 µF.
 
 ## 2. What rounding costs, and why the optimizer's winner is not the design
 
@@ -77,7 +77,7 @@ The predicted failure (S8 at ss/−40) did not happen: phase margin is the *leas
 
 ## 4. How the optimizer was driven
 
-`run_opt.py` builds the project YAML from `lab.dut.CANDIDATE` itself: decks are rendered with **no overrides**, so every knob is defined exactly once (its `sizing.yaml` `.param` default) and the optimizer's by-name `.param` rewrite hits the live line. 17 of the 31 knobs were searched, the rest frozen at their defaults; `seed_from_init` makes the 002 hand point trial 0, which is what makes the control row and the reported cut comparable. Budget 120 trials, NGOpt, 8 workers, ~9.7 s/trial, best score −0.2506 at trial 104.
+`run_opt.py` builds the project YAML from `ldo.dut.CANDIDATE` itself: decks are rendered with **no overrides**, so every knob is defined exactly once (its `sizing.yaml` `.param` default) and the optimizer's by-name `.param` rewrite hits the live line. 17 of the 31 knobs were searched, the rest frozen at their defaults; `seed_from_init` makes the 002 hand point trial 0, which is what makes the control row and the reported cut comparable. Budget 120 trials, NGOpt, 8 workers, ~9.7 s/trial, best score −0.2506 at trial 104.
 
 - objective: `i(i_supply)` minimize, target 30 µA, log reward, weight 2
 - constraints with margin against the box: `v(vout_dc)` 1.2 ± 20 mV, `load_reg` ≤ 4 mV, `line_reg` ≤ 1.5 mV, `v_dropout` ≤ 170 mV, `psrr_vdd_db` ≥ 43 dB, `v_undershoot` ≤ 120 mV (weight 1.5), and phase margin ≥ 63° on all three of `ac_loopgain`, `ac_loopgain_lo`, `ac_loopgain_hi`

@@ -1,6 +1,7 @@
 # The one file that describes this design to the harness (spicexplorer-harness).
 # Keys not listed here keep their defaults; unknown keys fail `make lint`.
 name: ldo-ihp130
+package: ldo         # the design's own Python package (decks, lane, metrics), importable from the repo root
 exp_env: LDO_EXP        # env var stamping every ledger row with the experiment id
 jobs_env: LDO_JOBS      # width of spicexplorer_harness.batch
 

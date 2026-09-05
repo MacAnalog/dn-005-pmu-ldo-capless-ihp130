@@ -1,6 +1,6 @@
 # Candidate manifest (analog-db circuit shape, kept LOCAL to this design repo — see
-# doc/journal/analog-db-has-no-overlay-root.md). lab.dut resolves circuits/<id>/ before the
-# analog-db submodule root, so `lab.dut.Design(circuit="ldo_ihp_capless")` renders every class
+# doc/journal/analog-db-has-no-overlay-root.md). ldo.dut resolves circuits/<id>/ before the
+# analog-db submodule root, so `ldo.dut.Design(circuit="ldo_ihp_capless")` renders every class
 # bench through analog-db's own assemble() exactly as the reference does.
 #
 # Topology of record (experiment 002): a DOUBLE-MIRROR flipped-voltage-follower (FVF) output

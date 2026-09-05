@@ -2,6 +2,7 @@
 """`make lint`: the platform harness checks (driven by harness.yaml) plus this repo's own."""
 from __future__ import annotations
 
+import importlib
 import json
 import sys
 from pathlib import Path
@@ -14,9 +15,9 @@ from spicexplorer_harness.lint import Lint  # noqa: E402
 
 
 def deck_rebuild(L: Lint) -> None:
-    """Every frozen bench must still be reproducible from lab.dut.Design + design.json.
+    """Every frozen bench must still be reproducible from ldo.dut.Design + design.json.
 
-    decks/reference/*.spice are bytes; lab.dut (analog-db assemble + the sizing point) is the
+    decks/reference/*.spice are bytes; ldo.dut (analog-db assemble + the sizing point) is the
     generator. If the analog-db submodule, the class templates or the builder drift, every
     experiment silently measures a different bench than the certified one.
     """
@@ -25,22 +26,24 @@ def deck_rebuild(L: Lint) -> None:
     if not dj.exists():
         return  # nothing certified yet; the frozen check reports a missing manifest
     try:
-        from lab.dut import Design
+        # resolved through `package:`, never `from ldo.dut import ...`: the check that catches a
+        # half-finished package rename must not itself be broken BY the rename
+        Design = importlib.import_module(f"{L.h.package}.dut").Design
         d = Design.from_dict(json.loads(dj.read_text()))
         built = {b: d.deck(b) for b in d.benches()}
     except Exception as exc:  # noqa: BLE001
         L.fail("deck-rebuild", f"cannot rebuild the reference decks from design.json: {exc!r}",
-               "design.json must round-trip through lab.dut.Design.from_dict; fix the loader or re-certify")
+               "design.json must round-trip through ldo.dut.Design.from_dict; fix the loader or re-certify")
         return
-    fix = ("a class template, the analog-db submodule pin or lab.dut changed: revert it, or re-certify "
-           "deliberately (`python -m lab.metrics --certify && make freeze`) -- an un-reproducible "
+    fix = ("a class template, the analog-db submodule pin or ldo.dut changed: revert it, or re-certify "
+           "deliberately (`python -m ldo.metrics --certify && make freeze`) -- an un-reproducible "
            "reference means every A/B is measured against a bench nobody can rebuild")
     for b, text in built.items():
         p = ref / f"{b}.spice"
         if not p.exists():
             L.fail("deck-rebuild", f"decks/reference/{b}.spice is missing", fix)
         elif p.read_text() != text:
-            L.fail("deck-rebuild", f"lab.dut.Design.deck({b!r}) no longer reproduces decks/reference/{b}.spice", fix)
+            L.fail("deck-rebuild", f"ldo.dut.Design.deck({b!r}) no longer reproduces decks/reference/{b}.spice", fix)
 
 
 def spec_reference(L: Lint) -> None:

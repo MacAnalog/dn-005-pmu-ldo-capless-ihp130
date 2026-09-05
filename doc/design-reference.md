@@ -28,7 +28,7 @@ loop, in `sg13_lv_*` at 1.5 V. Chosen in experiment 002, sized in 003, drawn in 
   well under the 100 pF bound: 002 showed the transient is loop-speed-limited, not charge-limited.
 
 Sizing knobs and their defaults ARE the design of record:
-`circuits/ldo_ihp_capless/pdk/ihp-sg13g2/sizing.yaml`, so a bare `lab.dut.CANDIDATE` renders it.
+`circuits/ldo_ihp_capless/pdk/ihp-sg13g2/sizing.yaml`, so a bare `ldo.dut.CANDIDATE` renders it.
 Certified into `decks/candidate/` with `SHA256SUMS`. Schematic of record:
 `experiments/004-schematic/`. Layout generator: `layout/gen_ldo.py`.
 
@@ -40,7 +40,7 @@ an RC (`R_LPF`/`C_LPF`) filters it, and a two-stage error amplifier (`XMEA_*`, M
 `REAZ`/`CEAC`) drives the PMOS pass device `XMP` (w×m); `R3` bleeds the output, `C1` is the
 on-die 10 pF. All MOS are `sg13_hv_*` (3.3 V family). The 0 V source `VLP lp_brk vout` is the
 loop-break marker the `ac_loopgain` bench turns into a generator. Sizing knobs and their
-defaults: `circuits/ldo_005_buffered_ref/pdk/ihp-sg13g2/sizing.yaml`; a `lab.dut.Design`
+defaults: `circuits/ldo_005_buffered_ref/pdk/ihp-sg13g2/sizing.yaml`; an `ldo.dut.Design`
 is that circuit id + a dict of knob overrides.
 
 ## Validated model

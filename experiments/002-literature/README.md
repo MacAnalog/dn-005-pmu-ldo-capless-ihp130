@@ -34,7 +34,7 @@ Table 1 — the reference row (certified, `decks/reference/scorecard.json`; hv/3
 | reference (certified) | 1.609 | 758.7 | 1.274 | 4.32 | 169.7 | 44.53 | 1.957 | 46.39 | FAIL (S1 window, S3, S5, S8; S4/S7 not at our conditions) |
 | spec box | [1.176, 1.224] | ≤ 50 | ≤ 5 | ≤ 2 | ≤ 200 | ≥ 40 | ≤ 150 | ≥ 60 | |
 
-Table 2 — structural A/B on the candidate at tt/27 °C, gm/ID starting sizes (ledger tags `003_probe0_*`, `003_probe1_*`, `003_probe2_*`; every row is the full 13-bench scorecard through `lab.metrics.evaluate`):
+Table 2 — structural A/B on the candidate at tt/27 °C, gm/ID starting sizes (ledger tags `003_probe0_*`, `003_probe1_*`, `003_probe2_*`; every row is the full 13-bench scorecard through `ldo.metrics.evaluate`):
 
 | cell | v_out_v | i_q_ua | load_reg_mv | line_reg_mv | v_dropout_mv | psrr_1k_db | v_undershoot_mv | pm_loop_deg | pm_loop_lo_deg | pm_loop_hi_deg | loopgain_db | ugf_loop_khz | verdict |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|

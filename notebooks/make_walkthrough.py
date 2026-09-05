@@ -92,7 +92,7 @@ for k in ("load_reg_mv", "line_reg_mv", "psrr_1k_db", "pm_loop_deg"):
     MD("""## 3. The design of record, device by device
 
 The sizing point is not stored in this notebook or in the layout generator: it is the `default:`
-fields of the circuit's `sizing.yaml`, so a bare `lab.dut.CANDIDATE`, the frozen decks, the
+fields of the circuit's `sizing.yaml`, so a bare `ldo.dut.CANDIDATE`, the frozen decks, the
 schematic of record and the GDS all render the same numbers by construction."""),
 
     CODE("""import yaml

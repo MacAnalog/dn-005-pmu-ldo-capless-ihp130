@@ -190,7 +190,7 @@ def table(rows: dict[str, dict], cols=COLS) -> str:
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(prog="lab.metrics")
+    ap = argparse.ArgumentParser(prog="ldo.metrics")
     ap.add_argument("--certify", action="store_true", help="(re)certify the reference into decks/reference/")
     ap.add_argument("--check", action="store_true", help="exit 1 if the frozen reference drifted")
     ap.add_argument("--baseline", action="store_true", help="simulate the frozen decks and print the scorecard")
@@ -201,7 +201,7 @@ def main(argv=None) -> int:
         print("\nbench status:", doc["bench_status"])
         return 0
     if not (C.REF_DIR / "scorecard.json").exists():
-        print("no reference certified yet: `python -m lab.metrics --certify`, then `make freeze`")
+        print("no reference certified yet: `python -m ldo.metrics --certify`, then `make freeze`")
         return 1
     decks = frozen_decks()
     values, records = run_decks(decks, "reference_check")
@@ -220,7 +220,7 @@ def main(argv=None) -> int:
             for k, got, want, why in d:
                 print(f"  {k:16s} got {got:.6g}  certified {want:.6g}  ({why})")
             print("\nFIX: the simulator, the PDK models, the analog-db submodule or the deck moved; "
-                  "re-certify deliberately (`python -m lab.metrics --certify && make freeze`) "
+                  "re-certify deliberately (`python -m ldo.metrics --certify && make freeze`) "
                   "and re-measure every A/B that was scored before")
             return 1
         print("\nreference reproduces its certified scorecard")

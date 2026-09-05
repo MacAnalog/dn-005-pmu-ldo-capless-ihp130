@@ -1,7 +1,7 @@
 """003 — sizing: score the optimizer's winner through the FROZEN bench definitions.
 
 `run_opt.py` reads nine benches through the optimizer's own recipe layer; rule 1 says a number
-is a claim until it has passed `lab.metrics.evaluate` (the full 13-bench analog-db class
+is a claim until it has passed `ldo.metrics.evaluate` (the full 13-bench analog-db class
 scorecard). This script does that, for three points and for the corner sweep:
 
     control  the double-mirror fold hand point of 002, pinned explicitly in CONTROL below
@@ -24,9 +24,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from lab import config as C  # noqa: E402
-from lab import metrics as M  # noqa: E402
-from lab.dut import CANDIDATE  # noqa: E402
+from ldo import config as C  # noqa: E402
+from ldo import metrics as M  # noqa: E402
+from ldo.dut import CANDIDATE  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 OUT = HERE / "out"

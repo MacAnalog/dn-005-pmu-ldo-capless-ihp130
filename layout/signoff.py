@@ -44,7 +44,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lab import config as C  # noqa: E402
+from ldo import config as C  # noqa: E402
 
 CELL = "ldo_ihp_capless"
 GEN = Path(__file__).resolve().parent / "gen_ldo.py"

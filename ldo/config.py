@@ -1,7 +1,7 @@
 """Paths and knobs. Everything is overridable via environment variables.
 
 The simulation lane is native ngspice + the open IHP SG13G2 PDK, driven through the
-platform's `NGSpice_Wrapper` (see `lab.sim`). Nothing here is under NDA: decks, models and
+platform's `NGSpice_Wrapper` (see `ldo.sim`). Nothing here is under NDA: decks, models and
 logs may all be committed and published verbatim.
 """
 from __future__ import annotations

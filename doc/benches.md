@@ -2,15 +2,15 @@
 
 KIND: REFERENCE (what certifies what)
 
-**Reference-first policy.** Fast metrics (`lab.metrics.evaluate`) iterate; the frozen
+**Reference-first policy.** Fast metrics (`ldo.metrics.evaluate`) iterate; the frozen
 definitions certify. A number that has not passed through them is a claim.
 
 The measurement definitions are the **analog-db LDO class testbench templates**
 (`examples/analog-db/_shared/classes/ldo/testbench-templates/*.spice`, canonical vocabulary in
-`metrics.yaml`). `lab.dut.Design.deck(bench)` renders one of them through analog-db's own
+`metrics.yaml`). `ldo.dut.Design.deck(bench)` renders one of them through analog-db's own
 `assemble()` — class template + the circuit's lowered netlist + the sizing point — so the
 fast scorecard and the frozen reference run the same definition. Every deck ends with
-`print <measures>`; `lab.sim.run` parses those scalars out of the ngspice log.
+`print <measures>`; `ldo.sim.run` parses those scalars out of the ngspice log.
 
 | bench (analog-db template) | what it measures | ngspice measure → spec key (scale) |
 |---|---|---|

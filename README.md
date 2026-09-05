@@ -6,7 +6,7 @@ context pack, spec checks) is the SpiceXplorer platform package `spicexplorer-ha
 simulator lane is the platform's `NGSpice_Wrapper`; the benches are the analog-db **LDO class**
 testbench templates and the reference circuit is analog-db's `ldo_005_buffered_ref`. This repo
 holds only what is specific to this design: `harness.yaml`, the docs under `doc/`, the thin
-`lab/` that builds decks and measures them, and the agent definitions under `.claude/`.
+`ldo/` that builds decks and measures them, and the agent definitions under `.claude/`.
 
 Start at [CLAUDE.md](CLAUDE.md) (the entry map), then [doc/target-spec.md](doc/target-spec.md).
 
@@ -17,7 +17,7 @@ two-stage error amplifier ([doc/design-reference.md](doc/design-reference.md)). 
 ([003](experiments/003-sizing/README.md)), drawn as a schematic
 ([004](experiments/004-schematic/README.md)) and laid out, DRC/LVS-clean and extracted
 ([005](experiments/005-layout/README.md)). Every number below is the analog-db LDO class benches
-via `lab.metrics.evaluate`; the reference row is quoted from its own certification.
+via `ldo.metrics.evaluate`; the reference row is quoted from its own certification.
 
 | | S1 v_out (V) | S2 load reg (mV) | S3 line reg (mV) | S4 dropout (mV) | S5 Iq (µA) | S6 PSRR 1 kHz (dB) | S7 undershoot (mV) | S8 PM (deg) | verdict |
 |---|---|---|---|---|---|---|---|---|---|
@@ -82,8 +82,8 @@ See [doc/environment.md](doc/environment.md) for the PDK pin and the lane's gotc
 | `harness.yaml` | the design described to the harness: spec rows, frozen dirs, denylist, ledger columns |
 | `CLAUDE.md` | the entry map agents read first |
 | `doc/` | target spec, design reference (constraints), benches, environment, experiment log, journal + index, the memory model |
-| `lab/` | `config` (paths, PDK), `sim` (lane), `dut` (the sizing point → deck), `metrics` (measure, check, log) |
-| `scripts/lint.py` | repo-specific checks on top of the harness (frozen decks rebuild from `lab/`) |
+| `ldo/` | `config` (paths, PDK), `sim` (lane), `dut` (the sizing point → deck), `metrics` (measure, check, log) |
+| `scripts/lint.py` | repo-specific checks on top of the harness (frozen decks rebuild from `ldo/`) |
 | `decks/reference/` | the certified reference benches + `scorecard.json`, sha-locked |
 | `decks/candidate/` | the **design of record's** 13 certified benches + `scorecard.json`, sha-locked |
 | `circuits/ldo_ihp_capless/` | the candidate as an analog-db circuit dir (manifest, datasheet, analyses, IHP binding + `sizing.yaml` = the design of record) |
