@@ -61,6 +61,44 @@ _RES_CARD = re.compile(
 _L_PARAM = re.compile(r"\bl\s*=\s*([-+.\deE]+)", re.I)
 
 
+# The 2.5D R mesh anchors a named net on its `[Pin]` node with a **zero-ohm** resistor -- the
+# stitcher means "merge these two nodes".  ngspice does not merge: it clamps the value to 1e-12
+# ohm and puts a 1e12 S entry into a conductance matrix whose signal entries are ~1e-5 S, and the
+# direct solve then returns an operating point that is not a solution of the network.  It is not
+# a convergence failure -- it converges, silently, to the wrong answer, and it does so with both
+# SPARSE and KLU and with a `.nodeset` seeded from the correct solution.  Measured on the LDO's
+# feedback divider, sixteen IDENTICAL 126 kOhm segments in series between vout and vss:
+#
+#     two 0-ohm ties present   fb = 9.99 mV   (top half drops 186.25 mV/segment, bottom 1.25)
+#     the same two at 1e-3     fb = 599.7 mV  (uniform 75 mV/segment, vout 1.1995 V, Iq 33.77 uA)
+#
+# The first row violates KCL at `fb` by 1.5 uA with no path to carry it, and it survives the
+# resistors being replaced by ideal linear ones -- so it is arithmetic, not a model.  A finite
+# floor is the smallest honest repair: 1 mOhm against a mesh whose own segments are 0.2-20 ohm
+# adds at most a nanovolt, and unlike a node merge it leaves the netlist's shape (and every node
+# name a reviewer might probe) intact.
+R_FLOOR = 1e-3
+_R_MESH = re.compile(r"^(R\S*)\s+(\S+)\s+(\S+)\s+([-+.\deE]+)\s*(.*)$")
+
+
+def floor_zero_r(txt: str) -> tuple[str, int]:
+    """Give every zero-valued mesh resistor a finite value; return the text and the count."""
+    out, n = [], 0
+    for ln in txt.splitlines():
+        m = _R_MESH.match(ln)
+        if m and m.group(1).lower().startswith("rext"):
+            try:
+                v = float(m.group(4))
+            except ValueError:
+                out.append(ln); continue
+            if v == 0.0:
+                n += 1
+                ln = f"{m.group(1)} {m.group(2)} {m.group(3)} {R_FLOOR:g}" + (
+                    f" {m.group(5)}" if m.group(5) else "")
+        out.append(ln)
+    return "\n".join(out) + ("\n" if txt.endswith("\n") else ""), n
+
+
 def ngspice_cards(txt: str) -> str:
     """kpex element cards -> cards ngspice can read."""
     out = []
@@ -92,6 +130,9 @@ def pex_subckt(pex_netlist: Path) -> str:
         raise SystemExit(f"{pex_netlist} is already a prepared block (it carries VSUBSTIE) — "
                          "point --netlist at the extractor's own output, or read it directly")
     txt = ngspice_cards(prep_pex_subckt(pex_netlist, CELL))
+    txt, n_zero = floor_zero_r(txt)
+    if n_zero:
+        print(f"pex: {n_zero} zero-ohm mesh tie(s) floored at {R_FLOOR:g} Ohm", flush=True)
     # The header spills onto `+` continuation lines: every labelled net becomes a pin, so the
     # extracted block has ~15 of them where the schematic subckt has three.
     m = re.search(rf"(?im)^\.subckt\s+{CELL}\b[^\n]*\n(?:\+[^\n]*\n)*", txt)
@@ -216,7 +257,16 @@ def select_pex_netlist(pex_dir, explicit: str | None = None,
             named = ((json.loads(rp.read_text()).get("pex") or {}).get("netlist"))
             if named and Path(named).is_file():
                 p = Path(named)
-                return p, ("stitched" if p.name.endswith("_stitched.spice") else "raw")
+                # The record is only evidence about the directory it belongs to. A run dir that
+                # holds a CC stage AND an RC stage has ONE signoff.json, whose `pex.netlist` is
+                # whichever stage wrote last -- so honouring it while the caller asked for the
+                # other stage's directory measures the wrong extraction and says the right name
+                # (review-005: `--pex .../pex_rc --record .../signoff.json` silently scored the
+                # CC netlist). If they disagree, the explicit directory wins and says so.
+                if Path(pex_dir).resolve() in p.resolve().parents:
+                    return p, ("stitched" if p.name.endswith("_stitched.spice") else "raw")
+                print(f"note: {rp} names {p}, which is not under the requested {pex_dir}; "
+                      "reading the directory instead", flush=True)
     pex_dir = Path(pex_dir)
     stitched = sorted(pex_dir.rglob("*_pex_netlist_stitched.spice"))
     raw = sorted(pex_dir.rglob("*_pex_netlist.spice"))   # does NOT match the stitched name

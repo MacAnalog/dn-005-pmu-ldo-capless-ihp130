@@ -275,6 +275,54 @@ def test_a_second_invocation_does_not_erase_the_first_stages():
     assert got["lvs"]["matched"] is True and got["pex"]["mode"] == "RC", got
 
 
+def test_a_record_from_another_stage_does_not_win_over_the_directory_asked_for():
+    """review-005: one run dir, two PEX stages, one `signoff.json`.
+
+    `--pex <dir>/pex_rc --record <dir>/signoff.json` scored the CC netlist, because the record's
+    `pex.netlist` was whatever stage ran last. A record that names a file outside the requested
+    directory is evidence about a different stage and must be ignored, out loud.
+    """
+    import json
+    import tempfile
+
+    import postlayout as pl
+
+    d = Path(tempfile.mkdtemp(prefix="pexrec_"))
+    cc, rc = d / "pex", d / "pex_rc"
+    cc.mkdir(); rc.mkdir()
+    (cc / "cell_k25d_pex_netlist.spice").write_text("* cc\n")
+    (rc / "cell_k25d_pex_netlist_stitched.spice").write_text("* rc\n")
+    (d / "signoff.json").write_text(json.dumps(
+        {"pex": {"netlist": str(cc / "cell_k25d_pex_netlist.spice")}}))
+    got, kind = pl.select_pex_netlist(rc, record=str(d / "signoff.json"))
+    assert got.parent == rc and kind == "stitched", (got, kind)
+    got, kind = pl.select_pex_netlist(cc, record=str(d / "signoff.json"))
+    assert got.parent == cc and kind == "raw", (got, kind)
+
+
+def test_a_zero_ohm_mesh_tie_is_floored_and_a_device_resistor_is_not():
+    """review-005: kpex writes the `[Pin]` anchor as a 0-ohm resistor meaning "merge these two".
+
+    ngspice clamps it to 1e-12 ohm instead, and the 1e12 S entry wrecks the conductance matrix:
+    the LDO's sixteen identical divider segments then report 186 mV of drop across the top eight
+    and 1.2 mV across the bottom eight, which violates KCL at `fb` by 1.5 uA. The floor is the
+    repair; it must NOT touch a `rhigh`/`XR` device card, whose value is a real design value.
+    """
+    import postlayout as pl
+
+    txt, n = pl.floor_zero_r(
+        "Rext_971 fb fb.n_24.18 0 R\n"
+        "Rext_1 a b 9 R\n"
+        "Rext_2 c d 0.0\n"
+        "XRn_101 n_30 fb vss rhigh w=0.5u l=42.5u m=1\n"
+        "Rdiv x y 0\n")
+    assert n == 2, n            # only the extractor's own mesh cards, by name
+    assert "Rext_971 fb fb.n_24.18 0.001 R" in txt, txt
+    assert "Rext_1 a b 9 R" in txt, txt
+    assert "XRn_101 n_30 fb vss rhigh w=0.5u l=42.5u m=1" in txt, txt
+    assert "Rdiv x y 0" in txt, txt    # not a mesh tie: left exactly as written
+
+
 def main() -> int:
     fails = 0
     for name, fn in sorted(globals().items()):
