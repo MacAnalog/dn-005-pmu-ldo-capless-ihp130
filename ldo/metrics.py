@@ -1,6 +1,7 @@
 """Fast scorecard: build every bench deck, simulate, map measures to spec keys, check the box,
-log the row. Also the reference certification (`--certify`), the drift check (`--check`,
-second half of `make check`) and the plain baseline print (`--baseline`).
+log the row. Also the certification of a frozen dir (`--certify [DIR]`, provenance block and
+all), the drift check (`--check`, second half of `make check`) and the plain baseline print
+(`--baseline`).
 
 The measurement definitions are the analog-db LDO class benches; this module only maps their
 `print`ed measures onto the unit-scaled spec keys of harness.yaml (`KEYMAP`, documented in
@@ -15,11 +16,16 @@ import sys
 import time
 from pathlib import Path
 
-from spicexplorer_harness import batch, log_run, violations
+from spicexplorer_harness import batch, hashes, log_run, provenance, violations
 
 from . import config as C
 from . import sim
 from .dut import REFERENCE, Design
+
+# The scorer `provenance()` hashes, DERIVED from this file rather than written as a literal: a
+# literal would keep naming a path the package rename has already moved, and only a certification
+# that re-hashes its own scorer ever notices (doc/journal/a-signed-row-that-can-never-match.md).
+SCRIPT = Path(__file__).resolve().relative_to(C.H.root).as_posix()
 
 # (bench, ngspice measure) -> (spec/report key, scale). Anything not listed is kept raw under
 # "<bench>.<measure>" in the per-bench record but not promoted to a scorecard column.
@@ -135,30 +141,75 @@ def certified() -> dict:
 
 
 def certify(design: Design = REFERENCE, tag: str = "reference_certify", out: Path | None = None) -> dict:
-    """Write <out>/{<bench>.spice, design.json, scorecard.json} (default decks/reference/);
-    `make freeze` afterwards. A candidate certifies into decks/candidate/ the same way."""
-    out = C.REF_DIR if out is None else Path(out)
+    """Write <out>/{<bench>.spice, design.json, decks.sha256, scorecard.json} (default
+    decks/reference/); `make freeze` afterwards. A candidate certifies into decks/candidate/ the
+    same way.
+
+    The scorecard's `provenance:` block comes from `spicexplorer_harness.ledger.provenance()`, so
+    it carries `tag`/`corner`/`exp` at the TOP level plus the hash block (`script_sha`, `raw_sha`,
+    one `computation_hash` per metric) that the harness's `scorecard-recompute` lint matches a
+    signed ledger row on. The run is logged from the SAME block with the same `corner=`, as
+    `evidence="awaiting"`: certification is a delivery claim, and the signature is the verifier's
+    own re-measure (rule 7). Writing the tag inside `provenance` and no hash block -- what this
+    function used to do -- produced a lint failure no signature could ever clear
+    (`doc/journal/a-signed-row-that-can-never-match.md`).
+    """
+    # resolved: a relative `--certify decks/reference` must still yield a repo-relative
+    # `raw:` for the provenance block, not fall through to the outside-the-repo branch
+    out = C.REF_DIR if out is None else Path(out).resolve()
+    # Build EVERY deck before anything is unlinked: a builder that raises half way through -- an
+    # unbound template placeholder, say -- would otherwise leave the frozen dir short of benches,
+    # one `make freeze` away from a sha-locked reference missing a column nobody can miss again.
+    decks = {b: design.deck(b) for b in design.benches()}
     out.mkdir(parents=True, exist_ok=True)
     for old in out.glob("*.spice"):
         old.unlink()
-    decks = {b: design.deck(b) for b in design.benches()}
     for b, text in decks.items():
         (out / f"{b}.spice").write_text(text)
     values, records = run_decks(decks, tag)
-    log_run(C.H, tag, values, deck="".join(decks.values()), violations=violations(C.H.spec, values),
-            design=design.as_dict(), extra={"benches": {b: r["status"] for b, r in records.items()}})
+    card = {k: v for k, v in values.items() if isinstance(v, float) and not math.isnan(v)}
+    (out / "design.json").write_text(json.dumps(design.as_dict(), indent=1) + "\n")
+    # What `provenance(raw=...)` hashes: the certified deck bytes, digested. Never SHA256SUMS --
+    # `make freeze` writes that over the whole dir INCLUDING scorecard.json, so a scorecard
+    # naming it could never re-derive.
+    digest = out / "decks.sha256"
+    digest.write_text("".join(f"{hashes.sha256_text(text)}  {b}.spice\n"
+                              for b, text in sorted(decks.items())))
+    try:
+        raw_rel: str | None = digest.relative_to(C.H.root).as_posix()
+    except ValueError:
+        # a frozen dir outside the repo (a scratch certification) has no repo-relative name, and
+        # an absolute host path in a committed scorecard leaks a home dir and never re-hashes
+        raw_rel = None
+    prov = provenance(C.H, tag, card, corner=design.corner, script=SCRIPT, raw=raw_rel)
+    viol = violations(C.H.spec, values)
+    log_run(C.H, tag, values, corner=design.corner, deck="".join(decks.values()), violations=viol,
+            design=design.as_dict(), evidence="awaiting",
+            extra={"benches": {b: r["status"] for b, r in records.items()}},
+            **{k: prov[k] for k in hashes.HASH_KEYS})
     doc = {
+        "tag": prov["tag"],
         "circuit": design.circuit, "pdk": design.pdk, "corner": design.corner,
+        "t": time.strftime("%Y-%m-%dT%H:%M:%S"), "lane": sim.preflight()["lane"],
         "design": design.as_dict(),
-        "scorecard": {k: v for k, v in values.items() if isinstance(v, float) and not math.isnan(v)},
+        "scorecard": card,
         "bench_measures": {b: r.get("measures", {}) for b, r in records.items()},
         "bench_status": {b: r["status"] for b, r in records.items()},
-        "violations": violations(C.H.spec, values),
-        "provenance": {"tag": tag, "t": time.strftime("%Y-%m-%dT%H:%M:%S"), "lane": sim.preflight()["lane"]},
+        "violations": viol,
+        "provenance": prov,
     }
-    (out / "design.json").write_text(json.dumps(design.as_dict(), indent=1) + "\n")
     (out / "scorecard.json").write_text(json.dumps(doc, indent=1) + "\n")
     return doc
+
+
+def certify_dir(out: Path, tag: str | None = None) -> dict:
+    """Re-certify the frozen dir `out` from ITS OWN `design.json` -- the sizing point it was
+    certified from -- so re-certifying a deck can never quietly change the design it certifies.
+    The tag is the dir's name (`decks/candidate` -> `candidate_certify`)."""
+    out = Path(out)
+    dj = out / "design.json"
+    design = Design.from_dict(json.loads(dj.read_text())) if dj.is_file() else REFERENCE
+    return certify(design, tag or f"{out.name}_certify", out=out)
 
 
 def drift(measured: dict) -> list[tuple[str, float, float, str]]:
@@ -191,13 +242,16 @@ def table(rows: dict[str, dict], cols=COLS) -> str:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="ldo.metrics")
-    ap.add_argument("--certify", action="store_true", help="(re)certify the reference into decks/reference/")
+    ap.add_argument("--certify", nargs="?", const=str(C.REF_DIR), default=None, metavar="DIR",
+                    help="(re)certify DIR (default decks/reference/) from its own design.json")
     ap.add_argument("--check", action="store_true", help="exit 1 if the frozen reference drifted")
     ap.add_argument("--baseline", action="store_true", help="simulate the frozen decks and print the scorecard")
     a = ap.parse_args(argv)
-    if a.certify:
-        doc = certify()
-        print(table({"reference (certified)": {**doc["scorecard"], "_violations": doc["violations"]}}))
+    if a.certify is not None:
+        doc = certify_dir(Path(a.certify))
+        print(table({f"{Path(a.certify).name} (certified)":
+                     {**doc["scorecard"], "_violations": doc["violations"]}},
+                    cols=COLS_CANDIDATE if doc["circuit"] != C.REF_CIRCUIT else COLS))
         print("\nbench status:", doc["bench_status"])
         return 0
     if not (C.REF_DIR / "scorecard.json").exists():
