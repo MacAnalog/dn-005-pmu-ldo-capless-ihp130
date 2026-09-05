@@ -644,3 +644,237 @@ iterations:
     png: it09/layout.png
     diff_from_it08: diff_it08_it09.png
   drc_hits: {}
+- id: it10
+  note: 'certified deck re-issued on the drawn device set (F19): Iq 36.28->33.81 uA, S7 104.8->115.1 mV'
+  detail: 'Commit 1 of the fix round: `decks/candidate` re-certified so the certified netlist and the
+    LVS reference are the same text (review-003 F19, adopted). The drawn device set moves into `circuits/.../netlist.spice`:
+    XMB0/XMB1/XMS/XM1..XM4 as named half-width A/B cards, XR1/XR2 as eight-segment strings and XRB as
+    five, XMP as m=76 unit fingers of 2.5 um. The generator''s slot tables now name those cards, so a
+    matched member is a certified device rather than a split `--combine_devices` happens to tolerate,
+    and `xmp_nf_mult` / `r_segs` / `rb_segs` leave `LayoutParams` for `sizing.yaml`. Attribution measured
+    on the certified deck: 91 % of the -2.47 uA Iq shift is the bias-branch halving, 8 % the resistor
+    segmentation, and the pass finger split is +0.015 uA, i.e. free. The GDS changes with it (sha 226bf2ea
+    -> ff85adc0) at the same 42 231 um2. This round had no snapshot when it was committed; it is recorded
+    here so the trail has no hole between the reviewed drawing and the fix round.'
+  gen_sha256: 62411818d1a30da0a838b281bc32c9b3ee679b43f19e76fce9ec62c1fd05cddf
+  gds_sha256: ff85adc0da06ed2edbbb0d7d97f84e152e6a41cbeb48732100b3b6529509181a
+  params:
+    area_um2: 42231
+    current_density_worst_over: 0.836
+  area_um2: 42231
+  drc:
+    passed: true
+    n: 0
+    rules: {}
+  lvs:
+    passed: true
+    matched: true
+    unmatched: {}
+    netlist_sha: null
+  pex: {}
+  scorecard: {}
+  files:
+    gen: it10/gen.py
+    png: it10/layout.png
+    diff_from_it09: diff_it09_it10.png
+  drc_hits: {}
+- id: it11
+  note: 'Metal2 comb registered per-layer + gate track on Metal3 + ea_in_pair leftmost: DRC 0, LVS
+    matched, PM 68.76->69.30'
+  detail: 'Fix round for layout review-003 (blockers F1-F3, majors F4-F9, minors F10-F14).
+
+
+    Router: ObstacleMap is layer-aware. Every vertical carries its layer and claim_box() records an
+
+    arbitrary drawn rectangle, so the pass array''s Metal2 comb (fingers + two 6 um spines, drawn by the
+
+    power path as plain rects) is finally an obstacle. That closes the gate|vout short class the
+
+    reviewer reproduced at col_vias 3 and 4, and it removes the hard-coded to_track_m3: gate''s track
+    is
+
+    now Metal3 (TRACK_LAYER), so the comb is simply not on its layer. Same-net columns now keep the
+
+    via-pad pitch too - two ea_n columns 0.38 um apart merge legally on Metal2 but put their Via1 cuts
+
+    0.19 um apart (V1.b).
+
+
+    Geometry: the pass device''s gate stand-off is derived from the drain via pad (at col_vias 4 the
+
+    drain Metal1 reached 0.08 um into the gate bar); the n-well ring''s Metal2 riser reaches the source
+
+    spine at any ring_gap (at 3.0 the pass bulk extracted as an unnamed node); the right cell edge is
+
+    placed by TopMetal1 spacing to the XCOUT block, so pwr_w 1.64-8 and vss_ret_w 0.8-6 are all legal.
+
+
+    Floorplan: ea_in_pair is the first group of row B (fb 107 -> 79.6 um) and bias_p_group takes the
+
+    long trip. Common-centroid members reserve a MIRRORED COLUMN PAIR before the general allocator runs
+
+    - the XOR of the two halves'' own routing is 0.000-0.011 um2 with equal via counts, against 64.7 %
+
+    and 32.8 %. Dummies are sized to the slot they stand beside, not to the widest slot in the group.
+
+    XRB is on res_pitch with a tied dummy at each end. vss return: bottom rail plus TWO edge risers at
+
+    vss_ret_w = 3.0 (hand model 32 -> ~3 ohm) and ONE vss label. lp_brk escapes to the right edge beside
+
+    vout, so the divider senses at the output pin. pwr_w 2.0 -> 4.0 (hand model: vdd 1.20 -> 0.60 ohm,
+
+    vout 1.11 -> 0.56 ohm, dropout adder 30.5 -> 15.2 mV).
+
+
+    Sign-off: DRC and LVS now BLOCK; a new bounds stage walks both ends of every documented range
+
+    (40/40 build + DRC 0 + LVS matched + current density pass); the per-net C table keeps every net;
+
+    kpex runs with the run dir as its cwd so its stray <cell>_extracted.cir lands inside it.
+
+
+    Measured: area 42 231 -> 44 266 um2 (+4.8 %). CC per-net to-rail C: gate 34.45, fb 21.20, ea_o1
+
+    43.92, ea_out 16.75 fF. Post-layout 18/18 PASS, S7 127.6 mV, PM 69.30 (was 68.76). Gate-only what-if
+
+    S7 201.7 mV (was 204.5) - still over 150 and NOT closed by routing: gpad 0.5 -> 0.34, i.e. 32 % less
+
+    gate-bar area, buys 0.30 fF of 34.45, so the term is the pass array''s own gate structure, which the
+
+    certified finger count sets. RC still emits an 8548-card R mesh with ZERO nodes in common with the
+
+    33 device pins (kpex 0.3.12), so 5 of 13 benches abort and the R is electrically absent.
+
+    '
+  gen_sha256: 7d274c6a75c404541616f478e17988251e1f086c62dc08ae36da76b20f3e02ee
+  gds_sha256: a66d15b58033051c9100a5f067b3b0c10de5527a29df42812070d983a5f40467
+  params:
+    area_um2: 44266
+    current_density_worst_over: 0.836
+  area_um2: 44266
+  drc:
+    passed: true
+    n: 0
+    rules: {}
+  lvs:
+    passed: true
+    matched: true
+    unmatched: {}
+    netlist_sha: f573b653cd022e639fbe1c97c7c3cb08db32c5c08b8edf920c1e34067951fcfd
+  pex:
+    ok: true
+    mode: CC
+    n_c: 186
+    n_r: 21
+  scorecard: {}
+  files:
+    gen: it11/gen.py
+    png: it11/layout.png
+    diff_from_it10: diff_it10_it11.png
+  drc_hits: {}
+- id: it12
+  note: 'vss cliff is shared impedance, not width: XCOUT gets its own strap to the pin, right riser
+    deleted -> return 4.9 ohm, 40/40 endpoints clean'
+  detail: 'Second round of the fix, after the brief author re-derived every budget on the re-certified
+
+    schematic row (BRIEF.md @ 223373e). Two brief changes drive it.
+
+
+    F9''s MECHANISM changed. The re-derived brief §4a splits the vss injection: with only the ACTIVE
+
+    devices behind 32 ohm S7 moves +0.44 mV (nothing), and with only XCOUT''s bottom plate behind it S7
+
+    IMPROVES to 103.2 mV (ESR-zero damping). The 11 ohm cliff needs BOTH halves behind one R - Cout''s
+
+    load-step displacement current develops a ground bounce the FVF sources and the EA read as a
+
+    reference step. So the fix is a CONNECTION, not a width: the vss pin is now the foot of the single
+
+    left-edge riser, the active devices reach it down that riser alone, and XCOUT''s four bottom plates
+
+    reach the same pin along the bottom rail on their own vss_ret_w-wide straps. The right-edge riser
+
+    of the previous round is DELETED - it would have put the active current back onto the cap''s return
+
+    rail, which is the shared impedance the cliff is made of. Hand model: common series element 4.9
+
+    ohm, worst-device total including the cell rail in parallel with the ptap ring 14.3 ohm, against
+
+    the brief''s 16 ohm active-only budget (S6, -0.4553 dB/ohm).
+
+
+    F3''s TARGET changed: gate to-rail 29.3 -> 12 fF, with a measured step between 12 and 13 fF, and
+
+    gate->vout re-bracketed at 40 fF (26x cheaper per fF). The drawn cell is 34.45 fF to-rail and 8.91
+
+    fF to vout. Two new measurements settle what layout can do about it. (1) dev_gap 3.2 -> 6.0
+
+    lengthens the Metal3 gate track 50.77 -> 59.17 um and moves gate to-rail 34.45 -> 34.95 fF, i.e.
+
+    0.060 fF/um, so the WHOLE track is worth 3.0 fF and a vout shield under it can convert at most that
+
+    into the 26x-cheaper column - 13 % of the 22.5 fF shortfall. (2) A sizing sweep at
+
+    x_dut_xmp_nf_mult = 2 gives gate 33.70 total / 26.63 fF to-rail, i.e. 3.9 fF of to-rail per unit
+
+    finger multiple, so the extrapolated floor at nf_mult -> 0 is ~18.8 fF - still above 12 fF, and
+
+    nf_mult = 2 is already 1.46x over the Metal1 current-density limit on the shared S/D column. 12 fF
+
+    is therefore not reachable by routing OR by any legal sizing; it is a spec/topology ruling for the
+
+    owner and is filed as one.
+
+
+    Verdicts unchanged by the F9 change, as expected - the CC extraction carries no R, so a return-path
+
+    topology fix cannot show in it: DRC 0, LVS matched, current density 30/30 worst 0.836x, kpex CC
+
+    186 C / 21 R, post-layout 18/18 PASS with S7 127.558 mV and PM 69.301 deg, area 44 266 um2.
+
+    The pwr_w = 4.0 hand model re-scored against the brief''s new pooled rule: 10.34 x 0.598 + 8.64 x
+
+    0.556 = 10.98 mV of the 23.83 mV dropout pool (46 %), where pwr_w = 2.0 spends 21.98 mV (92 %).
+
+
+    Two further generator fixes found by re-walking the ranges after this round''s changes, both
+
+    verified byte-identical at the record sizing: XRB''s five segment end pads are now CLAIMED in the
+
+    obstacle map (the divider''s already were), and the XCOUT array starts at `x_pass_r` instead of a
+
+    fixed x = 1.0 um. At res_pitch = 3.0 the XRB block slid right to x = -2..16 and XCOUT''s
+
+    bottom-plate drop - 3.0 um wide since the Kelvin return, 0.6 um before it - ran straight down
+
+    through it, so the five-segment string extracted as vss-27.7-$23, vss-27.7-nbias, vss-55.4-vdd.
+
+    `x_pass_r` had been computed and never used.
+
+    '
+  gen_sha256: a539510636e7610fd5061b93b94fee58fd35f2e01261cc50c22aadc41f4299aa
+  gds_sha256: c8d92a2f9e9bc0aa8883bf9090f25cb623b9192717803119a4caa28096260a9b
+  params:
+    area_um2: 44266
+    current_density_worst_over: 0.836
+  area_um2: 44266
+  drc:
+    passed: true
+    n: 0
+    rules: {}
+  lvs:
+    passed: true
+    matched: true
+    unmatched: {}
+    netlist_sha: f573b653cd022e639fbe1c97c7c3cb08db32c5c08b8edf920c1e34067951fcfd
+  pex:
+    ok: true
+    mode: CC
+    n_c: 186
+    n_r: 21
+  scorecard: {}
+  files:
+    gen: it12/gen.py
+    png: it12/layout.png
+    diff_from_it11: diff_it11_it12.png
+  drc_hits: {}

@@ -476,16 +476,9 @@ class Builder(ObstacleMap):
 
     # -- passives ----------------------------------------------------------
     def serpentine(self, w: float, l_total: float, segs: int, x0: float, y0: float,
-                   pitch: float | None = None) -> tuple[tuple[float, float], tuple[float, float],
-                                                        list[float], tuple[float, float]]:
-        """``segs`` vertical rhigh segments joined top/bottom by Metal1; returns the two end pads,
-        the segment x list and the two port y's (bottom, top).  With ``segs`` even both ends come
-        out at the bottom.
-
-        The port y's are returned so the caller can CLAIM every segment's Metal1 end pads: a
-        routing stub that walks along an unclaimed port row taps the chain in the middle and the
-        string extracts as several resistors (measured on the divider in round 2, and again on
-        XRB at `res_pitch` = 3.0 in the fix round)."""
+                   pitch: float | None = None) -> tuple[tuple[float, float], tuple[float, float], list[float]]:
+        """``segs`` vertical rhigh segments joined top/bottom by Metal1; returns the two end pads
+        and the segment x list.  With ``segs`` even both ends come out at the bottom."""
         pitch = pitch or self.p.res_pitch
         seg = _s(l_total / segs)
         cell = C.rhigh(dy=seg, dx=w)
@@ -508,7 +501,7 @@ class Builder(ObstacleMap):
                 self.m1h(bot[1], bot[0], nbot[0], 0.3)
         first = ends[0][1]
         last = ends[-1][1] if segs % 2 == 0 else ends[-1][0]
-        return first, last, xs, (_s(ends[0][1][1]), _s(ends[0][0][1]))
+        return first, last, xs
 
     def mim(self, unit: float, x0: float, y0: float, mirror: bool = False,
             top_to: float | None = None, escape: float = 0.0) -> tuple[tuple[float, float], tuple[float, float], tuple[float, float, float, float]]:
@@ -966,7 +959,7 @@ def build_full(p: LayoutParams = LayoutParams(),
     ports: dict[str, list[tuple[tuple[float, float], tuple[float, float]]]] = {"XR1": [], "XR2": []}
     for i in range(n_cols):
         xx = _s(x_res1 + i * p.res_pitch)
-        lo, hi, _, _ = b.serpentine(r_w, seg_l, 1, xx, y_res)
+        lo, hi, _ = b.serpentine(r_w, seg_l, 1, xx, y_res)
         # the rhigh end pads are Metal1: claim them, or a stub walking the port row shorts the
         # comb into itself (round 2 extracted XR2 as 212.5 + 85 + 42.5 um with `fb` in the middle)
         for k, (px, py) in enumerate((lo, hi)):
@@ -1027,32 +1020,25 @@ def build_full(p: LayoutParams = LayoutParams(),
     # end — at 1.6 um and no dummy the divider's right dummy saw XRB 1.1 um away and its left
     # dummy saw open field, i.e. the two ends of the divider array were not equivalent either.
     x_rb = _s(x_res1 + n_cols * p.res_pitch + 1.0)
-    def _rb_dummy(xx: float, tag: int) -> tuple[float, float]:
-        lo, hi, _xs, _ys = b.serpentine(r_w, rb_seg_l, 1, xx, y_res)
+    for k in range(p.n_dummy):
+        xx = _s(x_rb + k * p.res_pitch)
+        lo, hi, _ = b.serpentine(r_w, rb_seg_l, 1, xx, y_res)
         b.m1v(lo[0], lo[1], hi[1], 0.3)
         b.m1_claim("vss", lo[1], lo[0] - 0.45, lo[0] + 0.45, 0.9)
         b.m1_claim("vss", hi[1], hi[0] - 0.45, hi[0] + 0.45, 0.9)
-        b.dummies.append(NR.Dummy(f"RBD{tag}", "r", "vss", r_w, rb_seg_l))
-        return lo
-
-    for k in range(p.n_dummy):
-        lo = _rb_dummy(_s(x_rb + k * p.res_pitch), k)
+        b.dummies.append(NR.Dummy(f"RBD{k}", "r", "vss", r_w, rb_seg_l))
         b.to_track("vss", lo[0], lo[1])
     x_rb = _s(x_rb + p.n_dummy * p.res_pitch)
-    rba, rbb, xs_rb, ys_rb = b.serpentine(r_w, rb_seg_l * rb_segs, rb_segs, x_rb, y_res,
-                                          pitch=p.res_pitch)
-    # claim EVERY segment's two Metal1 end pads before anything routes past them: at
-    # `res_pitch` = 3.0 a dummy's `vss` stub walked the XRB port row and the five-segment string
-    # extracted as `vss-27.7-$23`, `vss-27.7-nbias`, `vss-55.4-vdd` (review-003 F2 re-walk).
-    for i, xx in enumerate(xs_rb):
-        for k, yy in enumerate(ys_rb):
-            b.m1_claim(f"@rb{i}{k}", yy, xx - 0.45, xx + 0.45, 0.9)
-    b.m1_retag("@rb00", "vdd")
-    b.m1_retag(f"@rb{rb_segs - 1}{0 if rb_segs % 2 == 0 else 1}", "nbias")
+    rba, rbb, _ = b.serpentine(r_w, rb_seg_l * rb_segs, rb_segs, x_rb, y_res, pitch=p.res_pitch)
     b.to_track("vdd", rba[0], rba[1])
     b.to_track("nbias", rbb[0], rbb[1])
     for k in range(p.n_dummy):
-        lo = _rb_dummy(_s(x_rb + (rb_segs + k) * p.res_pitch), p.n_dummy + k)
+        xx = _s(x_rb + (rb_segs + k) * p.res_pitch)
+        lo, hi, _ = b.serpentine(r_w, rb_seg_l, 1, xx, y_res)
+        b.m1v(lo[0], lo[1], hi[1], 0.3)
+        b.m1_claim("vss", lo[1], lo[0] - 0.45, lo[0] + 0.45, 0.9)
+        b.m1_claim("vss", hi[1], hi[0] - 0.45, hi[0] + 0.45, 0.9)
+        b.dummies.append(NR.Dummy(f"RBD{p.n_dummy + k}", "r", "vss", r_w, rb_seg_l))
         b.to_track("vss", lo[0], lo[1])
     x_rb_r = _s(x_rb + (rb_segs + p.n_dummy) * p.res_pitch)
 
@@ -1090,11 +1076,7 @@ def build_full(p: LayoutParams = LayoutParams(),
     # 0.60) and 0.76 um of the top plate (TM1.b is 1.64).  4.0 is the room the default needs.
     pwr_extra = max(0.0, p.pwr_w - 4.0)
     pitch_x = _s(cw + 2 * p.mim_gap + 4.0 + pwr_extra)
-    # The cap array starts where the passive column ends.  `x_pass_r` was computed and never used:
-    # at `res_pitch` = 3.0 the XRB block slid right to x = -2..16 and XCOUT's bottom-plate drop —
-    # 3.0 um wide since the Kelvin return — ran straight down through it, extracting XRB as
-    # `vss-27.7-$23`, `vss-27.7-nbias`, `vss-55.4-vdd` (review-003 F2 re-walk).
-    x_cout0 = _s(max(1.0, x_pass_r))
+    x_cout0 = 1.0
     vout_spine_x = _s(x_cout0 + cw + p.mim_gap + 2.0 + pwr_extra / 2)
     cout_bot = _s(y_cout_top - rows_ * unit_h)
     vss_pads: list[tuple[float, float]] = []
@@ -1118,40 +1100,29 @@ def build_full(p: LayoutParams = LayoutParams(),
     x_left = _s(x_res1 - 2.5 - p.vss_ret_w)
     # ... and the `vout` strap that runs down the right edge is `pwr_w` wide, so where the edge
     # sits also has to satisfy TM1.b (1.64) against the XCOUT top plates: at `pwr_w` = 8 the two
-    # collided (5 x TM1.b, 4 x MIM.e).
-    x_right = _s(max(x_stack + 2.0, x_cout_r + 2.0,
-                     x_cout_r + TM1_MIN_SP + p.pwr_w))
+    # collided (5 x TM1.b, 4 x MIM.e), and at `vss_ret_w` = 0.8 the edge came back in far enough
+    # to do it at `pwr_w` = 4.
+    x_right = _s(max(x_stack + 2.0, x_cout_r + 2.0) + p.vss_ret_w)
+    x_right = _s(max(x_right, x_cout_r + TM1_MIN_SP + p.pwr_w))
     y_bot = _s(min(cout_bot, bbff[1] - 3.0) - 4.0)
     b.m1h(y_vss, x_left, x_right, p.rail_w)
     b.m1h(y_vdd, x_left, x_stack, p.rail_w)
-    # The vss return, as a KELVIN CAP RETURN (review-003 F9, re-derived brief §4a).  The first
-    # fix here widened the rail, on the reviewer's reading that 32 Ohm of return R was the
-    # problem.  The re-derived brief settles the mechanism by splitting the injection: with only
-    # the ACTIVE devices behind 32 Ohm, S7 moves +0.44 mV — nothing; with only XCOUT's bottom
-    # plate behind it, S7 *improves* to 103.2 mV.  The 11 Ohm cliff needs BOTH halves behind one
-    # R, because Cout's load-step displacement current develops a ground bounce the FVF sources
-    # and the EA read as a reference step.  So the two returns are SEPARATED here rather than
-    # widened together:
-    #
-    #   * the `vss` PIN is the foot of the single left-edge riser, and the ACTIVE devices reach
-    #     it down that riser alone — `vss_ret_w` = 3.0 um over 134.8 um is 4.9 Ohm against the
-    #     brief's 16 Ohm budget for the active-only return (S6, -0.4553 dB/Ohm);
-    #   * XCOUT's four bottom plates reach the SAME PIN along the bottom rail on their own
-    #     `vss_ret_w`-wide straps, and the active current never enters that rail, so the shared
-    #     impedance between the two returns is the pin itself.
-    #
-    # A second, right-edge riser would halve the active return and put it straight back: the
-    # active current would then run the length of the bottom rail, which is the cap's return.
+    # Bottom vss rail — the vss PIN — joined to the cell's vss rail up BOTH edges (review-003
+    # **F9**).  One 0.8 um riser 134.8 um long is 18.5 Ohm at the PDK's 110 mOhm/sq, and with the
+    # 13.7 Ohm of bottom rail from the label that is ~32 Ohm against the brief's 17 Ohm budget on
+    # a return path carrying 27.7 uA — EM-safe, so no rule and no scorecard row ever saw it.  Two
+    # risers of `vss_ret_w` in parallel, and the rail itself at `vss_ret_w`, put it at ~3 Ohm.
     b.m1h(y_bot, x_left, x_right, p.vss_ret_w)
     x_ret_l = _s(x_left + p.vss_ret_w / 2)
+    x_ret_r = _s(x_right - p.vss_ret_w / 2)
     b.m1v(x_ret_l, y_bot, y_vss, p.vss_ret_w)
+    b.m1v(x_ret_r, y_bot, y_vss, p.vss_ret_w)
     b.m1_claim_box("vss", x_ret_l - p.vss_ret_w / 2, y_bot, x_ret_l + p.vss_ret_w / 2, y_vss)
-    b.budget("vss", "vss active-device return: left edge riser (Iq only)", I_VSS, "metal1",
+    b.m1_claim_box("vss", x_ret_r - p.vss_ret_w / 2, y_bot, x_ret_r + p.vss_ret_w / 2, y_vss)
+    b.budget("vss", "vss bottom rail + 2 edge risers (return path, Iq only)", I_VSS, "metal1",
              width_um=p.vss_ret_w)
-    b.budget("vss", "vss XCOUT bottom-plate return: bottom rail (displacement current)", I_VSS,
-             "metal1", width_um=p.vss_ret_w)
     for (xb, yb) in vss_pads:                     # XCOUT bottom plates -> the bottom rail
-        b.m1v(xb, yb, y_bot, p.vss_ret_w)       # the plate pad already reaches Metal1
+        b.m1v(xb, yb, y_bot, 0.6)               # the plate pad already reaches Metal1
     # vdd: the Metal1 rail climbs to the TopMetal1 strap on the left, clear of every device
     b.climb("vdd", _s(x_left + 2.6), y_vdd, y_s_band)
     b.h("TopMetal1drawing", y_s_band, x_left, x_right, p.pwr_w)
@@ -1206,10 +1177,8 @@ def build_full(p: LayoutParams = LayoutParams(),
     b.label("vdd", _s(x_left + 6.0), y_s_band, "TopMetal1text")
     b.label("vout", _s(x_right - p.pwr_w / 2), _s(y_vss), "TopMetal1text")
     # ONE `vss` label (F9): with two, which one is the pin — and therefore what the return
-    # resistance of the cell is — was ambiguous.  The pin is the bottom edge, as PLAN A1 says,
-    # and specifically the FOOT OF THE RISER, which is what makes the active return and the
-    # XCOUT return meet only at the pin.
-    b.label("vss", x_ret_l, y_bot)
+    # resistance of the cell is — was ambiguous.  The pin is the bottom edge, as PLAN A1 says.
+    b.label("vss", _s((x_left + x_right) / 2), y_bot)
     b.label("vdd", _s(x_left + 6.0), y_vdd)
     b.check()
     return b.c, b

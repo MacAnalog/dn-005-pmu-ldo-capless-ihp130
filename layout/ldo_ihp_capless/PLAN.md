@@ -27,11 +27,15 @@ listed again in the PR body.
 | A1 | **Pins**: `vdd` TopMetal1 strap on the **top** edge, `vss` Metal1 rail on the **bottom** edge, `vout` TopMetal1 strap on the **right** edge, `vref` + `fb` Metal1/Metal2 on the **left** edge | brief §9 pin-intent table | The coordinator's default ("vdd/vss on the long edges, vin/vout/vref/fb on the short edges") is self-contradictory here: `vin` **is** `vdd` in this cell (one supply pin). Resolved in favour of the brief, which is measured. |
 | A2 | **Aspect ratio ceiling 2:1**, target ~1.1:1 | coordinator | 005 is 2.34:1 (287.4 x 122.9). The cap block (XCOUT 2x2 ~ 125 x 125 um) dominates; it goes *under* the transistor stack rather than beside it. |
 | A3 | **Cap plan: XCOUT is the unit-cell array (2x2 common centroid of the certified 58 um unit); XCC and XCFF are single certified units inside the same block, same orientation, same plate side. NO MIM dummy ring.** | deviates from the coordinator's "ONE unit-cell array with a dummy ring" | Arithmetic: the three plate areas are 64 / 2916 / 13456 um^2; a common unit needs `u^2` to divide all three, i.e. `u = 2 um` and ~3400 tiles. Any coarser unit rounds XCC/XCOUT by >= 0.8 %, which changes the drawn device and is a **sizing change** (re-certify), not a layout choice. `m = 4` on XCOUT already *is* a unit array. The dummy ring is dropped because it is measured to buy nothing: brief §6 gives `mim_cout_unit` **no bound**, `mim_feedforward` 133 sigma and `mim_miller` 794 sigma of headroom, while a ring of 58 um units triples the block area. A Metal5/TopMetal1 keep-out frame is drawn instead (metal-density environment, no extracted device). |
-| A4 | **Strap plan**: TopMetal1 `vdd` along the top edge and `vout` along the right edge, `pwr_w = 2.0 um` (TM1.a floor is 1.64); each stitched to a Metal5 landing pad with **12 TopVia1**, and down to the pass array through **48 cuts per level** on Via2/3/4 and 2 Via1 per S/D column | brief §8 | See §3. The Metal1 rails keep `rail_w = 0.8 um` because after this change **no Metal1 in the cell carries more than 0.27 mA**. |
+| A4 | **Strap plan**: TopMetal1 `vdd` along the top edge and `vout` along the right edge, `pwr_w = 4.0 um` (TM1.a floor is 1.64; **2.0 in the first drawing — raised in the fix round, review-003 F1**, because the strap's own series R is 1.13 Ohm on `vdd` and 1.03 Ohm on `vout` at 2.0 um and the extractor measures neither); each stitched to a Metal5 landing pad with **12 TopVia1**, and down to the pass array through **48 cuts per level** on Via2/3/4 and 2 Via1 per S/D column | brief §8 | See §3. The Metal1 rails keep `rail_w = 0.8 um` because after this change **no Metal1 in the cell carries more than 0.27 mA**. |
 | A5 | **The pass array is redrawn with 4x the fingers (`x_dut_xmp_nf_mult = 4`: 76 unit fingers of 2.5 um, total W unchanged at 190 um)** | not in the brief; see §3 | This is the only way the shared-diffusion column riser gets legal. **A5 originally filed it as "not a sizing change" because `w`/`m` were untouched; review F19 overturned that and the ruling is adopted** — see §0.1. The knob now lives in `sizing.yaml`, the certified netlist draws the unit fingers, and the benches simulate them. |
 | A6 | **Matched-row dummies are real, fully-tied devices declared in the LVS reference** (G=S=D=B on one rail) | none | Measured: the IHP LVS deck extracts a fully shorted dummy MOS as a device and `--purge --purge_nets` does **not** remove it (probe log `lvs_d2`/`lvs_d2p`); LVS matches only when the dummy is in the reference. The reference is therefore `lower(certified netlist) + dummy cards`, and the emitter asserts every added card has all four nodes on one rail — a divergence in a *real* device still fails. |
 | A7 | **Density / fill and sealring are out of scope**; DRC runs with the density tables off by default (`--density` re-enables them) and the REPORT names the flag | 005 precedent, `review-002` m1 | Fill is a chip-assembly step and distorts the PEX of a bare cell. |
 | A8 | **The GDS is not committed**; the layout of record is `layout/gen_ldo.py`. The render PNG *is* committed at `experiments/005-layout/figs/ldo_ihp_capless.png` | 005 precedent + `.gitignore` | An 845 kB binary can only drift from the generator. |
+| A10 | **The `vss` return is a KELVIN CAP RETURN**: the pin is the foot of a **single** left-edge `vss_ret_w = 3.0 um` riser, the active devices reach it down that riser alone, and XCOUT's four bottom plates reach the *same pin* along the bottom rail on their own `vss_ret_w`-wide straps | re-derived brief §4a (review-003 F9, mechanism corrected) | The first attempt widened the rail, on the reviewer's reading that 32 Ohm of return R was the problem. The re-derived brief settles it by splitting the injection: **active devices only** behind 32 Ohm moves S7 by +0.44 mV, **XCOUT's plate only** behind 32 Ohm *improves* S7 to 103.2 mV, and the 11 Ohm cliff needs **both halves behind one R** — Cout's load-step displacement current develops a ground bounce the FVF sources and the EA read as a reference step. So the fix is a **connection**, not a width, and the second (right-edge) riser is deliberately **deleted**: it would put the active current back onto the cap's own return rail, which is the shared impedance the cliff is made of. Hand model: common series element 4.9 Ohm, worst-device total 14.3 Ohm, against the brief's 16 Ohm active-only budget. **One** `vss` label, at that pin. |
+| A11 | **The pass gate's channel track is Metal3, not Metal1** (`TRACK_LAYER`) | not in the brief; review-003 F3 | `gate` was the only net whose track ran the length of the cell on Metal1 0.6 um above the substrate, and gate-only parasitics alone put S7 at 204.5 mV. Metal3 is ~2 um further up and is also the layer that lets the net cross the pass array's Metal2 comb without the hard-coded hop F7 flagged. The measured effect is in REPORT §6. |
+| A12 | **`lp_brk` stays a pin and is escaped to the RIGHT edge, beside `vout`** | brief §4 + review-003 F8 | The certified netlist closes the divider with `VLP lp_brk vout dc 0` — a loop-break port the benches drive — so the cell cannot merge the two nets without deleting a pin. What the layout decides is *where* the external short lands, and brief §4 wants the sense at the OUTPUT PIN (0.026 mV of load regulation) rather than the pass drain (~10 mV against a 5.0 mV line). Drawn, labelled and stated here, so the GDS says which. |
+| A13 | **`gpad` (0.5) and `isl_gap` (2.0) are knobs; `tap_pitch` is deleted** | review-003 F11 | `tap_pitch` gave a byte-identical GDS at both ends of its range — a dead search dimension. `isl_gap` moved the floorplan and was in neither the plan nor `BOUNDS`. `gpad` sets every gate bar's own area, which is what F3 is about. §5 is now generated from the dataclass and an assertion in `gen_ldo.py` fails the build if `BOUNDS` and `LayoutParams` ever disagree again. |
 | A9 | **`LDO_GF_PYTHON` stays `~/miniconda3/envs/ai_env/bin/python`** | — | The coordinator's `LDO_GDS_PYTHON=…/envs/pex/bin/python` has **no gdsfactory** (verified). `pex` is the kpex interpreter; `ai_env` is the gdsfactory one. |
 
 ### 0.1 Re-certification of `decks/candidate` on the drawn device set (review F19, adopted)
@@ -137,7 +141,7 @@ has no global differential axis).
 
 ```
    ______________________________________________________________________  <- vdd PIN (top edge)
-  |  vdd  TopMetal1 strap  pwr_w = 2.0 um, full core width                |
+  |  vdd  TopMetal1 strap  pwr_w = 4.0 um, full core width                |
   |            [ M5 pad + 12 TopVia1 + 48-cut Via4/3/2 riser ]            |
   |                                                    ______________     |   v
   |                                                   | XMP island  |     |   o
@@ -145,7 +149,7 @@ has no global differential axis).
   |                                                   | 76 fingers  |     |   t
   |  ------------------------ vdd Metal1 rail ------------------------    |
   |  [ nwell island "quiet" + ntap ring ]     [ nwell island "fvf" ]      |   T
-  |  d XMBP XMT XM6 d | d XM1a XM2a XM2b XM1b d      d XMC XMCP XMD d     |   M
+  |  d XM1a XM2a XM2b XM1b d | d XMBP XMT XM6 d      d XMC XMCP XMD d     |   M
   |  ---- channel: one Metal1 track per internal net (track_pitch) ----   |   1
   |  [ ptap ring, row A ]                                                 |
   |  d XM5 d | d XM3a XM4a XM4b XM3b d | d XMA XMB d | d XMS XMB1 XMB0 XMB0 XMB1 XMS d
@@ -238,44 +242,87 @@ blocker.** The table above is the plan; the REPORT carries the as-built one.
 ## 5. Parameter list — the optimizer knobs
 
 `LayoutParams` fields; sizes that LVS pins (W, L, m) are **not** here — they come from
-`sizing.yaml`.
+`sizing.yaml`, which is the sizing of record (review F14). The table is **generated from the
+dataclass**, and `gen_ldo.py` asserts at import that `BOUNDS` and `LayoutParams` name the same
+knobs (review-003 F11): a knob that is not in both is a dead search dimension or an undocumented
+one, and this cell has had each.
+
+Every range below was **walked**: `layout/signoff.py --stages bounds` builds, current-density
+checks, DRC-checks and LVS-checks the cell at *both* ends of every row, two KLayout jobs at a
+time, and the stage fails if any endpoint does not come back clean (review-003 F2 — five of ten
+values the previous table documented produced a cell that was not the certified circuit). The
+run of record is in REPORT §4.
 
 | knob | default | range | what it moves |
 |---|---|---|---|
-| `dev_gap` | 3.2 | 3.0–6.0 | x gap between devices in a row |
-| `grp_gap` | 2.0 | 0.0–8.0 | extra gap between matching groups |
-| `track_pitch` | 0.7 | 0.65–1.2 | channel Metal1 track pitch |
-| `ch_margin` | 0.9 | 0.8–2.0 | gate/drain bar -> first track |
-| `rail_w` | 0.8 | 0.5–2.0 | vdd / vss Metal1 rail width |
+| `dev_gap` | 3.2 | 3–6 | x gap between devices in a row |
+| `grp_gap` | 2 | 0–8 | extra gap between matching groups |
+| `track_pitch` | 0.7 | 0.65–1.2 | channel Metal1 track pitch (0.38 pads -> 0.32 space) |
+| `ch_margin` | 0.9 | 0.8–2 | clearance from the gate/drain bars to the first track |
+| `rail_w` | 0.8 | 0.5–1.4 | vdd / vss Metal1 rail width (Iq only: 0.037 mA worst) |
 | `rail_gap` | 1.6 | 1.4–2.5 | active edge -> rail centre |
 | `ring_w` | 0.6 | 0.5–1.5 | guard-ring width (ntap / ptap) |
-| `ring_gap` | 1.2 | 0.6–3.0 | device bbox -> guard ring |
-| `n_dummy` | 1 | 0–2 | dummy devices at each end of a matched group |
-| `pwr_w` | 2.0 | 1.64–6.0 | TopMetal1 strap width |
-| `pwr_stitch` | 12 | 8–24 | TopVia1 cuts per strap stitch |
+| `ring_gap` | 1.4 | 0.6–3 | device/pad bbox -> guard ring inner edge |
+| `isl_gap` | 2 | 1.3–6 | Activ gap between two well islands (NW.b 0.62 + Act.b 0.21) |
+| `n_dummy` | 1 | 1–2 | dummy devices at each end of a matched group |
+| `pwr_w` | 4 | 1.64–8 | TopMetal1 power-strap width (TM1.a floor is 1.64) |
+| `pwr_stitch` | 12 | 8–24 | TopVia1 cuts per Metal5 -> TopMetal1 stitch |
 | `pwr_riser_vias` | 48 | 28–72 | Via2/3/4 cuts per riser level |
-| `pwr_band_w` | 6.0 | 5.0–12.0 | Metal2 comb spine / riser pad width |
-| `xmp_nf_mult` | 4 | 1–8 | fingers per `m` unit of the pass device |
+| `pwr_band_w` | 6 | 5.1–12 | Metal2 comb spine / riser pad width |
 | `col_vias` | 2 | 1–4 | Via1 per pass-array S/D column |
-| `mim_gap` | 3.0 | 2.5–8.0 | gap between MIM units |
-| `res_pitch` | 2.0 | 1.8–4.0 | serpentine segment pitch |
-| `r_segs` | 4 | 2–8 | divider segments per arm (even, for the ABBA pattern) |
-| `rb_segs` | 2 | 1–6 | bias-resistor segments |
-| `blk_gap` | 6.0 | 4.0–15.0 | transistor stack -> passive band |
-| `tap_pitch` | 12.0 | 6.0–18.0 | tie spacing along a ring segment |
+| `mim_gap` | 3 | 2.5–8 | gap between MIM units |
+| `res_pitch` | 2 | 1.9–3 | serpentine segment pitch (rhigh cell is 0.9 wide) |
+| `blk_gap` | 6 | 4–15 | transistor stack -> passive band |
+| `gpad` | 0.5 | 0.34–0.6 | gate-bar height (Metal1 + GatPoly): sets every gate's own C |
+| `vss_ret_w` | 3 | 0.8–6 | bottom vss rail + its two edge risers (brief's 17 Ohm budget) |
+
+Three ranges were **narrowed** rather than fixed, each because the limit is geometric and the
+knob has somewhere else to go: `rail_w` stops at 1.4 (at 1.6 the channel runs out of free Metal2
+columns for `vout` — and `vss_ret_w` is now the knob that sizes the return path, so `rail_w` no
+longer has to), `res_pitch` at 1.9–3.0 (below 1.9 the `rhigh` cells' Metal1 end pads merge and the
+divider extracts as four resistors instead of two; above 3.0 the block's own links reach the vdd
+rail), `gpad` at 0.6 (0.8 gives 38 M1.b — the gate bars meet the S/D straps). Four failures were
+**fixed in the generator** instead: `col_vias` 3–4 (the pass drain's via pad reached into the gate
+bar — the gate stand-off is now derived from the pad, not the module constant), `ring_gap` 3.0
+(the n-well ring's Metal2 riser fell off the end of the source comb spine and the pass device's
+bulk extracted as an unnamed node), and `pwr_w` 8.0 / `vss_ret_w` 0.8 (the right cell edge is now
+placed by TopMetal1 spacing to the XCOUT block, not by a constant margin).
 
 ## 6. Sensitivity -> concrete constraint
 
 | brief row | budget | generator constraint |
 |---|---|---|
-| `gate` C | **29.3 fF**, step at 60–65 fF; to `vout` 10–24x cheaper, hard limit 100 fF | `XMD`/`XMS`/`XMP` clustered at the right; the `gate` track is the **top** channel track, immediately under the vout bus; no Metal2 column of another net allowed to run parallel to it (the existing obstacle map already enforces one net per column) |
-| `fb` C | **27.9 fF**, binds S8; coupling to `vdd` *buys* +0.122 dB/fF of PSRR | `fb` is a **short** track: the divider is placed so `fb` reaches `XM1`'s gate without crossing the cell; it is kept off the right half (vout/gate edges) entirely |
+| `gate` C | **12 fF to-rail**, step between 12 and 13 fF; to `vout` **26x cheaper** (+0.0197 vs +0.507 mV/fF), hard limit **40 fF** there | `XMD`/`XMS`/`XMP` clustered at the right; the `gate` track is the **top** channel track and is drawn on **Metal3** (`TRACK_LAYER`, review-003 F3 — on Metal1 the same run sits 0.6 um above the substrate and gate-only parasitics put S7 at 204.5 mV); no column of another net may run parallel to it on that layer, which the obstacle map now enforces **per layer** |
+| `fb` C | **27.1 fF to-rail**, binds S8hi; coupling to `vdd` *buys* +0.122 dB/fF of PSRR. The brief's −0.111 °/fF is a **to-rail** coefficient, so the budget column is read to-rail throughout (review-003 F10) | `fb` is a **short** track: `ea_in_pair` is the FIRST group of row B, nearest the divider (review-003 F5 — as the second group the track measured 107 um, 53 % of the cell width and into the right half this row forbids) |
 | `fb` leakage | **5.43 nA** | no antenna diode and no added diffusion on `fb` or `lp_brk`; the `fb` route is Metal1/Metal2 only and short enough not to attract an antenna fix |
 | `ea_n` leakage | 12.5 nA, binds S6 | same rule on the `ea_n` track |
-| `vout_all` R | 0.126 Ohm if sensed at the pass drain, **1.78 Ohm at the pin** | `lp_brk` taps the TopMetal1 vout strap at the **pin** end (§2) |
-| `vdd` R | 1.77 Ohm (dropout, 13.2 mV/Ohm) | TopMetal1 strap + 12 TopVia1 + 48-cut risers; nothing on Metal1 |
-| `vss` R | 17 Ohm (PSRR, −0.44 dB/Ohm) | Metal1 rail plus the ptap ring in parallel; only 27.7 uA |
+| `vout` R | **0.126 Ohm** if sensed at the pass drain (S2 = 10.2 mV, OUT), **2.76 Ohm at the pin** | `lp_brk` is escaped to the **right cell edge beside the `vout` pin** and labelled there, so the external short lands at the pin (A12) |
+| `vdd` R | **2.31 Ohm**, and `vdd` + `vout` share one pooled rule: **10.34 x R(vdd) + 8.64 x R(vout) <= 23.83 mV** | `pwr_w = 4.0 um` TopMetal1 strap + 12 TopVia1 + 48-cut risers; nothing on Metal1. Hand model 0.598 + 0.556 Ohm = 10.98 mV, 46 % of the pool |
+| `vss` R | **11 Ohm with XCOUT sharing the return (a step, S7), 16 Ohm for the active devices alone (S6)** | A **Kelvin cap return** (A10): XCOUT's bottom plates and the active devices meet only at the pin, so the 11 Ohm cliff does not apply; the active-only path is 4.9 Ohm of common riser, 14.3 Ohm worst-device |
 | don't-cares | `nbias`, `pbias`, `ea_tail`, `lp_brk`, `x1`, `y`, `vout` C; `gate`/`fb`/`vref`/`lp_brk` R | used as the routing freedom: `nbias`/`pbias` run the full cell length so the bias group can sit next to `gate` |
+
+## 6b. Open rulings — decisions this plan cannot take
+
+These are measured conflicts between the spec box and the topology. Layout can report them; it
+cannot resolve them.
+
+1. **`gate` to-rail cannot reach 12 fF at any legal sizing.** The re-derived brief budgets 12 fF
+   with a measured step between 12 and 13 fF. The drawn cell is **34.45 fF**. Two measurements
+   bound what can be done: the whole Metal3 gate track is worth **3.0 fF** (0.060 fF/um, from
+   `dev_gap` 3.2 -> 6.0), so a `vout` shield under it — the only routing lever left — recovers at
+   most 13 % of the 22.5 fF shortfall; and a sizing sweep at `x_dut_xmp_nf_mult` = 2 gives
+   **26.63 fF** to-rail, i.e. 3.9 fF per unit finger multiple, so the extrapolated floor as
+   nf_mult -> 0 is ~18.8 fF — still above 12 — while nf_mult = 2 is already 1.46x over the Metal1
+   current-density limit on the shared S/D column. **Owner's call**: a smaller pass device, a
+   different output stage, a deliberate certified capacitor on `ea_o1` (brief §3b: the EA-path
+   recovery is real but must be a design decision, not a routing accident), or a wider S7 spec.
+2. **S7's 34.94 mV of undershoot margin leaves sub-sigma mismatch budgets on `ea_nmos_load` and
+   `bias_p_group`.** The re-derived brief prices `ea_nmos_load` at 1.0 mV of ΔVT = **0.61 sigma**
+   and `bias_p_group` at 1.2 mV = **1.07 sigma** of the PDK's own random mismatch. Common-centroid
+   placement removes the *systematic* part only; nothing a layout can draw removes a sub-sigma
+   random budget. Recovering it needs larger EA-load / bias-p area or a wider S7 spec — **owner's
+   call**. The layout draws the best common-centroid available and reports the achieved
+   sigma-multiple per class in REPORT §8.
 
 ## 7. What this plan does NOT do
 

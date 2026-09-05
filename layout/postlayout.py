@@ -21,6 +21,7 @@ subcircuit a drop-in replacement for the schematic `.subckt ldo_ihp_capless vdd 
 from __future__ import annotations
 
 import argparse
+import datetime
 import json
 import re
 import sys
@@ -100,6 +101,33 @@ def pex_subckt(pex_netlist: Path) -> str:
     return txt
 
 
+_C_CARD = re.compile(r"^(C\S*)\s+(\S+)\s+(\S+)\s+(\S+)\s*$")
+
+
+def filter_caps(block: str, keep: str = "", drop: str = "") -> tuple[str, int, int]:
+    """Delete extracted coupling/ground capacitors, for a what-if.
+
+    ``keep`` (comma list) keeps only the `Cext_` cards that touch one of those nets; ``drop``
+    keeps everything except those.  Nothing else in the block changes, so the difference between
+    two runs is exactly the capacitance named — this is how "the `gate` parasitics alone move S7
+    by X" is measured rather than asserted (review-003 F3).  The re-inserted MIM cards are `X`
+    calls, not `C` cards, so they always survive."""
+    kk = {n for n in keep.split(",") if n}
+    dd = {n for n in drop.split(",") if n}
+    out, gone, left = [], 0, 0
+    for ln in block.splitlines():
+        m = _C_CARD.match(ln.strip())
+        if m and m.group(1).lower().startswith("cext"):
+            nets = {m.group(2), m.group(3)}
+            hit = bool(nets & kk) if kk else not (nets & dd)
+            if not hit:
+                gone += 1
+                continue
+            left += 1
+        out.append(ln)
+    return "\n".join(out) + "\n", left, gone
+
+
 def run_frozen(decks: dict[str, str], tag: str) -> tuple[dict, dict]:
     """Score `decks` through the FROZEN measurement path -- `ldo.sim.run` + `ldo.metrics.promote`,
     the same two calls `ldo.metrics.evaluate` makes for the pre-layout row.
@@ -132,14 +160,35 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--pex", default=str(C.WORK / "layout" / "pex"))
     ap.add_argument("--tag", default="005_postlayout")
+    ap.add_argument("--keep-c", default="", help="what-if: keep only the extracted C on these nets")
+    ap.add_argument("--drop-c", default="", help="what-if: drop the extracted C on these nets")
+    ap.add_argument("--no-c", action="store_true", help="what-if: drop every extracted C")
+    ap.add_argument("--out-dir", default=None,
+                    help="where the scorecard goes (a what-if must NOT overwrite the record)")
     a = ap.parse_args()
-    OUT.mkdir(parents=True, exist_ok=True)
+    whatif = bool(a.keep_c or a.drop_c or a.no_c)
+    out_dir = Path(a.out_dir) if a.out_dir else OUT
+    if whatif and out_dir == OUT:
+        raise SystemExit("a what-if run needs --out-dir: it must not overwrite the record")
+    out_dir.mkdir(parents=True, exist_ok=True)
 
+    # review-003 **F17**: `hits[-1]` on an `rglob` is a SORT ORDER, not a freshness check — it
+    # once re-measured the first drawing's extraction with every stage reporting success.  Exactly
+    # one match, or say which ones there are and stop.
     hits = sorted(Path(a.pex).rglob("*_pex_netlist.spice"))
     if not hits:
         raise SystemExit(f"no kpex netlist under {a.pex} — run layout/signoff.py first")
+    if len(hits) > 1:
+        raise SystemExit("more than one kpex netlist under "
+                         f"{a.pex}; name the run directory of THIS drawing:\n  "
+                         + "\n  ".join(f"{h} ({datetime.datetime.fromtimestamp(h.stat().st_mtime)})"
+                                        for h in hits))
+    print("pex netlist:", hits[-1], flush=True)
     block = pex_subckt(hits[-1])
-    (OUT / "extracted_subckt.spice").write_text(block)
+    if whatif:
+        block, left, gone = filter_caps(block, "__none__" if a.no_c else a.keep_c, a.drop_c)
+        print(f"what-if: kept {left} extracted C card(s), dropped {gone}", flush=True)
+    (out_dir / "extracted_subckt.spice").write_text(block)
 
     from spicexplorer_signoff.postlayout import splice_subckt
 
@@ -147,14 +196,17 @@ def main() -> int:
     pre_decks = {b: CANDIDATE.deck(b) for b in benches}
     post_decks = {b: splice_subckt(pre_decks[b], block, CELL, check_pins=False) for b in benches}
 
-    print("pre-layout:", flush=True)
-    pre, pre_rec = run_frozen(pre_decks, f"{a.tag}_pre")
+    if whatif:
+        pre, pre_rec = {}, {}
+    else:
+        print("pre-layout:", flush=True)
+        pre, pre_rec = run_frozen(pre_decks, f"{a.tag}_pre")
     print("post-layout:", flush=True)
     post, post_rec = run_frozen(post_decks, f"{a.tag}_post")
     for b, r in sorted(post_rec.items()):
         if r["status"] != "ok":
             print(f"    {b}: {r['status']}")
-    for row, d in ((pre, "pre"), (post, "post")):
+    for row, d in (((pre, "pre"), (post, "post")) if not whatif else ((post, "post"),)):
         row["_violations"] = M.violations(C.H.spec, row)
         print(f"  {d}: {len(row['_violations'])} violation(s)")
 
@@ -163,6 +215,16 @@ def main() -> int:
     # `metrics.certify()` logs a certification: the signature is the verifier's own re-measure
     # (rule 7, designer != verifier), never the designer's. The pre-layout row is the control and
     # stays `scratch` -- the certified pre-layout scorecard lives in decks/candidate/.
+    if whatif:
+        table = M.table({"post-layout (what-if)": post}, cols=M.COLS_CANDIDATE)
+        (out_dir / "scorecard.md").write_text(table + "\n")
+        (out_dir / "scorecard.json").write_text(json.dumps(
+            {"post": {k: v for k, v in post.items() if not k.startswith("_")},
+             "post_violations": post["_violations"],
+             "whatif": {"keep_c": a.keep_c, "drop_c": a.drop_c, "no_c": a.no_c},
+             "pex_netlist": str(hits[-1])}, indent=1) + "\n")
+        print("\n" + table)
+        return 0
     M.log_run(C.H, f"{a.tag}_pre", {k: v for k, v in pre.items() if not k.startswith("_")},
               violations=pre["_violations"], design=CANDIDATE.as_dict(),
               extra={"benches": {b: r["status"] for b, r in pre_rec.items()}, "netlist": "schematic"})
@@ -173,8 +235,8 @@ def main() -> int:
 
     table = M.table({"pre-layout (schematic)": pre, "post-layout (extracted)": post},
                     cols=M.COLS_CANDIDATE)
-    (OUT / "scorecard.md").write_text(table + "\n")
-    (OUT / "scorecard.json").write_text(json.dumps(
+    (out_dir / "scorecard.md").write_text(table + "\n")
+    (out_dir / "scorecard.json").write_text(json.dumps(
         {"pre": {k: v for k, v in pre.items() if not k.startswith("_")},
          "post": {k: v for k, v in post.items() if not k.startswith("_")},
          "pre_violations": pre["_violations"], "post_violations": post["_violations"],

@@ -11,6 +11,14 @@ alone still gave 0 violations and a matched netlist at every committed sizing �
 it, and a regression no case exercises rots. This module is that case's home: `layout/
 test_builder.py` builds the collision by hand and asserts the allocator refuses it.
 
+`review-003` **F7**: the same hole existed one layer up. `column_free` tested only the columns the
+router itself registered, so the pass array's Metal2 comb — drawn as plain rectangles by the power
+path — was invisible to it, and `col_vias` in {3, 4} still merged `gate` into `vout`. The map is
+now **layer-aware**: every vertical carries its layer, and :meth:`claim_box` records an arbitrary
+drawn rectangle on a named layer. A Metal3 column is no longer refused by a Metal2 obstacle (which
+is what forced the hard-coded Metal3 hop the review flagged), and a Metal2 column through the comb
+is refused whatever drew it.
+
 `Builder` in `gen_ldo.py` derives from :class:`ObstacleMap`, so the code under test is the code
 that draws.
 """
@@ -32,7 +40,10 @@ class ObstacleMap:
 
     def __init__(self) -> None:
         self.m1_rows: list[list] = []   # [net, y0, y1, x0, x1]
-        self.verticals: list[tuple[str, float, float, float]] = []  # (net, x, y0, y1)
+        #: (net, x, y0, y1[, layer]) — a 4-tuple means Metal2, the layer the router defaults to.
+        self.verticals: list[tuple] = []
+        #: (layer, net, x0, y0, x1, y1) — any drawn rectangle a later column must not run into.
+        self.boxes: list[tuple[str, str, float, float, float, float]] = []
 
     # -- claims ------------------------------------------------------------
     def m1_claim(self, net: str, y: float, x0: float, x1: float, h: float = W_M1) -> None:
@@ -47,6 +58,17 @@ class ObstacleMap:
         for r in self.m1_rows:
             if r[0] == old:
                 r[0] = new
+        self.boxes = [(lay, new if n == old else n, *rest) for lay, n, *rest in self.boxes]
+        self.verticals = [(new if v[0] == old else v[0], *v[1:]) for v in self.verticals]
+
+    def claim_box(self, layer: str, net: str, x0: float, y0: float, x1: float, y1: float) -> None:
+        """Record a drawn rectangle on ``layer`` so no foreign column may cross it (F7)."""
+        self.boxes.append((layer, net, snap(min(x0, x1)), snap(min(y0, y1)),
+                           snap(max(x0, x1)), snap(max(y0, y1))))
+
+    def claim_vertical(self, net: str, x: float, y0: float, y1: float,
+                       layer: str = "Metal2") -> None:
+        self.verticals.append((net, snap(x), snap(min(y0, y1)), snap(max(y0, y1)), layer))
 
     # -- the two checks ----------------------------------------------------
     def stub_clear(self, net: str, y: float, xa: float, xb: float,
@@ -61,14 +83,38 @@ class ObstacleMap:
             return False
         return True
 
-    def column_free(self, net: str, x: float, lo: float, hi: float) -> bool:
-        """Is a Metal2 vertical of ``net`` over [lo, hi] clear of every other net's vertical?"""
-        return all(v[0] == net or abs(v[1] - x) >= self.M2_CLEAR - 1e-6
-                   or v[3] < lo - self.M2_CLEAR or v[2] > hi + self.M2_CLEAR
-                   for v in self.verticals)
+    def column_free(self, net: str, x: float, lo: float, hi: float,
+                    layer: str = "Metal2") -> bool:
+        """Is a vertical of ``net`` on ``layer`` over [lo, hi] clear of every foreign obstacle
+        **on that layer** — other routed columns and every rectangle :meth:`claim_box` recorded?
+        """
+        for v in self.verticals:
+            if (v[4] if len(v) > 4 else "Metal2") != layer:
+                continue
+            dx = abs(v[1] - x)
+            if dx >= self.M2_CLEAR - 1e-6:
+                continue
+            if v[0] == net and dx < 1e-6:
+                continue   # the net's own column, on the same x: a merge, not a neighbour
+            if v[3] < lo - self.M2_CLEAR or v[2] > hi + self.M2_CLEAR:
+                continue
+            # Two columns of the SAME net at less than the pad pitch are not a short, but their
+            # via pads still abut and their cuts land 0.19 um apart — V1.b (0.22).  The pitch is
+            # a geometric rule, so it applies to the net's own columns too.
+            return False
+        pad = self.M2_CLEAR / 2
+        for lay, n, x0, y0, x1, y1 in self.boxes:
+            if n == net or lay != layer:
+                continue
+            if x < x0 - pad + 1e-6 or x > x1 + pad - 1e-6:
+                continue
+            if hi < y0 - pad + 1e-6 or lo > y1 + pad - 1e-6:
+                continue
+            return False
+        return True
 
     def alloc(self, net: str, x: float, y0: float, y1: float, step: float = 0.6,
-              tries: int = 80) -> float:
+              tries: int = 80, layer: str = "Metal2") -> float:
         """First x from ``x`` in ``step`` increments whose Metal2 vertical over [y0, y1] is free
         AND whose Metal1 stub crosses nobody.
 
@@ -80,6 +126,7 @@ class ObstacleMap:
         for k in range(tries):
             for s in (step, -step) if k else (step,):
                 xx = snap(x + k * s)
-                if self.column_free(net, xx, lo, hi) and self.stub_clear(net, y0, x, xx):
+                if self.column_free(net, xx, lo, hi, layer) and self.stub_clear(net, y0, x, xx):
                     return xx
-        raise AssertionError(f"no free Metal2 column for {net} near x={x} (widen dev_gap/grp_gap)")
+        raise AssertionError(
+            f"no free {layer} column for {net} near x={x} (widen dev_gap/grp_gap)")

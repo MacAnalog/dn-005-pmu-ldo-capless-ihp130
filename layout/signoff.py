@@ -99,13 +99,15 @@ def current_density(power_json: Path) -> dict:
             "violations": [v.__dict__ for v in r.violations]}
 
 
-def build(out: Path, sizing: Path | None = None) -> dict:
+def build(out: Path, sizing: Path | None = None, params: dict | None = None) -> dict:
     """GDS + LVS reference + power-path budget at the sizing of record (or `sizing`)."""
     out.mkdir(parents=True, exist_ok=True)
     gds, lvs = out / f"{CELL}.gds", out / f"{CELL}_lvs.spice"
     cmd = [GF_PYTHON, GEN, "-o", gds, "--lvs", lvs, "--power", out / "power_path.json"]
     if sizing:
         cmd += ["--sizing", str(sizing)]
+    if params:
+        cmd += ["--params", json.dumps(params)]
     r = _run(cmd)
     if r.returncode != 0 or not gds.is_file():
         raise SystemExit(f"generator failed:\n{r.stdout}\n{r.stderr}")
@@ -114,6 +116,74 @@ def build(out: Path, sizing: Path | None = None) -> dict:
     return {"gds": str(gds), "lvs_netlist": str(lvs), "power_path": str(out / "power_path.json"),
             "area_um2": int(m.group(1)) if m else None, "sizing": str(sizing) if sizing else None,
             "stdout": r.stdout.strip()}
+
+
+def knob_space() -> dict:
+    """`LayoutParams` defaults + `BOUNDS`, read from the generator (which needs gdsfactory)."""
+    r = _run([GF_PYTHON, "-c",
+              "import sys, json, dataclasses;"
+              f"sys.path.insert(0, {str(GEN.parent)!r});"
+              "import gen_ldo as G;"
+              "print(json.dumps({'bounds': G.BOUNDS,"
+              " 'defaults': dataclasses.asdict(G.LayoutParams())}))"])
+    if r.returncode != 0:
+        raise SystemExit(f"cannot read the knob space:\n{r.stdout}\n{r.stderr}")
+    return json.loads(r.stdout.strip().splitlines()[-1])
+
+
+def bounds(out: Path, jobs: int = 2, only: str = "") -> dict:
+    """Build + DRC + LVS at BOTH ends of every documented knob range (review-003 **F2**).
+
+    "5 of 10 tested in-range values give a cell that is not the certified circuit" — the ranges
+    were written as a search space and never walked.  This stage is what makes `BOUNDS` a claim
+    instead of a comment; the run is capped at 2 concurrent KLayout jobs, which is the documented
+    ceiling for this host (eight gave seven spurious DRC failures with empty violation lists).
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    space = knob_space()
+    todo = []
+    for k, (lo, hi) in sorted(space["bounds"].items()):
+        if only and k not in only.split(","):
+            continue
+        for tag, v in (("lo", lo), ("hi", hi)):
+            d = space["defaults"][k]
+            todo.append((k, tag, int(v) if isinstance(d, int) else float(v)))
+
+    def one(job):
+        k, tag, v = job
+        d = out / "bounds" / f"{k}_{tag}"
+        rec: dict = {"knob": k, "end": tag, "value": v}
+        try:
+            b = build(d, params={k: v})
+            rec["area_um2"] = b["area_um2"]
+        except SystemExit as exc:
+            rec.update(built=False, reason=str(exc)[-400:])
+            return rec
+        rec["built"] = True
+        try:
+            cd = current_density(d / "power_path.json")
+            rec["cd_ok"], rec["cd_worst"] = cd["passed"], cd["worst_over"]
+            rc = drc(d / f"{CELL}.gds", d / "drc")
+            rec["drc_ok"], rec["drc_n"] = rc["passed"], rc["n_violations"]
+            rec["drc_rules"] = rc["violations_per_rule"]
+            lv = lvs(d / f"{CELL}.gds", d / f"{CELL}_lvs.spice", d / "lvs")
+            rec["lvs_ok"] = lv["matched"]
+        except Exception as exc:            # noqa: BLE001
+            rec["reason"] = f"{type(exc).__name__}: {exc}"
+        rec["ok"] = bool(rec.get("built") and rec.get("drc_ok") and rec.get("lvs_ok")
+                         and rec.get("cd_ok"))
+        return rec
+
+    with ThreadPoolExecutor(max_workers=max(1, jobs)) as ex:
+        rows = list(ex.map(one, todo))
+    bad = [r for r in rows if not r.get("ok")]
+    for r in rows:
+        print(f"  {r['knob']:16s} {r['end']:2s} {str(r['value']):>6s}  "
+              f"built={r.get('built')} drc={r.get('drc_n')} lvs={r.get('lvs_ok')} "
+              f"cd={r.get('cd_worst')}  {'OK' if r.get('ok') else 'FAIL'}")
+    print(f"  bounds: {len(rows) - len(bad)}/{len(rows)} endpoints clean")
+    return {"passed": not bad, "n": len(rows), "n_bad": len(bad), "rows": rows}
 
 
 def render(gds: Path, png: Path) -> bool:
@@ -182,12 +252,28 @@ def pex(gds: Path, lvs_netlist: Path, out: Path, mode: str = "CC") -> dict:
     strip_mim_for_pex(gds, pex_gds)
     sch = gds.with_name(f"{CELL}_pex_schematic.spice")
     sch.write_text(pex_schematic(lvs_netlist.read_text()))
-    r = run_pex(pex_gds, CELL, sch, out, mode=mode)
+    # kpex drives its own KLayout LVS pass and does NOT pass `-rd target_netlist=` to the runset
+    # (`klayout_pex/klayout/lvs_runner.py:49-69`), so `sg13g2.lvs:227-237` falls into its else
+    # branch and writes `<cell>_extracted.cir` next to `RBA::CellView.active.filename` — which in
+    # batch resolves to the PROCESS cwd, i.e. wherever this driver was started.  We cannot fix the
+    # runset from here, so we contain it: the stage runs with the run directory as its cwd, and
+    # the stray lands inside the run dir with everything else.  (Our own `spicexplorer_signoff.lvs`
+    # path is unaffected — it already writes into its own run dir.)
+    out.mkdir(parents=True, exist_ok=True)
+    cwd0 = Path.cwd()
+    try:
+        os.chdir(out)
+        r = run_pex(pex_gds, CELL, sch, out, mode=mode)
+    finally:
+        os.chdir(cwd0)
     print(f"  PEX: ok={r.ok} n_C={r.n_c} n_R={r.n_r}")
-    top = sorted(((v, k) for k, v in (r.per_net_c_ff or {}).items()), reverse=True)[:12]
+    # EVERY net, not the top twelve (review-003 **F10**): `x1` and `y` read "< 17.7" in the last
+    # report only because the twelfth net was 17.7 fF — they are 11.28 and 11.50, i.e. a quarter
+    # of their budgets, and a table that truncates cannot say that.
+    rows = sorted(((v, k) for k, v in (r.per_net_c_ff or {}).items()), reverse=True)
     return {"ok": bool(r.ok), "available": bool(r.available), "mode": r.mode,
             "netlist": r.netlist_path, "n_c": int(r.n_c), "n_r": int(r.n_r),
-            "per_net_c_ff": {k: round(v, 3) for v, k in top}, "reason": r.reason,
+            "per_net_c_ff": {k: round(v, 3) for v, k in rows}, "reason": r.reason,
             "log_tail": (r.log or "")[-1500:] if not r.ok else ""}
 
 
@@ -222,6 +308,12 @@ def main() -> int:
                     help="PEX policy: CC in the loop, RC once for the report")
     ap.add_argument("--density", action="store_true",
                     help="run the density/fill rule tables too (review-002 m1)")
+    ap.add_argument("--jobs", type=int, default=2,
+                    help="concurrent KLayout jobs for the `bounds` stage (2 is the host ceiling)")
+    ap.add_argument("--only", default="", help="restrict `bounds` to these knobs (comma list)")
+    ap.add_argument("--no-gate", action="store_true",
+                    help="report DRC/LVS instead of stopping on them (diagnosis only — a run "
+                         "with this flag is not a sign-off)")
     a = ap.parse_args()
     out = Path(a.out).resolve()
     out.mkdir(parents=True, exist_ok=True)
@@ -245,10 +337,27 @@ def main() -> int:
         if not rec["current_density"]["passed"]:
             (out / "signoff.json").write_text(json.dumps(rec, indent=1) + "\n")
             raise SystemExit("current-density stage failed — a segment is over the process limit")
+    # review-003 **F2**: only `guards` and `current_density` used to stop the run, so a build
+    # whose LVS did not match still produced a PEX netlist and a scorecard.  A cell that is not
+    # the certified circuit has no scorecard — DRC and LVS are gates, not report lines.
     if "drc" in stages:
         print("drc:"); rec["drc"] = drc(gds, out / "drc", no_density=not a.density)
+        if not rec["drc"]["passed"] and not a.no_gate:
+            (out / "signoff.json").write_text(json.dumps(rec, indent=1) + "\n")
+            raise SystemExit(f"DRC failed — {rec['drc']['n_violations']} violation(s): "
+                             f"{rec['drc']['violations_per_rule']}")
     if "lvs" in stages:
         print("lvs:"); rec["lvs"] = lvs(gds, netlist, out / "lvs")
+        if not rec["lvs"]["matched"] and not a.no_gate:
+            (out / "signoff.json").write_text(json.dumps(rec, indent=1) + "\n")
+            raise SystemExit("LVS did not match — the drawn cell is not the certified circuit")
+    if "bounds" in stages:
+        print("bounds:")
+        rec["bounds"] = bounds(out, jobs=a.jobs, only=a.only)
+        (out / "signoff.json").write_text(json.dumps(rec, indent=1) + "\n")
+        if not rec["bounds"]["passed"] and not a.no_gate:
+            raise SystemExit(f"{rec['bounds']['n_bad']} documented knob endpoint(s) do not build, "
+                             f"do not pass DRC or do not match LVS")
     if "pex" in stages:
         print("pex:"); rec["pex"] = pex(gds, netlist, out / f"pex_{a.pex_mode.lower()}"
                                         if a.pex_mode != "CC" else out / "pex", mode=a.pex_mode)

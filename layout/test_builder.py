@@ -77,6 +77,72 @@ def test_column_free_still_keeps_two_nets_off_one_metal2_column():
     assert m.column_free("vref", 3.0, 20.0, 30.0)     # no y overlap
 
 
+# --------------------------------------------------------------------- review-003 F7 ----
+# The same hole one layer up: the pass array's Metal2 comb is drawn by the power path as plain
+# rectangles.  Before F7 the router never saw it, `column_free` compared routed columns only, and
+# `col_vias` in {3, 4} put a `gate` column straight through the `vout` spine — a merge of two
+# legal polygons, so DRC reported 0 on a shorted netlist and only LVS caught it.
+
+COMB_Y0, COMB_Y1 = 52.0, 58.0     # a 6 um Metal2 spine, as `pwr_band_w` draws it
+COMB_X0, COMB_X1 = 44.0, 90.0
+
+
+def _map_with_the_pass_arrays_metal2_comb() -> ObstacleMap:
+    m = ObstacleMap()
+    m.claim_box("Metal2", "vout", COMB_X0, COMB_Y0, COMB_X1, COMB_Y1)
+    return m
+
+
+def test_a_metal2_column_may_not_run_through_the_power_comb():
+    m = _map_with_the_pass_arrays_metal2_comb()
+    # `gate` leaves the array at x = 44.1 and drops to a track at y = 21: straight down is a short
+    assert not m.column_free("gate", 44.1, 21.0, 60.0)
+    assert not m.column_free("gate", 60.0, 21.0, 60.0)     # anywhere under the spine
+    assert m.column_free("gate", 43.5, 21.0, 60.0)         # clear of it to the left
+    assert m.column_free("vout", 60.0, 21.0, 60.0)         # its own comb: a merge, not a short
+    assert m.column_free("gate", 60.0, 0.0, 20.0)          # no y overlap
+
+
+def test_a_metal3_column_is_not_refused_by_a_metal2_obstacle():
+    """Layer-awareness is what removed the hard-coded Metal3 hop: `gate`'s track is Metal3, so
+    the Metal2 comb is simply not an obstacle for it."""
+    m = _map_with_the_pass_arrays_metal2_comb()
+    assert m.column_free("gate", 60.0, 21.0, 60.0, "Metal3")
+    m.claim_box("Metal3", "vout", COMB_X0, COMB_Y0, COMB_X1, COMB_Y1)
+    assert not m.column_free("gate", 60.0, 21.0, 60.0, "Metal3")
+
+
+def test_without_the_claim_the_allocator_walks_into_the_comb():
+    """The regression itself: drop the comb from the map and the walk takes the first column,
+    which is inside the spine — the it02 -> it03 `gate` | `vout` short, reproduced."""
+    m = _map_with_the_pass_arrays_metal2_comb()
+    x_guarded = m.alloc("gate", 44.1, 60.0, 21.0, step=-0.6)
+    assert x_guarded < COMB_X0 - 0.3 + 1e-6, f"alloc returned {x_guarded}, inside the comb"
+    bare = ObstacleMap()
+    assert bare.alloc("gate", 44.1, 60.0, 21.0, step=-0.6) == 44.1
+
+
+def test_two_columns_of_one_net_still_keep_the_via_pad_pitch():
+    """Same net is not the same column: two `ea_n` columns 0.38 um apart merge on Metal2 but put
+    their Via1 cuts 0.19 um apart, which is V1.b (0.22).  Coincident is a merge; 0.38 is not."""
+    m = ObstacleMap()
+    m.claim_vertical("ea_n", 20.07, 4.5, 14.93)
+    assert m.column_free("ea_n", 20.07, 14.93, 26.0)      # the same column: a merge
+    assert not m.column_free("ea_n", 20.45, 14.93, 26.0)  # 0.38 apart: V1.b
+    assert m.column_free("ea_n", 20.67, 14.93, 26.0)      # a full pitch away
+
+
+def test_retag_follows_the_claimed_shapes_too():
+    """`m1_retag` renames the placeholder tags a device is drawn under; a claim left under the
+    old tag would be an obstacle nobody owns."""
+    m = ObstacleMap()
+    m.claim_box("Metal2", "@g:XM1", 0.0, 0.0, 1.0, 1.0)
+    m.claim_vertical("@g:XM1", 5.0, 0.0, 10.0)
+    m.m1_retag("@g:XM1", "fb")
+    assert m.boxes[0][1] == "fb" and m.verticals[0][0] == "fb"
+    assert m.column_free("fb", 5.0, 2.0, 4.0)
+
+
 def test_alloc_raises_with_a_hint_when_nothing_fits():
     m = ObstacleMap()
     m.m1_claim("fb", Y, -100.0, 100.0, GATE_BAR)
