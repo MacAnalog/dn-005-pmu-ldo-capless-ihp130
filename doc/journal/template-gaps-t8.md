@@ -41,6 +41,17 @@ not self-applied.
    scalar from the log is the only honest criterion (ngspice exits 0 on a failed `.op`).
    Done here; the template stub should say it.
 
+10. **`netlist2xschem` drops the size of a 2-node PDK primitive shipped as a subckt.**
+    `XCFF a b cap_cmim w=.. l=..` has exactly two nets, so the prefix test types it `CAP` and it
+    never reaches the subcircuit fallback that rescued the 3-node `rhigh`; it is then drawn with
+    `devices/capa.sym` (`format="@name @pinlist @value m=@m"`) and `w`/`l` are gone. The PDK ships
+    `sg13g2_pr/cap_cmim.sym` with the `rhigh` shape minus `body`. Fix: key the PDK symbol lookup on
+    the model name for two-terminal kinds too, not only on `DeviceKind.SUBCKT`.
+11. **A `.param` expression cannot ride in a quoted xschem attribute.** `dc {vref_val}` is emitted
+    as `value="dc {vref_val}"`; xschem's tokenizer treats `{}` as its own delimiters, drops the
+    attribute (`SKIPPING |"}|`, exit 0) and falls back to the symbol template's `value=3`. Fix:
+    emit braced expressions unquoted, or escape them the way xschem's own writer does.
+
 Generic code written here that belongs in the platform: `lab/sim.py` (deck text →
 `NGSpice_Wrapper` with per-run dirs, fatal-string scan, `parse_measures`), `lab/dut.py`
 (`Design` = analog-db binding + shadowing `.param` overrides, comment-stripped `assemble()`),

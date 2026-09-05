@@ -1,6 +1,6 @@
 # 2026-09-04 — "the tool cannot draw it" was a precedence bug, not a missing symbol
 
-KIND: journal entry | type: semantic | status: live
+KIND: journal entry | type: semantic | status: resolved upstream — platform #129 (c846437, f0b78c5, b37afcc); the three resistors draw and round-trip, 2026-09-05
 
 **Supersedes the diagnosis in** `doc/journal/netlist2xschem-skips-3-terminal-resistors.md`.
 
