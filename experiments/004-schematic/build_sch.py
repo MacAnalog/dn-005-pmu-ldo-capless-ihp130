@@ -264,13 +264,16 @@ def build_hierarchy(deck: Path) -> dict:
     """Parent sheet + one child `.sch`/`.sym` per block + the cell's own symbol."""
     import sch_support
     from spicexplorer_netlist2xschem.annotation import BlockAnnotationSet
-    from spicexplorer_netlist2xschem.hierarchy import write_hierarchy
+    from spicexplorer_netlist2xschem.hierarchy import build_hierarchical_sch, write_hierarchy
     from spicexplorer_netlist2xschem.ingest import from_file
     from spicexplorer_netlist2xschem.sym_library import SymLibrary
 
-    applied = sch_support.apply_platform_proposals()
+    applied = sch_support.assert_platform_support()
     circuit = from_file(deck, name=CELL, into="XDUT")
-    blocks = BlockAnnotationSet.load(BLOCKS)
+    # P8: the loader itself raises on a member the circuit does not have. `check_block_coverage`
+    # stays as the belt-and-braces gate -- it also catches the other direction (a device in NO
+    # block and not one of the declared loose ones) and reports rather than raising.
+    blocks = BlockAnnotationSet.load(BLOCKS, circuit=circuit)
     coverage = check_block_coverage(circuit, blocks)
     lib = SymLibrary([Path(p) for p in library_path().split(":")])
     kw = dict(pdk=PDK, lib=lib, title=CELL, show_device_params=True)
@@ -279,26 +282,27 @@ def build_hierarchy(deck: Path) -> dict:
     # connects only at a junction, so the pin silently lands on an unnamed net. Each block is
     # netlisted on its own and the ones that lost a pin are redrawn label-only, which cannot lose
     # one. Measured per block, so a block keeps the readable drawing unless it is provably wrong.
-    sch_support.CHILD_WIRING = "hybrid"
-    res = sch_support.build_hierarchy(circuit, blocks, **kw)
+    res = build_hierarchical_sch(circuit, blocks, child_wiring="hybrid", **kw)
     probe = Path(os.environ.get("SX_SCRATCH", str(OUT))) / "ldo-schematic/child-wiring-probe"
     lost = sch_support.blocks_losing_a_pin(res.children, res.symbols, probe, library_path())
     if lost:
-        sch_support.CHILD_WIRING = "labels"
-        alt = sch_support.build_hierarchy(circuit, blocks, **kw)
-        for fname in lost:
-            res.children[fname] = alt.children[fname]
+        # P5: redraw exactly the measured blocks label-only, in one call, rather than swapping
+        # sheets between two whole builds.
+        modes = {f[:-4]: "labels" for f in lost}
+        res = build_hierarchical_sch(circuit, blocks, child_wiring=modes, **kw)
     parent = write_hierarchy(res, SCH_DIR, parent_name=CELL)
     sch_support.append_port_symbols(parent, [(p, DUT_DIRS[p]) for p in DUT_PORTS])
     child_ports = sch_support.append_child_port_symbols(CHILD_DIR)
     pin_dirs = sch_support.sync_symbol_pin_dirs(CHILD_DIR)
     sym = sch_support.write_cell_symbol(SCH_DIR / f"{CELL}.sym", CELL, DUT_PORTS,
                                         DUT_SIDES, DUT_DIRS)
-    # A block whose devices all vanished from the deck is silently dropped by the annotation
-    # loader, and the equivalence gate still passes on the collapsed drawing -- it measures the
-    # netlist, not the readability. So the block count is asserted here as well.
+    # The equivalence gate passes on a collapsed drawing -- it measures the netlist, not the
+    # readability -- so the block count is asserted here as well, against the generator's own
+    # report of which declared blocks never formed.
     coverage["blocks_formed"] = res.block_count
+    coverage["unformed_blocks"] = list(res.unformed_blocks)
     coverage["ok"] = (not coverage["unknown_devices"] and not coverage["unannotated_devices"]
+                      and not res.unformed_blocks
                       and res.block_count == coverage["blocks_declared"])
     return {"parent": str(parent), "symbol": str(sym), "patches": applied,
             "coverage": coverage, "pin_dirs_synced": pin_dirs, "child_ports_drawn": child_ports,
@@ -344,13 +348,11 @@ def gate(sch: Path, work: Path, deck: Path, rcfile: Path, *, hierarchical: bool)
 
 
 def build_flat(deck: Path, out: Path) -> Path:
-    """The one-sheet drawing of the same cell, built in-process with the same shims."""
-    import sch_support
+    """The one-sheet drawing of the same cell, in-process (the control for the hierarchy)."""
     from spicexplorer_netlist2xschem.emit import build_sch
     from spicexplorer_netlist2xschem.ingest import from_file
     from spicexplorer_netlist2xschem.sym_library import SymLibrary
 
-    sch_support.apply_platform_proposals()
     circuit = from_file(deck, name=CELL, into="XDUT")
     lib = SymLibrary([Path(p) for p in library_path().split(":")])
     doc = build_sch(circuit, pdk=PDK, lib=lib, title=CELL, show_device_params=True)
@@ -394,14 +396,13 @@ def main() -> int:
 
     rec: dict = {"deck": str(deck)}
     # --- 1. the flat sheet -- the control for the hierarchy -------------------------------------
-    # The stock generator is first run through the CLI, in its own process, so the shims this
-    # script applies cannot reach it. That run is EVIDENCE, not the drawing: it is gated
-    # non-fatally below and its findings are the case for the platform proposals. The flat sheet
-    # the repo keeps is then built in-process with the same shims as the hierarchy, so the two
-    # drawings differ only in structure.
-    ctrl_dir = (Path(a.workdir).resolve() if a.workdir else OUT) / "unpatched"
+    # The generator is first run through the CLI, in its own process, and gated non-fatally below.
+    # That run is the standing record of P4: before the fix it netlisted this cell's own pass
+    # device as `w='…xmp_nf_mult}'` while its topology check passed, so it is kept as a control
+    # that would go red again if the truncation ever came back.
+    ctrl_dir = (Path(a.workdir).resolve() if a.workdir else OUT) / "stock-cli"
     ctrl_dir.mkdir(parents=True, exist_ok=True)
-    ctrl_sch = ctrl_dir / f"{CELL}_flat_unpatched.sch"
+    ctrl_sch = ctrl_dir / f"{CELL}_flat_cli.sch"
     cmd = [sys.executable, "-m", "spicexplorer_netlist2xschem.cli", str(deck),
            "--into", "XDUT", "--name", CELL, "-o", str(ctrl_sch), "--show-params"]
     print("$", " ".join(cmd), flush=True)
@@ -427,10 +428,9 @@ def main() -> int:
     rec["gate_flat"] = gate(flat_sch, OUT, deck, rcfile, hierarchical=False)
     ok = (rec["gate_hierarchical"]["ok"] and rec["gate_flat"]["ok"] and not rec["skipped"]
           and rec["hierarchy"]["coverage"]["ok"])
-    # Report-only: the same gate on the unpatched generator's own sheet. Its findings are the
-    # measured case for the platform proposals, so they are recorded, not asserted.
+    # Report-only: the same gate on the CLI's own sheet, recorded rather than asserted.
     ctrl = gate(ctrl_sch, ctrl_dir, deck, rcfile, hierarchical=False)
-    rec["unpatched_cli_control"] = {"sch": ctrl["sch"], "ok": ctrl["ok"],
+    rec["stock_cli_control"] = {"sch": ctrl["sch"], "ok": ctrl["ok"],
                                     "equivalence": ctrl["equivalence"],
                                     "findings": ctrl["parameters"]["findings"]}
 

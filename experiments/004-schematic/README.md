@@ -101,14 +101,14 @@ gate and is stated as such.
 the same command reports `equivalent: false, components_matched: 0, vacuous: true` and names the
 devices of that revision the certified cell does not have. The value half of the same machinery
 catches live silent corruption twice over: the stock emitter abbreviates any attribute over 24
-characters and writes the abbreviation into the netlist, which truncated a `pulse(...)` stimulus on
-two bench sheets in [006](../006-visual-benches/README.md), and on **this** cell truncates the pass
-device's own size — the unpatched generator's sheet netlists `XMP` with
+characters and wrote the abbreviation into the netlist, which truncated a `pulse(...)` stimulus on
+two bench sheets in [006](../006-visual-benches/README.md), and on **this** cell truncated the pass
+device's own size — the pre-fix generator's sheet netlisted `XMP` with
 `w='…xmp_nf_mult}' m='…xmp_nf_mult}'` against a certified
 `w={x_dut_xmp_w/x_dut_xmp_nf_mult} m={x_dut_xmp_m*x_dut_xmp_nf_mult}`, while its topology check
-passes at 50/50. That run is kept as a report-only control (`out/unpatched/`,
-`unpatched_cli_control` in `out/schematic.json`): the drawing of record is built in-process with the
-shims, and the stock generator's own sheet is measured beside it as the evidence for P4.
+passed at 50/50. That run is kept as a report-only control (`out/stock-cli/`, `stock_cli_control` in
+`out/schematic.json`). With P4 landed it now passes, so the control's job from here is to go red
+again if the truncation ever comes back.
 
 ```
 uv run --no-sync python experiments/004-schematic/build_sch.py --check-sch <path/to.sch> \
@@ -117,24 +117,31 @@ uv run --no-sync python experiments/004-schematic/build_sch.py --check-sch <path
 
 ## 3. What the generator needed, and what it still needs
 
-Five changes were needed in `spicexplorer_netlist2xschem` to draw this cell and its benches. They
-are applied here as documented patches in `sch_support.py::apply_platform_proposals()`, each with a
-guard that fails loudly the moment the upstream code changes, and proposed upstream as a diff that
-applies cleanly at `1775a67` and still at `297493a` (`$SX_SCRATCH/ldo-schematic/platform-proposal/`). Nothing is worked
-around silently, and no coordinate is hand-written: placement and wiring stay the generator's job.
+Six changes were needed in `spicexplorer_netlist2xschem` to draw this cell and its benches. They
+were carried for one round as guarded local patches, proposed upstream
+(`$SX_SCRATCH/ldo-schematic/platform-proposal/`), and **have landed** in the platform
+(`33850e1`). Nothing is patched here any more: the build calls the generator's own APIs
+(`build_hierarchical_sch(..., child_wiring=…)`, `BlockAnnotationSet.load(path, circuit=…)`,
+`mapping.register_subckt_symbol`), and `sch_support.py::assert_platform_support()` checks all six
+behaviours are present so a platform regression fails loudly instead of quietly redrawing a wrong
+sheet. Rebuilding on the platform APIs reproduced every `.sch` and every PNG **byte for byte**, with
+the same verdicts. No coordinate is hand-written: placement and wiring stay the generator's job.
 
 | | change | why the drawing needed it |
 |---|---|---|
 | **P1+P2** | a declared supply port stays a port; the child inherits the parent's supply map | without both, a child is drawn as one flat row of transistors — the rail-banded floorplan is off, because `supply={}` tells the placer the block has no rails |
 | **P3** | `register_subckt_symbol` for a design's own cell symbol | a bench's `XDUT ... ldo_ihp_capless` had no symbol and was dropped from the drawing |
 | **P4** | a display shortening must not reach the netlist | see the truncated `pulse(...)` and the truncated `XMP` size above |
-| **P5** | a child sheet may be wired label-only | with the default `hybrid` wiring a net's trunk wire **crosses** a pin's stub without a junction; xschem connects only at a junction, so the pin lands on an unnamed `net1`. Measured on the recertified cell: `XMB0A net1 net1 vss vss` in `bias_ref` (certified `nbias nbias vss vss`) and `XM3A` likewise in `ea_stage1` — both the first half of a duplicated diode-connected pair. The gate catches it (33 nets vs 35) |
+| **P8** | the annotation loader fails closed | a member the circuit does not have raises at load time instead of silently emptying a block (§2) |
+| **P5** | per-child wiring mode on `build_hierarchical_sch` | with the default `hybrid` wiring a net's trunk wire **crosses** a pin's stub without a junction; xschem connects only at a junction, so the pin lands on an unnamed `net1`. Measured on the recertified cell: `XMB0A net1 net1 vss vss` in `bias_ref` (certified `nbias nbias vss vss`) and `XM3A` likewise in `ea_stage1` — both the first half of a duplicated diode-connected pair. The gate catches it (33 nets vs 35) |
 
-P5 is applied **per block, on measurement, not by default**: every child is drawn `hybrid` (drawn
+P5 is used **per block, on measurement, not by default**: every child is drawn `hybrid` (drawn
 rails and wires — the readable form), netlisted on its own, and only a block whose netlist shows an
-auto-named `netN` is redrawn label-only. On the cell of record that is 2 blocks of 5 (`bias_ref`,
-`ea_stage1`); the other three keep their wires. `out/schematic.json` records which mode each child
-got and which pins were lost.
+auto-named `netN` is passed as `labels` in the `child_wiring` mapping of a second build. On the cell
+of record that is 2 blocks of 5 (`bias_ref`, `ea_stage1`); the other three keep their wires.
+`out/schematic.json` records which mode each child got and which pins were lost. The underlying
+defect — piece membership counting a bare crossing as connectivity — is still open upstream; the
+per-child mode is the interim.
 
 Three smaller inconsistencies are post-processed here and reported upstream rather than patched:
 `sync_symbol_pin_dirs` gives each block symbol the pin directions its own child sheet declares (the
@@ -161,9 +168,11 @@ its own. With all three, xschem netlists the whole hierarchy with no warnings an
    any placement, so no placer change can help; the platform vendors "no-params" symbol twins for MOS
    devices but explicitly not for PDK subcircuit primitives. A render-side option to suppress a PDK
    symbol's own annotation text is the proposal (P7).
-4. **The annotation loader fails open.** `BlockAnnotationSet.load` silently drops a device it cannot
-   find in the circuit, so a stale `blocks.json` yields a smaller hierarchy and no diagnostic. The
-   coverage assertion in §2 is this repo's guard; failing closed upstream is the proposal (P8).
+4. *(closed)* The annotation loader used to fail open. `BlockAnnotationSet.load(path, circuit=…)`
+   now raises on an unresolvable member (P8), and `HierarchicalResult.unformed_blocks` names a
+   declared block that formed no child. The coverage assertion in §2 stays as the belt-and-braces
+   gate: it also catches the other direction — a device in no block that is not one of the three
+   declared loose ones.
 
 ## 4. The figures
 
@@ -192,7 +201,7 @@ previously committed `figs/ldo_ihp_capless.svg` is gone.
 | `circuits/ldo_ihp_capless/xschem/ldo_ihp_capless.sym` | the cell symbol, pins in the certified `.subckt` port order `vdd vout vss` |
 | `circuits/ldo_ihp_capless/xschem/ldo_ihp_capless.blocks.json` | the block decomposition that drives the hierarchy |
 | `circuits/ldo_ihp_capless/xschem/ldo_ihp_capless_flat.sch` | the flat drawing, same two gates |
-| `experiments/004-schematic/sch_support.py` | the generator patches, the hierarchy→flat splice, and the render/netlist helpers (006 imports it) |
+| `experiments/004-schematic/sch_support.py` | the platform-support assertion, the hierarchy→flat splice, the per-block wiring probe, and the render/netlist helpers (006 imports it) |
 | `out/ldo_ihp_capless_from_sch.spice` | the drawing's netlist, spliced flat, as compared |
 | `out/ldo_ihp_capless_certified.spice` | the certified cell, flat, out of the frozen deck |
 | `out/schematic.json` | both gates' verdicts, the parameter findings, xschem's own log |

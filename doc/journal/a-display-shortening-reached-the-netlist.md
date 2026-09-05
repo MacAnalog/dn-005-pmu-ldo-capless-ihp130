@@ -28,3 +28,9 @@ non-zero: this one drifted on 2 of 13 sheets, and a report would have been read 
 **Where it lives.** `experiments/006-visual-benches/build_benches.py::compare_bench`. The emitter
 fix is proposal **P4** in `$SX_SCRATCH/ldo-schematic/platform-proposal/`, applied here as a guarded
 patch in `experiments/004-schematic/sch_support.py` until it lands upstream.
+
+*Update, 2026-09-05:* it landed (`spicexplorer-platform @33850e1`), and on the way there the same
+defect was measured a second time on a SIZE rather than a stimulus — the recertified cell's pass
+device netlisted as `w='…xmp_nf_mult}'`. The local patch is gone; what remains in the design repo is
+an assertion that the behaviour is present, and a report-only run of the stock CLI whose job is to
+go red again if the truncation returns.

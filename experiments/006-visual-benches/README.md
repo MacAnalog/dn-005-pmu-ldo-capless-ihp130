@@ -74,8 +74,10 @@ unchanged by the recertification). Two sheets failed it: the drawing's netlist c
 `Iload vout 0 pulse(0.1m 10m 1u 100n 100n 10u 20u)`. The cause was in the emitter, which abbreviated
 any attribute value over 24 characters to its tail and wrote that into the instance's `value=` — the
 attribute xschem netlists. Sizing symbols are short enough that it had never shown; a transient
-stimulus is not. Every topology check passed on those two sheets. The fix is proposal **P4**
-(`$SX_SCRATCH/ldo-schematic/platform-proposal/`), applied here as a guarded patch.
+stimulus is not. Every topology check passed on those two sheets. The fix was proposed as **P4**
+(`$SX_SCRATCH/ldo-schematic/platform-proposal/`), carried here for one round as a guarded patch, and
+has landed in the platform (`33850e1`) — the sheets are now drawn by the stock generator, and
+`sch_support.py::assert_platform_support()` fails the build if the truncation ever returns.
 
 ## 3. The drawing reproduces the number
 

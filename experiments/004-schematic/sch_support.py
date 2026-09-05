@@ -1,42 +1,32 @@
 """Shared support for the schematic of record (004) and the visual benches (006).
 
-Everything here is either (a) a small, temporary patch to the generator that the design needs and
-the generator does not yet offer, or (b) a helper the two build scripts share. No coordinate is
-hand-placed: placement and wiring stay the generator's job throughout.
+Everything here is a helper the two build scripts share. No coordinate is hand-placed: placement and
+wiring stay the generator's job throughout.
 
-**The patches.** All are proposed upstream verbatim -- the diff and its rationale live in
-``$SX_SCRATCH/ldo-schematic/platform-proposal/`` -- and both carry an *outdated guard*: they assert
-the upstream code is still the version they patch, so the day the fix lands here this file fails
-loudly instead of silently patching a patch.
+**The generator does the work now.** Five changes this design needed were carried as guarded local
+patches for one round, proposed upstream (``$SX_SCRATCH/ldo-schematic/platform-proposal/``) and have
+landed in ``spicexplorer_netlist2xschem`` (platform ``33850e1``). Nothing is monkey-patched here any
+more; what remains is :func:`assert_platform_support`, which checks the five behaviours are present
+so a platform regression fails loudly instead of quietly redrawing a wrong sheet:
 
-* **P1/P2 -- a block's child sheet must keep its rails.** ``hierarchy._child_circuit`` hands every
-  child ``supply={}`` so that a boundary supply surfaces as a real ``.subckt`` port. That is right,
-  but it also tells the placer the child *has no rails*, and the rail-banded placement (VDD row on
-  top, VSS row on the bottom, the signal path between) is exactly what makes an amplifier readable.
-  Keeping the parent's supply map on the child would drop ``vdd``/``vss`` from its port list instead,
-  because ``analysis._port_roles`` refuses to call a supply net a port -- so the two must move
-  together: a *declared* port stays a port even when it is a supply (P1), and the child inherits the
-  parent's supply map (P2). With both, each child comes out as a textbook drawing and the hierarchy
-  still re-netlists.
-* **P4 -- a display shortening must not reach the netlist.** ``emit._display_value`` abbreviates an
-  attribute value longer than 24 characters to its tail (``…00n 10u 20u)``) and writes THAT into the
-  instance's ``value=``, which is the attribute xschem netlists. For a sizing symbol
-  (``w=x_dut_xmp_w``) the values are short and it never shows; for a transient stimulus
-  (``pulse(1.4 1.65 1u 100n 100n 10u 20u)``, 36 characters) the drawing's netlist silently loses the
-  front of the source. A shortening meant for the drawing has to stay in the drawing.
-* **P5 -- hybrid wiring drops a pin on a child sheet.** With the default ``wiring="hybrid"`` the
-  child sheets of two blocks came out with a device connected to an unnamed stub: ``XMB0A net1 net1
-  vss vss`` in ``bias_ref`` (certified ``nbias nbias vss vss``) and ``XM3A net1 net1 vss vss`` in
-  ``ea_stage1`` (certified ``ea_n ea_n vss vss``). Both are the FIRST half of a duplicated
-  diode-connected pair the recertified deck introduced (``XMB0`` -> ``XMB0A``/``XMB0B``); the flat
-  sheet of the same devices is correct, so the defect is in the child path only. The gate catches it
-  (net count 35 vs 33). Children are built ``hybrid`` and each is netlisted on its own; only a block
-  whose netlist shows an auto-named ``netN`` is redrawn label-only (``blocks_losing_a_pin`` and
-  ``build_sch.py::build_hierarchy``), so a block keeps the readable drawing unless it is provably
-  wrong.
-* **P3 -- a design's own cell symbol on a bench sheet.** ``mapping.symref_for`` resolves a subcircuit
-  instance through a PDK table, so a bench's ``XDUT ... ldo_ihp_capless`` has no symbol and is
-  dropped from the drawing. The design's own generated symbol is registered in that table.
+* **P1/P2 -- a block's child sheet keeps its rails.** A *declared* ``.subckt`` port stays a port even
+  when it is a supply, and the child inherits the parent's supply map, so each child is placed
+  rail-banded (VDD row on top, VSS row on the bottom, the signal path between) and still re-netlists.
+* **P3 -- a design's own cell symbol on a bench sheet.** ``mapping.register_subckt_symbol`` puts the
+  design's generated symbol in the table ``symref_for`` resolves, so a bench's
+  ``XDUT ... ldo_ihp_capless`` is drawn rather than dropped.
+* **P4 -- a display shortening must not reach the netlist.** ``emit._display_value`` no longer
+  abbreviates a value over 24 characters to its tail; the abbreviation used to be written into the
+  instance's ``value=``, which is the attribute xschem netlists (a truncated ``pulse(...)`` stimulus
+  on two bench sheets, and this cell's own ``w={x_dut_xmp_w/x_dut_xmp_nf_mult}``).
+* **P5 -- per-child wiring mode.** ``build_hierarchical_sch(..., child_wiring=...)`` takes a mode or
+  a per-block mapping. Needed because ``hybrid`` lets a net's trunk wire CROSS a pin's stub with no
+  junction, and xschem connects only at junctions, so the pin lands on an unnamed ``netN``. Children
+  are drawn ``hybrid`` and netlisted one at a time; only a block measured to have lost a pin
+  (:func:`blocks_losing_a_pin`) is redrawn ``labels``, which cannot lose one.
+* **P8 -- the annotation loader fails closed.** ``BlockAnnotationSet.load(path, circuit=...)`` raises
+  on a member the circuit does not have. Without it a netlist recertification that renamed devices
+  silently emptied three of five blocks while the topology gate stayed green.
 
 **The flattener.** The parent sheet netlists as a hierarchy (one ``.subckt`` per block); the gate
 compares against the certified *flat* cell. ``flatten_hierarchy`` splices the blocks back inline,
@@ -53,109 +43,49 @@ import subprocess
 from pathlib import Path
 
 from spicexplorer_netlist2xschem import analysis as _analysis
+from spicexplorer_netlist2xschem import annotation as _annotation
 from spicexplorer_netlist2xschem import emit as _emit
 from spicexplorer_netlist2xschem import hierarchy as _hierarchy
 from spicexplorer_netlist2xschem import mapping as _mapping
-from spicexplorer_netlist2xschem.ingest import N2XCircuit
 from spicexplorer_netlist2xschem.render import render
 from spicexplorer_netlist2xschem.symbol_gen import BlockPin, generate_block_symbol
 
 PROPOSAL = "$SX_SCRATCH/ldo-schematic/platform-proposal/"
 
-# The wiring mode the P5 shim gives every CHILD sheet. "hybrid" (drawn rails and wires) is the
-# readable one and the default; a block whose hybrid sheet is measured to have lost a pin is
-# rebuilt "labels" (see ``blocks_losing_a_pin``).
-CHILD_WIRING = "hybrid"
-
-_PARENT_SUPPLY: dict[str, str] = {}
-_APPLIED = False
-
 
 # ----------------------------------------------------------------------------------------------
-# P1 + P2 -- readable child sheets
+# The platform behaviours this design depends on (P1-P5, P8), asserted rather than patched
 # ----------------------------------------------------------------------------------------------
-def apply_platform_proposals() -> list[str]:
-    """Apply P1 and P2. Idempotent; raises if the upstream code has moved on (see module docstring)."""
-    global _APPLIED
-    if _APPLIED:
-        return ["already applied"]
-
-    orig_roles = _analysis._port_roles
-    orig_child = _hierarchy._child_circuit
-    # Outdated guard: if either function is already someone else's (or upstream renamed it), stop.
-    if getattr(orig_roles, "__module__", "") != _analysis.__name__:
-        raise RuntimeError("analysis._port_roles is not the stock function; P1 may be upstream now")
-    if getattr(orig_child, "__module__", "") != _hierarchy.__name__:
-        raise RuntimeError("hierarchy._child_circuit is not the stock function; P2 may be upstream now")
-    if "supply=" not in _child_source(orig_child) or "supply={}" not in _child_source(orig_child):
-        raise RuntimeError("hierarchy._child_circuit no longer passes supply={}; P2 is upstream")
-
-    def _port_roles(circuit, supply, net_pins):  # P1
-        roles = dict(orig_roles(circuit, supply, net_pins))
-        for net in circuit.ports:
-            if net in supply and net in net_pins:
-                roles.setdefault(net, "inout")
-        return roles
-
-    def _child_circuit(block_devs, name, boundary):  # P2
-        child = orig_child(block_devs, name, boundary)
-        keep = {n: r for n, r in _PARENT_SUPPLY.items() if n in child.nets}
-        return N2XCircuit(name=child.name, devices=child.devices, nets=child.nets,
-                          supply=keep, ports=child.ports)
-
-    orig_display = _emit._display_value
-    if getattr(orig_display, "__module__", "") != _emit.__name__:
-        raise RuntimeError("emit._display_value is not the stock function; P4 may be upstream now")
-    if orig_display("x" * 40) == "x" * 40:
-        raise RuntimeError("emit._display_value no longer shortens; P4 is upstream")
-
-    _emit._display_value = lambda value: str(value)  # P4
-
+def assert_platform_support() -> list[str]:
+    """Check the generator still carries what the drawing of record needs. Raises if it does not."""
     import inspect
-    if "child_wiring" in inspect.signature(_hierarchy.build_hierarchical_sch).parameters:
-        raise RuntimeError("build_hierarchical_sch now takes child_wiring; P5 is upstream")
-    if _hierarchy.build_sch is not _emit.build_sch:
-        raise RuntimeError("hierarchy.build_sch is not emit.build_sch; P5 may be upstream now")
-    _orig_build = _hierarchy.build_sch
 
-    def _child_build_sch(circuit, **kw):  # P5
-        kw.setdefault("wiring", CHILD_WIRING)
-        return _orig_build(circuit, **kw)
-
-    _hierarchy.build_sch = _child_build_sch
-    _analysis._port_roles = _port_roles
-    _hierarchy._child_circuit = _child_circuit
-    _APPLIED = True
-    return ["P1 analysis._port_roles: a declared supply port stays a port",
-            "P2 hierarchy._child_circuit: the child inherits the parent's supply map",
-            "P4 emit._display_value: the netlisted value is never abbreviated",
-            "P5 hierarchy child sheets are wired label-only (hybrid loses a pin, see below)"]
-
-
-def _child_source(fn) -> str:
-    import inspect
-    try:
-        return inspect.getsource(fn)
-    except Exception:  # noqa: BLE001
-        return "supply={}"   # cannot read it: do not block on the guard
+    checks: list[tuple[str, bool]] = [
+        ("P1 a declared supply port stays a port",
+         "DECLARED" in inspect.getsource(_analysis._port_roles)),
+        ("P2 the child inherits the parent's supply map",
+         "supply={n: r for n, r in supply.items() if n in nets}"
+         in inspect.getsource(_hierarchy._child_circuit)),
+        ("P3 a design's own cell symbol can be registered",
+         callable(getattr(_mapping, "register_subckt_symbol", None))),
+        ("P4 the netlisted value is never abbreviated",
+         _emit._display_value("x" * 40) == "x" * 40),
+        ("P5 per-child wiring mode",
+         "child_wiring" in inspect.signature(_hierarchy.build_hierarchical_sch).parameters),
+        ("P8 the annotation loader fails closed",
+         "circuit" in inspect.signature(_annotation.BlockAnnotationSet.load).parameters),
+    ]
+    missing = [name for name, ok in checks if not ok]
+    if missing:
+        raise RuntimeError(
+            "the installed spicexplorer_netlist2xschem is missing behaviour this drawing needs: "
+            + "; ".join(missing) + f" (see {PROPOSAL})")
+    return [name for name, _ in checks]
 
 
-def build_hierarchy(circuit, annotations, **kw):
-    """``hierarchy.build_hierarchical_sch`` with the parent's supply map visible to P2."""
-    global _PARENT_SUPPLY
-    _PARENT_SUPPLY = dict(circuit.supply)
-    return _hierarchy.build_hierarchical_sch(circuit, annotations, **kw)
-
-
-# ----------------------------------------------------------------------------------------------
-# P3 -- the design's own cell symbol
-# ----------------------------------------------------------------------------------------------
 def register_cell_symbol(pdk: str, cell: str, symref: str) -> None:
-    """Make the generator place ``cell`` as ``symref`` (a bench's DUT instance)."""
-    table = _mapping._PDK_SUBCKT_SYMREF
-    if (pdk, cell) in table and table[(pdk, cell)] != symref:
-        raise RuntimeError(f"{pdk}/{cell} already maps to {table[(pdk, cell)]}; P3 may be upstream")
-    table[(pdk, cell)] = symref
+    """Make the generator place ``cell`` as ``symref`` (a bench's DUT instance) -- P3."""
+    _mapping.register_subckt_symbol(pdk, cell, symref)
 
 
 def write_cell_symbol(path: Path, cell: str, ports: list[str], sides: dict[str, str],
