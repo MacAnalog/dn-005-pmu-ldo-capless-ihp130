@@ -31,7 +31,23 @@ freeze:  ## write SHA256SUMS into the frozen dirs after a deliberate certificati
 doctor:  ## is the simulation lane alive?
 	@$(PY) -m ldo.sim
 
+# The labelled layout figure.  Geometry comes from the rebuilt GDS and the annotation spec
+# `layout/ldo_ihp_capless/labels.yaml`; nothing is placed by hand.  `spicexplorer_signoff.annotate`
+# is a platform module that is PROPOSED, not yet merged — until it lands, point LAYOUT_ANNOTATE at
+# the workspace-level runner named in the workspace layout-annotation method doc, e.g.
+#   make fig-layout LAYOUT_ANNOTATE="$(PY) /path/to/annotate.py"
+LAYOUT_ANNOTATE ?= $(PY) -m spicexplorer_signoff.annotate
+
+fig-layout:  ## redraw experiments/005-layout/figs/ldo_ihp_capless_labelled*.png from the GDS + labels.yaml
+	@w=$$($(PY) -c "from ldo import config; print(config.WORK)"); g="$$w/layout/ldo_ihp_capless.gds"; \
+	 test -f "$$g" || { echo "no GDS at $$g — first: LDO_EXP=005 $(PY) layout/signoff.py --stages build"; exit 1; }; \
+	 for v in "dark:" "white:_white"; do \
+	   $(LAYOUT_ANNOTATE) "$$g" layout/ldo_ihp_capless/labels.yaml \
+	     experiments/005-layout/figs/ldo_ihp_capless --base "$$w/layout/annotate_base.png" \
+	     --ground "$${v%%:*}" --variant "$${v##*:}" --quantize 256 --formats png || exit 1; \
+	 done
+
 clean:  ## delete this checkout's simulation work dir + experiment output (never the ledger)
 	@d=$$($(PY) -c "from ldo import config; print(config.WORK)"); echo "rm -rf $$d"; rm -rf "$$d"; rm -rf experiments/*/out/
 
-.PHONY: help lint check baseline pack runs freeze doctor clean
+.PHONY: help lint check baseline pack runs freeze doctor fig-layout clean

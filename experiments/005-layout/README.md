@@ -200,6 +200,19 @@ could only drift from `gen_ldo.py` + `sizing.yaml`. Rebuild it with
 `LDO_EXP=005 uv run --no-sync python layout/signoff.py --stages build`; `--all` re-runs the whole
 sign-off chain above.
 
+**The labelled figure.** `figs/ldo_ihp_capless_labelled.png` (PDK colours) and
+`…_labelled_white.png` (white ground, for print) name what a reader is looking at: every matching
+group with the pattern it is drawn in, the tied dummies, the five closed guard rings, the Metal2
+power combs and the TopMetal1 straps, the pin frame, and the 10 mA load path as an arrow chain.
+`…_labelled_scale.png` / `…_labelled_white_scale.png` add a 50 µm scale bar in a strip of their own,
+so the unscaled figure stays clean for a caption that already gives the size. All four regenerate
+from the rebuilt GDS with `make fig-layout`; the annotation spec is
+[`layout/ldo_ihp_capless/labels.yaml`](../../layout/ldo_ihp_capless/labels.yaml), whose header
+documents how each `index:` range maps onto a device group and how that mapping was checked against
+the GDS. No coordinate in it was eyeballed: device boxes come from instance bounding boxes, the
+guard rings are the only `pSD`/`nSD` polygons that enclose a hole, and the pin positions are the
+GDS text labels. The plain render `figs/ldo_ihp_capless.png` is never overwritten.
+
 ## 6. What was not done
 
 - **No independent `layout-reviewer` pass.** The `layout-evidence` method asks for a numbered `REVIEW.md`/`REVIEW.yaml`/`REVIEW.png` from an agent that rebuilds and re-measures everything itself (rule 7, designer ≠ verifier). Everything here was produced by the designer; the sign-off is reproducible from the committed generator (`layout/signoff.py`), but it has not been independently re-measured.
