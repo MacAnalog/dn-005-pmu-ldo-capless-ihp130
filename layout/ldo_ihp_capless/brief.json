@@ -1,7 +1,152 @@
 {
  "cell": "ldo_ihp_capless",
  "netlist": "circuits/ldo_ihp_capless/pdk/ihp-sg13g2/netlist.spice",
- "netlist_sha": "18bd9c959a74f1fccb9bc9a9bdf8aed9b3fa1e2ae86774c214a51c8ec02a818b",
+ "netlist_sha": "f5c4efb02afe023e931d02ceda9b9916712409b28c9125f165dcafb396a42080",
+ "supersedes": {
+  "brief": "layout/ldo_ihp_capless/BRIEF.md @ the pre-bf3a4f8 row",
+  "netlist_sha": "18bd9c959a74f1fccb9bc9a9bdf8aed9b3fa1e2ae86774c214a51c8ec02a818b",
+  "why": "commit bf3a4f8 made the certified deck the drawn device set"
+ },
+ "changelog": [
+  {
+   "item": "scorecard",
+   "was": "Iq 36.2771 uA, Vout 1.200072 V, S7 104.847 mV, S4 106.143 mV, PM 72.4188 deg",
+   "now": "Iq 33.8054 uA, Vout 1.199499 V, S7 115.057 mV, S4 104.671 mV, PM 72.5064 deg",
+   "why": "commit bf3a4f8 made the certified deck the drawn device set: half-width A/B bias and EA cards, 8/8/5-segment resistor strings, XMP as 76 fingers. The independent reviewer attributed the shift device group by device group (REVIEW F19): the bias halving alone is -2.24 uA of Iq and +6.09 mV of S7"
+  },
+  {
+   "item": "S7 margin",
+   "was": "45.15 mV (quarter 11.3)",
+   "now": "34.943 mV (quarter 8.736)",
+   "why": "the undershoot baseline moved 104.847 -> 115.057 mV; every S7-bound budget shrinks with it"
+  },
+  {
+   "item": "S5 margin",
+   "was": "13.72 uA (quarter 3.43)",
+   "now": "16.195 uA (quarter 4.049)",
+   "why": "Iq fell 2.47 uA, so the quiescent-current budgets got LOOSER"
+  },
+  {
+   "item": "`gate` capacitance",
+   "was": "29.3 fF budget, hard step at 60-65 fF",
+   "now": "**12 fF**, hard step at 12-13 fF",
+   "why": "both the margin and the MECHANISM moved. The linear slope rose 0.386 -> +0.507 mV/fF, but the step that was 4.6x outside the linear budget is now INSIDE it: the linear budget would be 17.2 fF and the step arrives at 13 fF"
+  },
+  {
+   "item": "`gate` to `vout` (the escape route)",
+   "was": "100 fF, explicitly NOT bracketed",
+   "now": "**40 fF**, bracketed (40 fF in box, 45 fF out)",
+   "why": "the 005 brief could only say 'in box at 100 fF, out at 300'; it is now measured to 5 fF"
+  },
+  {
+   "item": "`fb` capacitance",
+   "was": "27.9 fF (S8hi)",
+   "now": "27.1 fF (S8hi)",
+   "why": "coefficient -0.115 deg/fF against -0.111; the PM margin barely moved"
+  },
+  {
+   "item": "`x1` capacitance",
+   "was": "46.1 fF, no step known",
+   "now": "**28.3 fF**, step at 30-40 fF",
+   "why": "the same S7 step, one mirror node away from the gate; never bracketed on the 005 row"
+  },
+  {
+   "item": "`y` capacitance",
+   "was": "62 fF, no step known",
+   "now": "**39.4 fF**, step at 50-60 fF",
+   "why": "as `x1`"
+  },
+  {
+   "item": "`fb` to `lp_brk` (parallel with XCFF)",
+   "was": "not a listed constraint",
+   "now": "**6 fF**, step at 6-8 fF",
+   "why": "10 fF across XCFF was benign on the 005 row; on this row 8 fF crosses the S7 step. The same limit read as a capacitor tolerance is XCFF +6 % in box, +8 % out"
+  },
+  {
+   "item": "`vdd` series R",
+   "was": "1.77 Ohm (13.24 mV/Ohm)",
+   "now": "2.31 Ohm (10.34 mV/Ohm)",
+   "why": "the dropout coefficient is now I*R to three digits (10.0 mA through the rail); the 005 row's 13.24 mV/Ohm was read off a single point against the unsplit baseline, which carries the offset a node split adds"
+  },
+  {
+   "item": "`vout` series R, sense at the pin",
+   "was": "2.35 Ohm",
+   "now": "2.76 Ohm (8.64 mV/Ohm)",
+   "why": "same re-measurement"
+  },
+  {
+   "item": "`vout` series R, sense at the pass drain",
+   "was": "0.126 Ohm",
+   "now": "0.126 Ohm",
+   "why": "unchanged -- it is dI x R and the load step did not move"
+  },
+  {
+   "item": "`vss` return R",
+   "was": "17 Ohm (PSRR, -0.4413 dB/Ohm)",
+   "now": "**11 Ohm** (S7, step at 11-12 Ohm)",
+   "why": "two corrections. The 005 injection moved a HAND LIST of vss instances that omitted XMA/XMB/XMS -- 13 of the ~34 uA -- so it measured a partial return; and the binding mechanism is not PSRR but the S7 step. PSRR at 32 Ohm is 62.0 dB, still in box; S7 there is 218.1 mV, out of it. The step is SHARED-IMPEDANCE: with XCOUT's return separated it disappears (section 4a)"
+  },
+  {
+   "item": "`vss` return R, XCOUT returned separately",
+   "was": "not measured",
+   "now": "**16.5 Ohm** (S6, -0.4553 dB/Ohm)",
+   "why": "new: splitting the injection shows the S7 cliff needs XCOUT and the active devices behind the SAME R. Kelvin-return the cap and the cliff is gone; what is left is a soft PSRR cost"
+  },
+  {
+   "item": "`ea_o1` / `ea_out` capacitance",
+   "was": "~630 fF (S8lo)",
+   "now": "no bound below 500 fF",
+   "why": "unchanged in substance: both are still hundreds of fF and still improve S7"
+  },
+  {
+   "item": "`ea_n` capacitance",
+   "was": "980 fF",
+   "now": "91 fF (S8hi)",
+   "why": "the 005 number came from a 10 fF point whose binding metric sat on the bench floor"
+  },
+  {
+   "item": "`ea_nmos_load` matching",
+   "was": "3.46 mV tolerated, 2.10 sigma, out of box first at 20 mV",
+   "now": "**1 mV**, **0.61 sigma**, step at 2 mV",
+   "why": "the 005 row probed the XM4 (output-leg) side, which is the safe sign. The XM3 (diode) side crosses the S7 step at 2 mV of dVT. Random mismatch is symmetric, so half the distribution sees the dangerous sign"
+  },
+  {
+   "item": "`bias_p_group` matching",
+   "was": "12.4 mV linear / step at 8 mV, 7.16 sigma",
+   "now": "**1.2 mV**, **1.07 sigma**, step at 1.5 mV",
+   "why": "the bias-current step review F16 predicted would move: the recertified bias branch sits much closer to it. dW on XMT steps at 3 % (2 % in box)"
+  },
+  {
+   "item": "`bias_n_group` matching",
+   "was": "8.92 mV, 3.15 sigma, interdigitated",
+   "now": "5 mV, 2.06 sigma, step at 6 mV",
+   "why": "the 005 sigma used XMB0's 1/1 um twice; the class is XMB0 (1/1) against XMS (2.2/0.95), so the pair sigma is 2.43 mV, not 2.83"
+  },
+  {
+   "item": "`fb_divider` matching",
+   "was": "1.00 % of single-arm dR/R, 1.71 sigma",
+   "now": "0.989 %, 1.72 sigma",
+   "why": "unchanged. sigma re-measured on the SEGMENTED string the deck now draws (0.2873 % of ratio) against the monolithic arms (0.2909 %): segmentation does not change the random part"
+  },
+  {
+   "item": "`XCFF` tolerance",
+   "was": "166 % (linear only)",
+   "now": "**6 %**, out of box at 8 %",
+   "why": "same S7 step, reached as a capacitor tolerance"
+  },
+  {
+   "item": "`XRB` tolerance",
+   "was": "20.2 %",
+   "now": "**6 %**, out of box at 10 %",
+   "why": "same S7 step"
+  },
+  {
+   "item": "pass-array current density",
+   "was": "1.05 mA per shared Metal1 column, 2.9x over minimum width; 'not a layout knob, needs a re-sizing campaign'",
+   "now": "0.263 mA per shared column, 0.73x",
+   "why": "the recertified pass device IS 76 fingers of 2.5 um, so the shared-column current fell by 4x and a minimum-width Metal1 riser now passes. The whole 'raise nf / Metal2 plate or re-certify' argument of the 005 section 8 is void"
+  }
+ ],
  "design": "decks/candidate/design.json",
  "scorecard": "decks/candidate/scorecard.json",
  "benches": "decks/candidate/*.spice",
@@ -9,45 +154,45 @@
  "pdk": "ihp-sg13g2",
  "margin_fraction": 0.25,
  "baseline": {
-  "v_out_v": 1.200072,
-  "load_reg_mv": 0.028,
-  "line_reg_mv": 0.059,
-  "v_dropout_mv": 106.1432,
-  "i_q_ua": 36.27715,
-  "psrr_1k_db": 69.9531,
-  "v_undershoot_mv": 104.847,
-  "pm_loop_deg": 72.41882,
-  "pm_loop_lo_deg": 72.38293,
-  "pm_loop_hi_deg": 72.31013
+  "v_out_v": 1.199499,
+  "load_reg_mv": 0.026,
+  "line_reg_mv": 0.056,
+  "v_dropout_mv": 104.671,
+  "i_q_ua": 33.80539,
+  "psrr_1k_db": 70.00703,
+  "v_undershoot_mv": 115.057,
+  "pm_loop_deg": 72.5064,
+  "pm_loop_lo_deg": 72.47302,
+  "pm_loop_hi_deg": 72.41834
  },
  "margin": {
-  "v_out_v": 0.023928,
-  "load_reg_mv": 4.972,
-  "line_reg_mv": 1.941,
-  "v_dropout_mv": 93.8568,
-  "i_q_ua": 13.72285,
-  "psrr_1k_db": 29.9531,
-  "v_undershoot_mv": 45.153,
-  "pm_loop_deg": 12.41882,
-  "pm_loop_lo_deg": 12.38293,
-  "pm_loop_hi_deg": 12.31013
+  "v_out_v": 0.023499,
+  "load_reg_mv": 4.974,
+  "line_reg_mv": 1.944,
+  "v_dropout_mv": 95.329,
+  "i_q_ua": 16.19461,
+  "psrr_1k_db": 30.00703,
+  "v_undershoot_mv": 34.943,
+  "pm_loop_deg": 12.5064,
+  "pm_loop_lo_deg": 12.47302,
+  "pm_loop_hi_deg": 12.41834
  },
  "quarter_margin": {
-  "v_out_v": 0.005982,
-  "load_reg_mv": 1.243,
-  "line_reg_mv": 0.48525,
-  "v_dropout_mv": 23.4642,
-  "i_q_ua": 3.430713,
-  "psrr_1k_db": 7.488275,
-  "v_undershoot_mv": 11.28825,
-  "pm_loop_deg": 3.104705,
-  "pm_loop_lo_deg": 3.095733,
-  "pm_loop_hi_deg": 3.077533
+  "v_out_v": 0.005875,
+  "load_reg_mv": 1.2435,
+  "line_reg_mv": 0.486,
+  "v_dropout_mv": 23.83225,
+  "i_q_ua": 4.048652,
+  "psrr_1k_db": 7.501758,
+  "v_undershoot_mv": 8.73575,
+  "pm_loop_deg": 3.1266,
+  "pm_loop_lo_deg": 3.118255,
+  "pm_loop_hi_deg": 3.104585
  },
  "resolution": {
   "v_out_v": 2e-06,
   "load_reg_mv": 0.001,
-  "line_reg_mv": 0.001,
+  "line_reg_mv": 0.03,
   "v_dropout_mv": 2.0,
   "i_q_ua": 0.001,
   "psrr_1k_db": 0.001,
@@ -58,571 +203,794 @@
  },
  "sign_conventions": {
   "leakage": "positive = current pulled OUT of the node to vss (a leak); the platform's inject_isource is the opposite",
-  "dvt": "series dc source in the gate lead: the device sees net - dVT; the platform's inject_vsource is the opposite",
-  "capacitance": "budget_c_ff is C from the net to a RAIL (vss; vdd measures the same)"
+  "dvt": "series dc source in the gate lead of EVERY card the device is drawn as: the device sees net - dVT; the platform's inject_vsource is the opposite",
+  "capacitance": "budget_c_ff is C from the net to a RAIL (vss; vdd measures the same)",
+  "budget": "min(25 % of the binding metric's remaining margin at the linear slope, the last measured point before a mechanism step)",
+  "step": "a point is a step, not a linear violation, when its departure exceeds 2x what the linear coefficient predicts"
  },
  "nets": [
   {
-   "name": "fb",
-   "class": "feedback_tap",
-   "budget_c_ff": 27.925,
-   "budget_c_asym_ff": null,
-   "hard_limit_c_ff": 125.0,
-   "hard_limit_c_to_vout_ff": null,
-   "binds": "S8hi",
-   "sensitivity": {
-    "v_undershoot_mv": -0.1126,
-    "pm_loop_deg": -0.110802,
-    "pm_loop_lo_deg": -0.110791,
-    "psrr_1m_db": -0.028321,
-    "gm_loop_lo_db": 0.057934,
-    "vn_out_urms": -15.387,
-    "ugf_loop_khz": -1.17122
-   },
-   "unit": "1fF_and_10fF_to_vss",
-   "linearity_1f_over_10f": 1.0216322160317757,
-   "hi_z": true,
-   "spent_c_ff_005": 19.2,
-   "role": "divider mid-point, error-amp inverting input"
-  },
-  {
    "name": "gate",
    "class": "fvf_pass_gate",
-   "budget_c_ff": 29.282,
+   "budget_c_ff": 12.0,
+   "linear_budget_c_ff": 17.23,
+   "step_lo_ff": 12.0,
+   "step_hi_ff": 13.0,
    "budget_c_asym_ff": null,
-   "hard_limit_c_ff": 60.0,
-   "hard_limit_c_to_vout_ff": 100.0,
    "binds": "S7",
    "sensitivity": {
-    "v_undershoot_mv": 0.3855,
-    "psrr_1m_db": -0.000439,
-    "gm_loop_lo_db": -0.003615
+    "v_undershoot_mv": 0.507
    },
-   "unit": "1fF_and_10fF_to_vss",
-   "linearity_1f_over_10f": 1.027237354085641,
+   "unit": "1fF_to_vss (coefficient); budget = min(25%-margin, last point before the step)",
+   "linearity_1f_over_10f": 1.02382875605814,
    "hi_z": true,
-   "spent_c_ff_005": 28.4,
+   "drawn_c_ff_2nd": 34.5,
    "role": "FVF fold output -> pass-device gate; pull-down-slew-limited"
+  },
+  {
+   "name": "fb",
+   "class": "feedback_tap",
+   "budget_c_ff": 27.06,
+   "linear_budget_c_ff": 27.06,
+   "step_lo_ff": null,
+   "step_hi_ff": null,
+   "budget_c_asym_ff": null,
+   "binds": "S8hi",
+   "sensitivity": {
+    "v_undershoot_mv": -0.243,
+    "pm_loop_deg": -0.11499,
+    "pm_loop_lo_deg": -0.11499,
+    "pm_loop_hi_deg": -0.11473
+   },
+   "unit": "1fF_to_vss (coefficient); budget = min(25%-margin, last point before the step)",
+   "linearity_1f_over_10f": 0.9986508247377364,
+   "hi_z": true,
+   "drawn_c_ff_2nd": 24.05,
+   "role": "divider mid-point, error-amp inverting input"
   },
   {
    "name": "x1",
    "class": "fvf_fold",
-   "budget_c_ff": 46.15,
+   "budget_c_ff": 28.271,
+   "linear_budget_c_ff": 28.271,
+   "step_lo_ff": 30.0,
+   "step_hi_ff": 40.0,
    "budget_c_asym_ff": null,
-   "hard_limit_c_ff": null,
-   "hard_limit_c_to_vout_ff": null,
    "binds": "S7",
    "sensitivity": {
-    "v_undershoot_mv": 0.2446
+    "v_undershoot_mv": 0.309
    },
-   "unit": "1fF_and_10fF_to_vss",
-   "linearity_1f_over_10f": 1.0302534750613586,
+   "unit": "1fF_to_vss (coefficient); budget = min(25%-margin, last point before the step)",
+   "linearity_1f_over_10f": 1.0248756218905388,
    "hi_z": false,
-   "spent_c_ff_005": 11.5,
+   "drawn_c_ff_2nd": 11.28,
    "role": "FVF control drain / NMOS fold diode (XMA)"
   },
   {
    "name": "y",
    "class": "fvf_fold",
-   "budget_c_ff": 61.989,
+   "budget_c_ff": 39.35,
+   "linear_budget_c_ff": 39.35,
+   "step_lo_ff": 50.0,
+   "step_hi_ff": 60.0,
    "budget_c_asym_ff": null,
-   "hard_limit_c_ff": null,
-   "hard_limit_c_to_vout_ff": null,
    "binds": "S7",
    "sensitivity": {
-    "v_undershoot_mv": 0.1821,
-    "psrr_1m_db": 0.000365
+    "v_undershoot_mv": 0.222
    },
-   "unit": "1fF_and_10fF_to_vss",
-   "linearity_1f_over_10f": 1.0214168039539113,
+   "unit": "1fF_to_vss (coefficient); budget = min(25%-margin, last point before the step)",
+   "linearity_1f_over_10f": 1.017415215398761,
    "hi_z": false,
-   "spent_c_ff_005": 10.6,
+   "drawn_c_ff_2nd": 11.5,
    "role": "NMOS fold drain / PMOS fold diode (XMCP)"
+  },
+  {
+   "name": "ea_n",
+   "class": "ea_mirror_diode",
+   "budget_c_ff": 90.671,
+   "linear_budget_c_ff": 90.671,
+   "step_lo_ff": null,
+   "step_hi_ff": null,
+   "budget_c_asym_ff": null,
+   "binds": "S8hi",
+   "sensitivity": {
+    "v_undershoot_mv": -0.105,
+    "pm_loop_hi_deg": -0.03424
+   },
+   "unit": "1fF_to_vss (coefficient); budget = min(25%-margin, last point before the step)",
+   "linearity_1f_over_10f": 5.493341889939893,
+   "hi_z": false,
+   "drawn_c_ff_2nd": 17.72,
+   "role": "error-amp NMOS mirror diode (XM3)"
+  },
+  {
+   "name": "ea_tail",
+   "class": "ea_tail",
+   "budget_c_ff": 6239.821,
+   "linear_budget_c_ff": 6239.821,
+   "step_lo_ff": null,
+   "step_hi_ff": null,
+   "budget_c_asym_ff": null,
+   "binds": "S7",
+   "sensitivity": {
+    "v_undershoot_mv": 0.0014
+   },
+   "unit": "1fF_to_vss (coefficient); budget = min(25%-margin, last point before the step)",
+   "linearity_1f_over_10f": 0.7142857142784639,
+   "hi_z": false,
+   "drawn_c_ff_2nd": null,
+   "role": "error-amp tail node (XMT drain)"
+  },
+  {
+   "name": "pbias",
+   "class": "bias",
+   "budget_c_ff": 8735.75,
+   "linear_budget_c_ff": 8735.75,
+   "step_lo_ff": null,
+   "step_hi_ff": null,
+   "budget_c_asym_ff": null,
+   "binds": "S7",
+   "sensitivity": {
+    "v_undershoot_mv": 0.001
+   },
+   "unit": "1fF_to_vss (coefficient); budget = min(25%-margin, last point before the step)",
+   "linearity_1f_over_10f": 0.9999999999900524,
+   "hi_z": false,
+   "drawn_c_ff_2nd": null,
+   "role": "PMOS bias diode node"
   },
   {
    "name": "ea_o1",
    "class": "miller_dominant_pole",
-   "budget_c_ff": 627.174,
+   "budget_c_ff": null,
+   "linear_budget_c_ff": null,
+   "step_lo_ff": null,
+   "step_hi_ff": null,
    "budget_c_asym_ff": null,
-   "hard_limit_c_ff": null,
-   "hard_limit_c_to_vout_ff": null,
-   "binds": "S8lo",
+   "binds": null,
    "sensitivity": {
-    "v_undershoot_mv": -0.1812,
-    "pm_loop_deg": -0.004933,
-    "pm_loop_lo_deg": -0.004936,
-    "psrr_1k_db": -0.000248,
-    "psrr_1m_db": -0.001269,
-    "gm_loop_lo_db": 0.007562,
-    "vn_out_urms": 1.582
+    "v_undershoot_mv": -0.323
    },
-   "unit": "1fF_and_10fF_to_vss",
-   "linearity_1f_over_10f": 1.0008103727723079,
+   "unit": "1fF_to_vss (coefficient); budget = min(25%-margin, last point before the step)",
+   "linearity_1f_over_10f": 1.0000000000017364,
    "hi_z": true,
-   "spent_c_ff_005": 44.7,
+   "drawn_c_ff_2nd": 64.91,
    "role": "error-amp stage-1 output, Miller dominant pole"
   },
   {
    "name": "ea_out",
    "class": "ea_stage2_out",
-   "budget_c_ff": 631.009,
-   "budget_c_asym_ff": null,
-   "hard_limit_c_ff": null,
-   "hard_limit_c_to_vout_ff": null,
-   "binds": "S8lo",
-   "sensitivity": {
-    "v_undershoot_mv": -0.182,
-    "pm_loop_deg": -0.004902,
-    "pm_loop_lo_deg": -0.004906,
-    "psrr_1m_db": -0.000859,
-    "gm_loop_lo_db": 0.007565,
-    "vn_out_urms": 1.271
-   },
-   "unit": "1fF_and_10fF_to_vss",
-   "linearity_1f_over_10f": 1.0008153281686885,
-   "hi_z": true,
-   "spent_c_ff_005": 22.6,
-   "role": "error-amp stage-2 output = FVF control gate"
-  },
-  {
-   "name": "ea_n",
-   "class": "ea_mirror_diode",
-   "budget_c_ff": 979.972,
-   "budget_c_asym_ff": null,
-   "hard_limit_c_ff": null,
-   "hard_limit_c_to_vout_ff": null,
-   "binds": "S8lo",
-   "sensitivity": {
-    "v_undershoot_mv": -0.0592,
-    "pm_loop_deg": -0.003157,
-    "pm_loop_lo_deg": -0.003159,
-    "psrr_1k_db": 0.000225,
-    "gm_loop_lo_db": 0.00501
-   },
-   "unit": "1fF_and_10fF_to_vss",
-   "linearity_1f_over_10f": 1.000316555874461,
-   "hi_z": false,
-   "spent_c_ff_005": null,
-   "role": "error-amp NMOS mirror diode (XM3)"
-  },
-  {
-   "name": "pbias",
-   "class": "bias",
-   "budget_c_ff": 16126.071,
-   "budget_c_asym_ff": null,
-   "hard_limit_c_ff": null,
-   "hard_limit_c_to_vout_ff": null,
-   "binds": "S7",
-   "sensitivity": {
-    "v_undershoot_mv": 0.0007,
-    "psrr_1m_db": -0.00031
-   },
-   "unit": "1fF_and_10fF_to_vss",
-   "linearity_1f_over_10f": 1.4285714285772289,
-   "hi_z": false,
-   "spent_c_ff_005": 13.9,
-   "role": "PMOS bias diode node"
-  },
-  {
-   "name": "ea_tail",
-   "class": "ea_tail",
    "budget_c_ff": null,
+   "linear_budget_c_ff": null,
+   "step_lo_ff": null,
+   "step_hi_ff": null,
    "budget_c_asym_ff": null,
-   "hard_limit_c_ff": null,
-   "hard_limit_c_to_vout_ff": null,
    "binds": null,
    "sensitivity": {
-    "v_undershoot_mv": -0.0062
+    "v_undershoot_mv": -0.323
    },
-   "unit": "1fF_and_10fF_to_vss",
-   "linearity_1f_over_10f": null,
-   "hi_z": false,
-   "spent_c_ff_005": 12.1,
-   "role": "error-amp tail node (XMT drain)"
+   "unit": "1fF_to_vss (coefficient); budget = min(25%-margin, last point before the step)",
+   "linearity_1f_over_10f": 0.9995903318310867,
+   "hi_z": true,
+   "drawn_c_ff_2nd": 26.44,
+   "role": "error-amp stage-2 output = FVF control gate"
   },
   {
    "name": "lp_brk",
    "class": "vout_sense",
    "budget_c_ff": null,
+   "linear_budget_c_ff": null,
+   "step_lo_ff": null,
+   "step_hi_ff": null,
    "budget_c_asym_ff": null,
-   "hard_limit_c_ff": null,
-   "hard_limit_c_to_vout_ff": null,
    "binds": null,
    "sensitivity": {
-    "v_undershoot_mv": -0.0008
+    "v_undershoot_mv": -0.0003
    },
-   "unit": "1fF_and_10fF_to_vss",
+   "unit": "1fF_to_vss (coefficient); budget = min(25%-margin, last point before the step)",
    "linearity_1f_over_10f": null,
    "hi_z": false,
-   "spent_c_ff_005": 16.4,
+   "drawn_c_ff_2nd": null,
    "role": "loop-break marker; divider top = vout sense"
   },
   {
    "name": "nbias",
    "class": "bias",
    "budget_c_ff": null,
+   "linear_budget_c_ff": null,
+   "step_lo_ff": null,
+   "step_hi_ff": null,
    "budget_c_asym_ff": null,
-   "hard_limit_c_ff": null,
-   "hard_limit_c_to_vout_ff": null,
    "binds": null,
    "sensitivity": {
-    "v_undershoot_mv": -0.0068
+    "v_undershoot_mv": -0.008
    },
-   "unit": "1fF_and_10fF_to_vss",
+   "unit": "1fF_to_vss (coefficient); budget = min(25%-margin, last point before the step)",
    "linearity_1f_over_10f": null,
    "hi_z": false,
-   "spent_c_ff_005": null,
+   "drawn_c_ff_2nd": null,
    "role": "NMOS bias diode node"
   },
   {
    "name": "vout",
    "class": "power_out",
    "budget_c_ff": null,
+   "linear_budget_c_ff": null,
+   "step_lo_ff": null,
+   "step_hi_ff": null,
    "budget_c_asym_ff": null,
-   "hard_limit_c_ff": null,
-   "hard_limit_c_to_vout_ff": null,
    "binds": null,
    "sensitivity": {
-    "v_undershoot_mv": -0.0008
+    "v_undershoot_mv": -0.00031
    },
-   "unit": "1fF_and_10fF_to_vss",
+   "unit": "1fF_to_vss (coefficient); budget = min(25%-margin, last point before the step)",
    "linearity_1f_over_10f": null,
    "hi_z": false,
-   "spent_c_ff_005": 72.0,
+   "drawn_c_ff_2nd": 82.67,
    "role": "output pin / pass drain / FVF source / Cout"
   },
   {
    "name": "vdd",
    "class": "power_in",
    "budget_c_ff": null,
+   "linear_budget_c_ff": null,
+   "step_lo_ff": null,
+   "step_hi_ff": null,
    "budget_c_asym_ff": null,
-   "hard_limit_c_ff": null,
-   "hard_limit_c_to_vout_ff": null,
    "binds": null,
    "sensitivity": {},
-   "unit": "1fF_and_10fF_to_vss",
+   "unit": "1fF_to_vss (coefficient); budget = min(25%-margin, last point before the step)",
    "linearity_1f_over_10f": null,
    "hi_z": false,
-   "spent_c_ff_005": 43.3,
+   "drawn_c_ff_2nd": 159.16,
    "role": "supply pin"
+  },
+  {
+   "name": "gate->vout",
+   "class": "coupling",
+   "budget_c_ff": 40.0,
+   "step_lo_ff": 40.0,
+   "step_hi_ff": 45.0,
+   "binds": "S7",
+   "sensitivity": {
+    "v_undershoot_mv": 0.0197
+   },
+   "unit": "10fF_gate_to_vout",
+   "note": "the escape route: coupling the pass gate to its own source instead of to a rail is 26x cheaper and moves the step out from 13 fF to 45 fF"
+  },
+  {
+   "name": "fb->lp_brk",
+   "class": "coupling",
+   "budget_c_ff": 6.0,
+   "step_lo_ff": 6.0,
+   "step_hi_ff": 8.0,
+   "binds": "S7",
+   "sensitivity": {
+    "v_undershoot_mv": 0.0935
+   },
+   "unit": "2fF_fb_to_lp_brk",
+   "note": "lands in parallel with XCFF; the same limit as XCFF +6 % (in box) / +8 % (out)"
   }
  ],
  "rails": [
   {
    "net": "gate",
-   "v_undershoot_mv_vss": 0.3855000000000004,
+   "v_undershoot_mv_vss": 0.4951999999999998,
    "pm_loop_deg_vss": 0.0,
    "psrr_1k_db_vss": 0.0,
-   "psrr_1m_db_vss": -0.0004390000000000782,
-   "v_undershoot_mv_vdd": 0.3855000000000004,
+   "psrr_1m_db_vss": -0.0004569999999999297,
+   "v_undershoot_mv_vdd": 0.4951999999999998,
    "pm_loop_deg_vdd": 0.0,
    "psrr_1k_db_vdd": 0.0,
    "psrr_1m_db_vdd": 0.0
   },
   {
    "net": "ea_out",
-   "v_undershoot_mv_vss": -0.18200000000000074,
-   "pm_loop_deg_vss": -0.0049019999999998735,
+   "v_undershoot_mv_vss": -0.2918000000000006,
+   "pm_loop_deg_vss": -0.00487799999999936,
    "psrr_1k_db_vss": 0.0,
-   "psrr_1m_db_vss": -0.0008589999999999876,
-   "v_undershoot_mv_vdd": -0.18200000000000074,
-   "pm_loop_deg_vdd": -0.0049019999999998735,
-   "psrr_1k_db_vdd": -0.00020000000000095497,
-   "psrr_1m_db_vdd": -0.002214999999999989
+   "psrr_1m_db_vss": -0.0008899999999998798,
+   "v_undershoot_mv_vdd": -0.2918000000000006,
+   "pm_loop_deg_vdd": -0.00487799999999936,
+   "psrr_1k_db_vdd": -0.00021500000000003184,
+   "psrr_1m_db_vdd": -0.0022649999999998726
   },
   {
    "net": "ea_o1",
-   "v_undershoot_mv_vss": -0.18119999999999975,
-   "pm_loop_deg_vss": -0.004932999999999766,
-   "psrr_1k_db_vss": -0.00024800000000055886,
-   "psrr_1m_db_vss": -0.0012690000000000977,
-   "v_undershoot_mv_vdd": -0.18119999999999975,
-   "pm_loop_deg_vdd": -0.004932999999999766,
-   "psrr_1k_db_vdd": 0.004283999999999821,
-   "psrr_1m_db_vdd": 0.006101999999999918
+   "v_undershoot_mv_vss": -0.2914999999999992,
+   "pm_loop_deg_vss": -0.004907000000000039,
+   "psrr_1k_db_vss": -0.00027000000000043656,
+   "psrr_1m_db_vss": -0.0012979999999998882,
+   "v_undershoot_mv_vdd": -0.2914999999999992,
+   "pm_loop_deg_vdd": -0.004907000000000039,
+   "psrr_1k_db_vdd": 0.004701000000000022,
+   "psrr_1m_db_vdd": 0.006083000000000105
   },
   {
    "net": "x1",
-   "v_undershoot_mv_vss": 0.2446000000000012,
+   "v_undershoot_mv_vss": 0.30150000000000005,
    "pm_loop_deg_vss": 0.0,
    "psrr_1k_db_vss": 0.0,
    "psrr_1m_db_vss": 0.0,
-   "v_undershoot_mv_vdd": 0.2446000000000012,
+   "v_undershoot_mv_vdd": 0.30150000000000005,
    "pm_loop_deg_vdd": 0.0,
    "psrr_1k_db_vdd": 0.0,
-   "psrr_1m_db_vdd": 0.0005860000000000199
+   "psrr_1m_db_vdd": 0.0006260000000001042
   },
   {
    "net": "y",
-   "v_undershoot_mv_vss": 0.1820999999999998,
+   "v_undershoot_mv_vss": 0.21819999999999878,
    "pm_loop_deg_vss": 0.0,
    "psrr_1k_db_vss": 0.0,
-   "psrr_1m_db_vss": 0.0003650000000000375,
-   "v_undershoot_mv_vdd": 0.1820999999999998,
+   "psrr_1m_db_vss": 0.0003820000000001045,
+   "v_undershoot_mv_vdd": 0.21819999999999878,
    "pm_loop_deg_vdd": 0.0,
    "psrr_1k_db_vdd": 0.0,
    "psrr_1m_db_vdd": 0.0
   },
   {
    "net": "nbias",
-   "v_undershoot_mv_vss": -0.006799999999999784,
+   "v_undershoot_mv_vss": -0.007900000000000773,
    "pm_loop_deg_vss": 0.0,
    "psrr_1k_db_vss": 0.0,
    "psrr_1m_db_vss": 0.0,
-   "v_undershoot_mv_vdd": -0.006799999999999784,
+   "v_undershoot_mv_vdd": -0.007900000000000773,
    "pm_loop_deg_vdd": 0.0,
    "psrr_1k_db_vdd": 0.0,
-   "psrr_1m_db_vdd": -0.0014599999999999724
+   "psrr_1m_db_vdd": -0.0014589999999998326
   },
   {
    "net": "pbias",
-   "v_undershoot_mv_vss": 0.0007000000000005002,
+   "v_undershoot_mv_vss": 0.0010000000000005115,
    "pm_loop_deg_vss": 0.0,
    "psrr_1k_db_vss": 0.0,
-   "psrr_1m_db_vss": -0.0003099999999999881,
-   "v_undershoot_mv_vdd": 0.0007000000000005002,
+   "psrr_1m_db_vss": -0.00032199999999988905,
+   "v_undershoot_mv_vdd": 0.0010000000000005115,
    "pm_loop_deg_vdd": 0.0,
    "psrr_1k_db_vdd": 0.0,
    "psrr_1m_db_vdd": 0.0
   },
   {
    "net": "fb",
-   "v_undershoot_mv_vss": -0.11260000000000048,
-   "pm_loop_deg_vss": -0.11080199999999962,
+   "v_undershoot_mv_vss": -0.21980000000000074,
+   "pm_loop_deg_vss": -0.11369200000000035,
    "psrr_1k_db_vss": 0.0,
-   "psrr_1m_db_vss": -0.02832100000000004,
-   "v_undershoot_mv_vdd": -0.11260000000000048,
-   "pm_loop_deg_vdd": -0.11080199999999962,
-   "psrr_1k_db_vdd": 0.12221899999999977,
-   "psrr_1m_db_vdd": 0.023170999999999962
+   "psrr_1m_db_vss": -0.028621999999999835,
+   "v_undershoot_mv_vdd": -0.21980000000000074,
+   "pm_loop_deg_vdd": -0.11369200000000035,
+   "psrr_1k_db_vdd": 0.13260199999999997,
+   "psrr_1m_db_vdd": 0.026232000000000078
   }
  ],
  "series_r": [
   {
    "segment": "vout_all",
    "budget_ohm": 0.1256,
+   "linear_budget_ohm": 0.1256,
+   "step_lo_ohm": 1.03,
+   "step_hi_ohm": null,
    "binds": "S2",
    "note": "vout bus + pin, sense INSIDE the drop (divider tapped at the pass drain)",
+   "pool": null,
    "sensitivity": {
     "load_reg_mv": 9.9,
-    "v_undershoot_mv": -8.966667
+    "v_dropout_mv": 10.0,
+    "v_undershoot_mv": -8.862963
    }
   },
   {
    "segment": "vdd",
-   "budget_ohm": 1.7727,
+   "budget_ohm": 2.3056,
+   "linear_budget_ohm": 2.3056,
+   "step_lo_ohm": 3.0,
+   "step_hi_ohm": null,
    "binds": "S4",
    "note": "supply rail resistance ahead of the whole cell (bulk ties included)",
+   "pool": "dropout_pool",
    "sensitivity": {
-    "line_reg_mv": 0.003333,
-    "v_dropout_mv": 13.236667,
-    "v_undershoot_mv": 0.35
+    "load_reg_mv": 0.002759,
+    "v_dropout_mv": 10.336828,
+    "i_q_ua": -0.001052,
+    "psrr_1k_db": -0.005003,
+    "v_undershoot_mv": 0.472759
    }
   },
   {
    "segment": "vout_pass_only",
-   "budget_ohm": 1.7757,
+   "budget_ohm": 2.6799,
+   "linear_budget_ohm": 2.6799,
+   "step_lo_ohm": 1.0,
+   "step_hi_ohm": null,
    "binds": "S4",
    "note": "R between the pass drain and everything else (sense + Cout + XMC at the pin)",
+   "pool": null,
    "sensitivity": {
-    "v_dropout_mv": 13.214,
-    "v_undershoot_mv": 0.276667
+    "v_dropout_mv": 8.893111,
+    "v_undershoot_mv": 0.381111
    }
   },
   {
    "segment": "vout_sense_at_pin",
-   "budget_ohm": 2.3464,
+   "budget_ohm": 2.7569,
+   "linear_budget_ohm": 2.7569,
+   "step_lo_ohm": 1.03,
+   "step_hi_ohm": null,
    "binds": "S4",
    "note": "R between (pass drain + XMC + Cout) and the pin; VLP/divider at the pin",
+   "pool": "dropout_pool",
    "sensitivity": {
-    "load_reg_mv": 0.031,
-    "line_reg_mv": 0.001,
-    "v_dropout_mv": 10.0001,
-    "psrr_1k_db": 0.0039,
-    "v_undershoot_mv": 1.161
+    "load_reg_mv": 0.030108,
+    "v_dropout_mv": 8.644516,
+    "psrr_1k_db": 0.003333,
+    "v_undershoot_mv": 1.412903
    }
   },
   {
    "segment": "vss",
-   "budget_ohm": 16.9687,
-   "binds": "S6",
-   "note": "cell ground return (Iq only; the load returns off-cell)",
+   "budget_ohm": 11.0,
+   "linear_budget_ohm": 46.1336,
+   "step_lo_ohm": 11.0,
+   "step_hi_ohm": 12.0,
+   "binds": "S7",
+   "note": "the whole cell's ground return (Iq only; the load returns off-cell)",
+   "pool": null,
    "sensitivity": {
-    "load_reg_mv": -0.01,
-    "line_reg_mv": 0.01,
-    "psrr_1k_db": -0.4413,
-    "v_undershoot_mv": -0.26,
-    "v_out_v": 2e-05
+    "v_out_v": -3.4e-05,
+    "load_reg_mv": -0.00156,
+    "i_q_ua": -0.001029,
+    "psrr_1k_db": 0.182703,
+    "v_undershoot_mv": 0.189358,
+    "pm_loop_deg": 0.008615,
+    "pm_loop_lo_deg": 0.009262,
+    "pm_loop_hi_deg": 0.009043
    }
   },
   {
-   "segment": "lp_brk",
-   "budget_ohm": 11036.9004,
-   "binds": "S1",
-   "note": "series R between the sense point and the divider top",
+   "segment": "vss_active",
+   "budget_ohm": 16.4772,
+   "linear_budget_ohm": 16.4772,
+   "step_lo_ohm": 32.0,
+   "step_hi_ohm": null,
+   "binds": "S6",
+   "note": "ground return of the ACTIVE devices only -- XCOUT returned separately",
+   "pool": null,
    "sensitivity": {
-    "line_reg_mv": 1e-06,
-    "psrr_1k_db": -1e-06,
-    "v_out_v": 1e-06
+    "v_out_v": -3.4e-05,
+    "load_reg_mv": 0.003083,
+    "line_reg_mv": 0.007667,
+    "i_q_ua": -0.001027,
+    "psrr_1k_db": -0.45528,
+    "v_undershoot_mv": 0.013708
    }
   },
   {
    "segment": "gate",
-   "budget_ohm": 25085.0,
+   "budget_ohm": 17707.6014,
+   "linear_budget_ohm": 17707.6014,
+   "step_lo_ohm": 1000.0,
+   "step_hi_ohm": null,
    "binds": "S7",
    "note": "series R between the fold output and the pass gate",
+   "pool": null,
    "sensitivity": {
-    "v_undershoot_mv": 0.00045
+    "v_undershoot_mv": 0.000493
    }
   },
   {
    "segment": "fb_tap",
-   "budget_ohm": 452923.5552,
+   "budget_ohm": 479567.5837,
+   "linear_budget_ohm": 479567.5837,
+   "step_lo_ohm": 10000.0,
+   "step_hi_ohm": null,
    "binds": "S8lo",
    "note": "series R in the XM1 gate lead (feedback tap)",
+   "pool": null,
    "sensitivity": {
-    "psrr_1k_db": 2e-06,
-    "v_undershoot_mv": -0.000186,
-    "pm_loop_deg": -7e-06
+    "psrr_1k_db": 4e-06,
+    "v_undershoot_mv": -0.000265,
+    "pm_loop_deg": -5e-06,
+    "pm_loop_lo_deg": -7e-06,
+    "pm_loop_hi_deg": -6e-06
    }
   },
   {
    "segment": "vref",
-   "budget_ohm": 856357.538,
+   "budget_ohm": 913935.0509,
+   "linear_budget_ohm": 913935.0509,
+   "step_lo_ohm": 100000.0,
+   "step_hi_ohm": null,
    "binds": "S8lo",
    "note": "series R in the XM2 gate lead (reference tap)",
+   "pool": null,
    "sensitivity": {
-    "line_reg_mv": 0.0,
     "psrr_1k_db": -2e-06,
-    "v_undershoot_mv": -4.9e-05,
-    "pm_loop_deg": -4e-06
+    "v_undershoot_mv": -6.9e-05,
+    "pm_loop_deg": -3e-06,
+    "pm_loop_lo_deg": -3e-06,
+    "pm_loop_hi_deg": -3e-06
+   }
+  },
+  {
+   "segment": "lp_brk",
+   "budget_ohm": 1091968.75,
+   "linear_budget_ohm": 1091968.75,
+   "step_lo_ohm": 1000.0,
+   "step_hi_ohm": null,
+   "binds": "S7",
+   "note": "series R between the sense point and the divider top",
+   "pool": null,
+   "sensitivity": {
+    "v_out_v": 1e-06,
+    "psrr_1k_db": -1e-06,
+    "v_undershoot_mv": 8e-06
+   }
+  },
+  {
+   "segment": "vss_cout",
+   "budget_ohm": null,
+   "linear_budget_ohm": null,
+   "step_lo_ohm": 32.0,
+   "step_hi_ohm": null,
+   "binds": null,
+   "note": "ground return of XCOUT's bottom plate only (the output cap's ESR)",
+   "pool": null,
+   "sensitivity": {
+    "v_undershoot_mv": -0.32781
    }
   }
  ],
+ "power_series_r": [
+  {
+   "net": "vdd",
+   "segment": "vdd",
+   "note": "the whole cell behind one R to the vdd pin (bulk ties included)",
+   "budget_ohm": 2.3056,
+   "step_lo_ohm": 3.0,
+   "step_hi_ohm": null,
+   "binds": "S4",
+   "d_dropout_mv_per_ohm": 10.3368,
+   "d_load_reg_mv_per_ohm": 0.00276,
+   "d_undershoot_mv_per_ohm": 0.4728,
+   "d_psrr_db_per_ohm": -0.005,
+   "pool": "dropout_pool"
+  },
+  {
+   "net": "vout, sense at the PIN",
+   "segment": "vout_sense_at_pin",
+   "note": "R between (pass drain + XMC + Cout) and the pin; VLP/divider tapped at the pin",
+   "budget_ohm": 2.7569,
+   "step_lo_ohm": 1.03,
+   "step_hi_ohm": null,
+   "binds": "S4",
+   "d_dropout_mv_per_ohm": 8.6445,
+   "d_load_reg_mv_per_ohm": 0.03011,
+   "d_undershoot_mv_per_ohm": 1.4129,
+   "d_psrr_db_per_ohm": 0.00333,
+   "pool": "dropout_pool"
+  },
+  {
+   "net": "vout, sense at the PASS DRAIN",
+   "segment": "vout_all",
+   "note": "R between the whole cell and the pin; the divider is INSIDE the drop",
+   "budget_ohm": 0.1256,
+   "step_lo_ohm": 1.03,
+   "step_hi_ohm": null,
+   "binds": "S2",
+   "d_dropout_mv_per_ohm": 10.0,
+   "d_load_reg_mv_per_ohm": 9.9,
+   "d_undershoot_mv_per_ohm": -8.863,
+   "d_psrr_db_per_ohm": 0.0,
+   "pool": null
+  },
+  {
+   "net": "vss",
+   "segment": "vss",
+   "note": "the whole cell's ground return: XMA/XMB/XMS AND XCOUT's bottom plate behind one R (VREF excluded -- an off-cell reference does not float with the cell)",
+   "budget_ohm": 11.0,
+   "step_lo_ohm": 11.0,
+   "step_hi_ohm": 12.0,
+   "binds": "S7",
+   "d_dropout_mv_per_ohm": 0.0,
+   "d_load_reg_mv_per_ohm": -0.00156,
+   "d_undershoot_mv_per_ohm": 0.1894,
+   "d_psrr_db_per_ohm": 0.1827,
+   "pool": null
+  },
+  {
+   "net": "vss, active devices only",
+   "segment": "vss_active",
+   "note": "the same return with XCOUT's bottom plate strapped to the pin instead (Kelvin cap return)",
+   "budget_ohm": 16.4772,
+   "step_lo_ohm": 32.0,
+   "step_hi_ohm": null,
+   "binds": "S6",
+   "d_dropout_mv_per_ohm": 0.0,
+   "d_load_reg_mv_per_ohm": 0.00308,
+   "d_undershoot_mv_per_ohm": 0.0137,
+   "d_psrr_db_per_ohm": -0.45528,
+   "pool": null
+  },
+  {
+   "net": "vss, XCOUT return only",
+   "segment": "vss_cout",
+   "note": "R in XCOUT's bottom-plate lead alone -- the output cap's own ESR",
+   "budget_ohm": null,
+   "step_lo_ohm": 32.0,
+   "step_hi_ohm": null,
+   "binds": null,
+   "d_dropout_mv_per_ohm": 0.0,
+   "d_load_reg_mv_per_ohm": 0.0,
+   "d_undershoot_mv_per_ohm": -0.3278,
+   "d_psrr_db_per_ohm": 0.0,
+   "pool": null
+  }
+ ],
+ "dropout_pool": {
+  "spec": "v_dropout_mv",
+  "quarter_margin_mv": 23.8322,
+  "terms": [
+   {
+    "net": "vdd",
+    "mv_per_ohm": 10.3368
+   },
+   {
+    "net": "vout (sense at the pin)",
+    "mv_per_ohm": 8.6445
+   }
+  ],
+  "rule": "10.34*R_vdd + 8.65*R_vout <= 23.83 mV",
+  "hand_model": {
+   "r_vdd_ohm": 1.13,
+   "r_vout_ohm": 1.03,
+   "measured_dropout_mv": 124.7143,
+   "delta_mv": 20.0433,
+   "fraction_of_pool": 0.841,
+   "source": "REVIEW.md F1 (drawn TopMetal1 at 18 mOhm/sq)"
+  }
+ },
+ "gate_budget_is_gate_only": {
+  "net": "gate",
+  "budget_c_ff": 12.0,
+  "step_lo_ff": 12.0,
+  "step_hi_ff": 13.0,
+  "excluded_credits": [
+   "ea_o1",
+   "ea_out",
+   "fb"
+  ],
+  "gate_only_at_35ff_mv": 201.691,
+  "recovery_mv": {
+   "ea_o1_50f": -79.314,
+   "ea_out_25f": -75.886,
+   "fb_24f": -74.263,
+   "all_three": -83.318
+  },
+  "why": "each net alone recovers 74-79 mV and all three together only 83 -- one saturating mechanism, not a per-fF sum. REVIEW F3."
+ },
  "leakage": [
   {
    "node": "fb",
-   "i_na": 543.358,
-   "budget_na": 5.4332,
-   "budget_pa": 5433.2,
+   "i_na": 539.163,
+   "budget_na": 5.2973,
+   "budget_pa": 5297.3,
    "binds": "S1",
    "sensitivity": {
-    "v_out_v": 0.001101,
-    "line_reg_mv": 0.001,
-    "psrr_1k_db": 0.0043,
-    "v_undershoot_mv": 0.014
+    "v_out_v": 0.001109,
+    "psrr_1k_db": 0.00371,
+    "v_undershoot_mv": 0.016
    }
   },
   {
    "node": "ea_n",
-   "i_na": 2282.328,
-   "budget_na": 12.5484,
-   "budget_pa": 12548.4,
+   "i_na": 2176.172,
+   "budget_na": 12.3875,
+   "budget_pa": 12387.5,
    "binds": "S6",
    "sensitivity": {
-    "v_out_v": -3.7e-05,
-    "line_reg_mv": 0.007,
-    "psrr_1k_db": -0.59675
-   }
-  },
-  {
-   "node": "ea_o1",
-   "i_na": 2284.037,
-   "budget_na": 153.3846,
-   "budget_pa": 153384.6,
-   "binds": "S1",
-   "sensitivity": {
-    "v_out_v": 3.9e-05,
-    "load_reg_mv": -0.001,
-    "line_reg_mv": -0.007,
-    "psrr_1k_db": 0.63278
-   }
-  },
-  {
-   "node": "ea_out",
-   "i_na": 2646.469,
-   "budget_na": 327.4279,
-   "budget_pa": 327427.9,
-   "binds": "S6",
-   "sensitivity": {
-    "psrr_1k_db": -0.02287,
-    "v_undershoot_mv": 0.006
+    "v_out_v": -3.9e-05,
+    "psrr_1k_db": -0.60559
    }
   },
   {
    "node": "nbias",
-   "i_na": 2514.61,
-   "budget_na": 490.7935,
-   "budget_pa": 490793.5,
+   "i_na": 2495.674,
+   "budget_na": 301.2328,
+   "budget_pa": 301232.8,
    "binds": "S7",
    "sensitivity": {
-    "i_q_ua": -0.01083,
-    "psrr_1k_db": -0.00173,
-    "v_undershoot_mv": 0.023
+    "i_q_ua": -0.01041,
+    "psrr_1k_db": -0.00204,
+    "v_undershoot_mv": 0.029
+   }
+  },
+  {
+   "node": "ea_out",
+   "i_na": 2514.756,
+   "budget_na": 328.7361,
+   "budget_pa": 328736.1,
+   "binds": "S6",
+   "sensitivity": {
+    "v_out_v": -2e-06,
+    "i_q_ua": -0.00444,
+    "psrr_1k_db": -0.02282,
+    "v_undershoot_mv": 0.011
+   }
+  },
+  {
+   "node": "y",
+   "i_na": 7751.038,
+   "budget_na": 794.1591,
+   "budget_pa": 794159.1,
+   "binds": "S7",
+   "sensitivity": {
+    "v_undershoot_mv": 0.011
    }
   },
   {
    "node": "gate",
-   "i_na": 8155.317,
-   "budget_na": 1256.6712,
-   "budget_pa": 1256671.2,
+   "i_na": 7474.222,
+   "budget_na": 1493.9677,
+   "budget_pa": 1493967.7,
    "binds": "S5",
    "sensitivity": {
-    "i_q_ua": 0.00273,
-    "v_undershoot_mv": -0.009
+    "load_reg_mv": -0.002,
+    "i_q_ua": 0.00271,
+    "v_undershoot_mv": -0.012
    }
   },
   {
    "node": "pbias",
-   "i_na": 4561.318,
-   "budget_na": 1356.0128,
-   "budget_pa": 1356012.8,
+   "i_na": 4333.33,
+   "budget_na": 1600.2579,
+   "budget_pa": 1600257.9,
    "binds": "S5",
    "sensitivity": {
     "i_q_ua": 0.00253
    }
   },
   {
-   "node": "y",
-   "i_na": 8454.636,
-   "budget_na": 1411.0312,
-   "budget_pa": 1411031.2,
-   "binds": "S7",
-   "sensitivity": {
-    "v_undershoot_mv": 0.008
-   }
-  },
-  {
    "node": "lp_brk",
-   "i_na": 543.358,
+   "i_na": 539.163,
    "budget_na": null,
    "budget_pa": null,
    "binds": null,
    "sensitivity": {}
   },
   {
-   "node": "ea_tail",
-   "i_na": 4566.37,
+   "node": "ea_o1",
+   "i_na": 2165.02,
    "budget_na": null,
    "budget_pa": null,
    "binds": null,
    "sensitivity": {
-    "psrr_1k_db": 0.01301
+    "v_out_v": 4e-05,
+    "psrr_1k_db": 0.63778
+   }
+  },
+  {
+   "node": "ea_tail",
+   "i_na": 4341.2,
+   "budget_na": null,
+   "budget_pa": null,
+   "binds": null,
+   "sensitivity": {
+    "psrr_1k_db": 0.01088,
+    "v_undershoot_mv": -0.006
    }
   },
   {
    "node": "x1",
-   "i_na": 4835.075,
+   "i_na": 4356.011,
    "budget_na": null,
    "budget_pa": null,
    "binds": null,
    "sensitivity": {
-    "v_undershoot_mv": -0.012
+    "v_undershoot_mv": -0.017
    }
   },
   {
    "node": "vout",
-   "i_na": 5378.43,
+   "i_na": 4895.18,
    "budget_na": null,
    "budget_pa": null,
    "binds": null,
@@ -631,98 +999,50 @@
  ],
  "matching": [
   {
-   "class": "ea_in_pair",
-   "devices": [
-    "XM1",
-    "XM2"
-   ],
-   "pattern": "common_centroid+dummies",
-   "tolerated": {
-    "dvt_mv": 3.0,
-    "dw_pct": 1.9896
-   },
-   "out_of_box_dvt_mv": 20.0,
-   "sigma": {
-    "dvt_mv": 1.6197,
-    "dw_pct": 0.0742
-   },
-   "headroom_sigma": 1.852,
-   "sensitivity": {
-    "v_out_v": 0.001994,
-    "line_reg_mv": 0.001,
-    "psrr_1k_db": 0.00774,
-    "v_undershoot_mv": 0.025
-   },
-   "binds": "S1",
-   "note": "error-amp input pair (XM1 gate = fb, XM2 gate = vref)",
-   "w_um": 9.53,
-   "l_um": 0.5,
-   "m": 1
-  },
-  {
    "class": "ea_nmos_load",
    "devices": [
     "XM3",
     "XM4"
    ],
    "pattern": "common_centroid+dummies",
+   "members": [
+    {
+     "name": "XM3",
+     "w_um": 2.95,
+     "l_um": 1.0,
+     "m": 1,
+     "sigma_vt_mv": 1.164445019479164
+    },
+    {
+     "name": "XM4",
+     "w_um": 2.95,
+     "l_um": 1.0,
+     "m": 1,
+     "sigma_vt_mv": 1.164445019479164
+    }
+   ],
    "tolerated": {
-    "dvt_mv": 3.4578,
-    "dw_pct": 1.8696
+    "dvt_mv": 1.0,
+    "dw_pct": 1.9538
    },
-   "out_of_box_dvt_mv": 20.0,
+   "linear_dvt_mv": 3.4395,
+   "out_of_box_dvt_mv": 2.0,
+   "out_of_box_dw_pct": null,
    "sigma": {
     "dvt_mv": 1.6468,
     "dw_pct": 0.1918
    },
-   "headroom_sigma": 2.1,
+   "headroom_sigma": 0.607,
    "sensitivity": {
-    "v_out_v": -0.00173,
-    "line_reg_mv": 0.015333,
-    "i_q_ua": 0.000403,
-    "psrr_1k_db": -1.20341,
-    "v_undershoot_mv": -0.133667,
-    "pm_loop_deg": 0.162723,
-    "pm_loop_lo_deg": 0.162987,
-    "pm_loop_hi_deg": 0.172897
+    "v_out_v": 0.001708,
+    "psrr_1k_db": 1.52393,
+    "v_undershoot_mv": 0.261,
+    "pm_loop_deg": -0.17721,
+    "pm_loop_lo_deg": -0.16462,
+    "pm_loop_hi_deg": -0.16765
    },
    "binds": "S1",
-   "note": "error-amp NMOS mirror load, 1:1; XM3 is the diode, XM4 the output leg",
-   "w_um": 2.95,
-   "l_um": 1.0,
-   "m": 1
-  },
-  {
-   "class": "bias_n_group",
-   "devices": [
-    "XMB0",
-    "XMB1",
-    "XMS"
-   ],
-   "pattern": "interdigitated+dummies",
-   "tolerated": {
-    "dvt_mv": 8.9214,
-    "dw_pct": 13.4264
-   },
-   "out_of_box_dvt_mv": null,
-   "sigma": {
-    "dvt_mv": 2.8284,
-    "dw_pct": 0.5657
-   },
-   "headroom_sigma": 3.154,
-   "sensitivity": {
-    "v_out_v": -0.0,
-    "i_q_ua": 0.384547,
-    "psrr_1k_db": 0.047612,
-    "v_undershoot_mv": -0.7678,
-    "pm_loop_deg": 0.003049,
-    "pm_loop_hi_deg": 0.006135
-   },
-   "binds": "S5",
-   "note": "NMOS bias diode XMB0 (1/1 um) -> XMB1 (1.39/1) and the pass-gate sink XMS (2.2/0.95)",
-   "w_um": 1.0,
-   "l_um": 1.0,
-   "m": 1
+   "note": "error-amp NMOS mirror load, 1:1; XM3 the diode, XM4 the output leg; A/B halves. The dVT series is on the XM3 side -- the sign that carries the step"
   },
   {
    "class": "bias_p_group",
@@ -731,62 +1051,133 @@
     "XMT",
     "XM6"
    ],
-   "pattern": "same_row_same_orientation",
+   "pattern": "common_centroid+dummies",
+   "members": [
+    {
+     "name": "XMBP",
+     "w_um": 10.0,
+     "l_um": 1.0,
+     "m": 1,
+     "sigma_vt_mv": 0.7905694150420948
+    },
+    {
+     "name": "XMT",
+     "w_um": 10.0,
+     "l_um": 1.0,
+     "m": 1,
+     "sigma_vt_mv": 0.7905694150420948
+    }
+   ],
    "tolerated": {
-    "dvt_mv": 8.0,
-    "dw_pct": 66.4015
+    "dvt_mv": 1.2,
+    "dw_pct": 31.1991
    },
-   "out_of_box_dvt_mv": 8.0,
+   "linear_dvt_mv": 11.7203,
+   "out_of_box_dvt_mv": 1.5,
+   "out_of_box_dw_pct": 3.0,
    "sigma": {
     "dvt_mv": 1.118,
     "dw_pct": 0.0707
    },
-   "headroom_sigma": 7.155,
+   "headroom_sigma": 1.073,
    "sensitivity": {
     "v_out_v": -6.1e-05,
-    "line_reg_mv": 0.001,
-    "i_q_ua": 0.06907,
-    "psrr_1k_db": -0.02067,
-    "v_undershoot_mv": 0.247,
-    "pm_loop_deg": -0.24862,
-    "pm_loop_lo_deg": -0.24909,
-    "pm_loop_hi_deg": -0.23018
+    "i_q_ua": 0.06686,
+    "psrr_1k_db": -0.01009,
+    "v_undershoot_mv": 0.456,
+    "pm_loop_deg": -0.26162,
+    "pm_loop_lo_deg": -0.2621,
+    "pm_loop_hi_deg": -0.26489
    },
-   "binds": "S8lo",
-   "note": "PMOS bias diode XMBP -> error-amp tail XMT (10:10 um) and stage-2 source XM6 (10:5.53 um)",
-   "w_um": 10.0,
-   "l_um": 1.0,
-   "m": 1
+   "binds": "S8hi",
+   "note": "PMOS bias diode XMBP -> error-amp tail XMT (10:10 um) and stage-2 source XM6 (10:5.53 um)"
   },
   {
-   "class": "fvf_fold_n",
+   "class": "ea_in_pair",
    "devices": [
-    "XMA",
-    "XMB"
+    "XM1",
+    "XM2"
    ],
-   "pattern": "same_row_same_orientation",
+   "pattern": "common_centroid+dummies",
+   "members": [
+    {
+     "name": "XM1",
+     "w_um": 9.53,
+     "l_um": 0.5,
+     "m": 1,
+     "sigma_vt_mv": 1.1452717708784403
+    },
+    {
+     "name": "XM2",
+     "w_um": 9.53,
+     "l_um": 0.5,
+     "m": 1,
+     "sigma_vt_mv": 1.1452717708784403
+    }
+   ],
    "tolerated": {
-    "dvt_mv": 29.7999,
-    "dw_pct": 297.0592
+    "dvt_mv": 2.9477,
+    "dw_pct": 2.1869
    },
+   "linear_dvt_mv": 2.9477,
    "out_of_box_dvt_mv": null,
+   "out_of_box_dw_pct": null,
    "sigma": {
-    "dvt_mv": 1.6623,
-    "dw_pct": 0.0977
+    "dvt_mv": 1.6197,
+    "dw_pct": 0.0742
    },
-   "headroom_sigma": 17.926,
+   "headroom_sigma": 1.82,
    "sensitivity": {
-    "v_out_v": 3e-06,
-    "line_reg_mv": 0.0001,
-    "i_q_ua": 0.115125,
-    "psrr_1k_db": -0.007591,
-    "v_undershoot_mv": -0.1562
+    "v_out_v": 0.001993,
+    "psrr_1k_db": -0.01292,
+    "v_undershoot_mv": 0.029
    },
-   "binds": "S5",
-   "note": "FVF NMOS fold mirror, 1:1",
-   "w_um": 5.79,
-   "l_um": 0.5,
-   "m": 1
+   "binds": "S1",
+   "note": "error-amp input pair (XM1 gate = fb, XM2 gate = vref); drawn as XM1A/B + XM2A/B"
+  },
+  {
+   "class": "bias_n_group",
+   "devices": [
+    "XMB0",
+    "XMS"
+   ],
+   "pattern": "common_centroid+dummies",
+   "members": [
+    {
+     "name": "XMB0",
+     "w_um": 1.0,
+     "l_um": 1.0,
+     "m": 1,
+     "sigma_vt_mv": 2.0
+    },
+    {
+     "name": "XMS",
+     "w_um": 2.2,
+     "l_um": 0.95,
+     "m": 1,
+     "sigma_vt_mv": 1.3834289277321492
+    }
+   ],
+   "tolerated": {
+    "dvt_mv": 5.0,
+    "dw_pct": 18.5735
+   },
+   "linear_dvt_mv": 8.0962,
+   "out_of_box_dvt_mv": 6.0,
+   "out_of_box_dw_pct": null,
+   "sigma": {
+    "dvt_mv": 2.4318,
+    "dw_pct": 0.5657
+   },
+   "headroom_sigma": 2.056,
+   "sensitivity": {
+    "v_out_v": -2e-06,
+    "i_q_ua": -0.241745,
+    "psrr_1k_db": -0.004595,
+    "v_undershoot_mv": 1.079
+   },
+   "binds": "S7",
+   "note": "NMOS bias diode XMB0 (1/1 um) -> the pass-gate sink XMS (2.2/0.95) and XMB1 (1.39/1); all three drawn as A/B halves"
   },
   {
    "class": "fvf_fold_p",
@@ -795,28 +1186,87 @@
     "XMD"
    ],
    "pattern": "same_row_same_orientation",
+   "members": [
+    {
+     "name": "XMCP",
+     "w_um": 9.02,
+     "l_um": 0.5,
+     "m": 1,
+     "sigma_vt_mv": 1.1772040233700278
+    },
+    {
+     "name": "XMD",
+     "w_um": 9.02,
+     "l_um": 0.5,
+     "m": 1,
+     "sigma_vt_mv": 1.1772040233700278
+    }
+   ],
    "tolerated": {
-    "dvt_mv": 31.9419,
-    "dw_pct": 81.2104
+    "dvt_mv": 20.7796,
+    "dw_pct": 54.2593
    },
+   "linear_dvt_mv": 20.7796,
    "out_of_box_dvt_mv": null,
+   "out_of_box_dw_pct": null,
    "sigma": {
     "dvt_mv": 1.6648,
     "dw_pct": 0.0784
    },
-   "headroom_sigma": 19.186,
+   "headroom_sigma": 12.482,
    "sensitivity": {
     "v_out_v": -2e-06,
-    "line_reg_mv": 0.0001,
-    "i_q_ua": -0.195809,
-    "psrr_1k_db": -0.003096,
-    "v_undershoot_mv": 0.3534
+    "i_q_ua": -0.188466,
+    "psrr_1k_db": -0.003638,
+    "v_undershoot_mv": 0.4204
    },
    "binds": "S7",
-   "note": "FVF PMOS fold mirror, 1:1, XMD is the pass-gate pull-up",
-   "w_um": 9.02,
-   "l_um": 0.5,
-   "m": 1
+   "note": "FVF PMOS fold mirror, 1:1; XMD is the pass-gate pull-up"
+  },
+  {
+   "class": "fvf_fold_n",
+   "devices": [
+    "XMA",
+    "XMB"
+   ],
+   "pattern": "any",
+   "members": [
+    {
+     "name": "XMA",
+     "w_um": 5.79,
+     "l_um": 0.5,
+     "m": 1,
+     "sigma_vt_mv": 1.1754541987684666
+    },
+    {
+     "name": "XMB",
+     "w_um": 5.79,
+     "l_um": 0.5,
+     "m": 1,
+     "sigma_vt_mv": 1.1754541987684666
+    }
+   ],
+   "tolerated": {
+    "dvt_mv": 40.5936,
+    "dw_pct": 242.6597
+   },
+   "linear_dvt_mv": 40.5936,
+   "out_of_box_dvt_mv": null,
+   "out_of_box_dw_pct": null,
+   "sigma": {
+    "dvt_mv": 1.6623,
+    "dw_pct": 0.0977
+   },
+   "headroom_sigma": 24.42,
+   "sensitivity": {
+    "v_out_v": -3e-06,
+    "i_q_ua": -0.092186,
+    "psrr_1k_db": 0.005652,
+    "v_undershoot_mv": 0.2152,
+    "pm_loop_hi_deg": -0.006828
+   },
+   "binds": "S7",
+   "note": "FVF NMOS fold mirror, 1:1; XMA is the diode"
   },
   {
    "class": "pass_array",
@@ -824,22 +1274,30 @@
     "XMP"
    ],
    "pattern": "any",
+   "members": [
+    {
+     "name": "XMP",
+     "w_um": 2.5,
+     "l_um": 0.13,
+     "m": 76,
+     "sigma_vt_mv": 0.5030272728659586
+    }
+   ],
    "tolerated": {
     "dvt_mv": null,
-    "dw_pct": 40.3152
+    "dw_pct": 25.0308
    },
+   "linear_dvt_mv": null,
    "out_of_box_dvt_mv": null,
+   "out_of_box_dw_pct": null,
    "sigma": {
     "dvt_mv": 0.503,
-    "dw_pct": 0.0707
+    "dw_pct": 0.2
    },
-   "headroom_sigma": null,
+   "headroom_sigma": 125.154,
    "sensitivity": {},
    "binds": "S7",
-   "note": "19 parallel fingers of one device",
-   "w_um": 10.0,
-   "l_um": 0.13,
-   "m": 19
+   "note": "76 parallel 2.5 um fingers of one device (nf_mult = 4)"
   },
   {
    "class": "fb_divider",
@@ -849,44 +1307,71 @@
    ],
    "pattern": "common_centroid+dummies",
    "tolerated": {
-    "delta_pct": 1.0037
+    "delta_pct": 0.989
    },
+   "linear_delta_pct": 0.989,
+   "out_of_box_pct": null,
    "sigma": {
-    "delta_pct": 0.5867
+    "delta_pct": 0.57452
    },
-   "headroom_sigma": 1.711,
+   "headroom_sigma": 1.721,
    "sensitivity": {
-    "v_out_v": -0.00596,
-    "line_reg_mv": 0.01,
-    "psrr_1k_db": 0.0259,
+    "v_out_v": -0.00594,
+    "psrr_1k_db": 0.0295,
     "v_undershoot_mv": -0.08
    },
    "binds": "S1",
-   "note": "1:1 rhigh divider, 0.5/340 um each. The MEASURED sigma is on the ratio m = R2/(R1+R2): 0.2934 % (2000-sample PDK mismatch MC), i.e. 0.587 % as a single-arm dR/R, so sigma(Vout) = 3.52 mV",
-   "unit": "%dR/R on one arm"
+   "note": "1:1 rhigh divider, 8 x 0.5/42.5 um per arm",
+   "unit": "%dR/R on one arm (all 8 segments)"
   },
   {
    "class": "mim_feedforward",
    "devices": [
     "XCFF"
    ],
-   "pattern": "any",
+   "pattern": "interdigitated+dummies",
    "tolerated": {
-    "delta_pct": 166.0037
+    "delta_pct": 6.0
    },
+   "linear_delta_pct": 95.9973,
+   "out_of_box_pct": 8.0,
    "sigma": {
     "delta_pct": 1.25
    },
-   "headroom_sigma": 132.803,
+   "headroom_sigma": 4.8,
    "sensitivity": {
-    "v_undershoot_mv": 0.068,
-    "pm_loop_deg": 0.07734,
-    "pm_loop_lo_deg": 0.07727,
-    "pm_loop_hi_deg": 0.07702
+    "v_undershoot_mv": 0.091,
+    "pm_loop_deg": 0.08116,
+    "pm_loop_lo_deg": 0.0811,
+    "pm_loop_hi_deg": 0.08083
    },
    "binds": "S7",
-   "note": "8 um MIM across XR1; absolute. 003 section 2: a +18 % side (9.4 -> 9.5 um) is a cliff",
+   "note": "8 um MIM across XR1; absolute. 003 section 2: a +18 % side is a cliff",
    "unit": "%dC/C"
+  },
+  {
+   "class": "fb_divider_segment",
+   "devices": [
+    "XR2_1"
+   ],
+   "pattern": "interdigitated+dummies",
+   "tolerated": {
+    "delta_pct": 7.9175
+   },
+   "linear_delta_pct": 7.9175,
+   "out_of_box_pct": null,
+   "sigma": {
+    "delta_pct": 1.6249879517091814
+   },
+   "headroom_sigma": 4.872,
+   "sensitivity": {
+    "v_out_v": -0.000742,
+    "psrr_1k_db": 0.00368,
+    "v_undershoot_mv": -0.011
+   },
+   "binds": "S1",
+   "note": "one 42.5 um segment; 1/8 of the arm's effect at sqrt(8)x the arm's sigma",
+   "unit": "%dR/R on ONE segment of eight"
   },
   {
    "class": "mim_miller",
@@ -895,14 +1380,16 @@
    ],
    "pattern": "any",
    "tolerated": {
-    "delta_pct": 147.1174
+    "delta_pct": 134.7783
    },
+   "linear_delta_pct": 134.7783,
+   "out_of_box_pct": null,
    "sigma": {
     "delta_pct": 0.18518518518518517
    },
-   "headroom_sigma": 794.434,
+   "headroom_sigma": 727.803,
    "sensitivity": {
-    "psrr_1k_db": -0.0509
+    "psrr_1k_db": -0.05566
    },
    "binds": "S6",
    "note": "54 um MIM across stage 2; absolute value, not a matching class",
@@ -915,21 +1402,46 @@
    ],
    "pattern": "any",
    "tolerated": {
-    "delta_pct": 20.2298
+    "delta_pct": 6.0
    },
+   "linear_delta_pct": 12.3386,
+   "out_of_box_pct": 10.0,
    "sigma": {
     "delta_pct": null
    },
    "headroom_sigma": null,
    "sensitivity": {
-    "load_reg_mv": -0.001,
-    "i_q_ua": -0.29399,
-    "psrr_1k_db": -0.03279,
-    "v_undershoot_mv": 0.558
+    "i_q_ua": -0.27963,
+    "psrr_1k_db": -0.04053,
+    "v_undershoot_mv": 0.708
    },
    "binds": "S7",
-   "note": "rhigh 0.5/138.5 um; sets every branch current (003 section 3)",
-   "unit": "%dR/R"
+   "note": "rhigh 5 x 0.5/27.7 um; sets every branch current (003 section 3)",
+   "unit": "%dR/R (all 5 segments)"
+  },
+  {
+   "class": "bias_resistor_segment",
+   "devices": [
+    "XRB_1"
+   ],
+   "pattern": "any",
+   "tolerated": {
+    "delta_pct": 61.0892
+   },
+   "linear_delta_pct": 61.0892,
+   "out_of_box_pct": null,
+   "sigma": {
+    "delta_pct": null
+   },
+   "headroom_sigma": null,
+   "sensitivity": {
+    "i_q_ua": -0.05634,
+    "psrr_1k_db": -0.00813,
+    "v_undershoot_mv": 0.143
+   },
+   "binds": "S7",
+   "note": "one segment of the bias string",
+   "unit": "%dR/R on 1 of 5"
   },
   {
    "class": "mim_cout",
@@ -940,15 +1452,17 @@
    "tolerated": {
     "delta_pct": null
    },
+   "linear_delta_pct": null,
+   "out_of_box_pct": null,
    "sigma": {
     "delta_pct": 0.08620689655172414
    },
    "headroom_sigma": Infinity,
    "sensitivity": {
-    "v_undershoot_mv": -0.17
+    "v_undershoot_mv": -0.066
    },
    "binds": null,
-   "note": "4 x 58 um MIM units in parallel; only the TOTAL matters (unit-to-unit mismatch does not)",
+   "note": "4 x 58 um MIM units in parallel; only the TOTAL matters",
    "unit": "%dC/C"
   },
   {
@@ -960,25 +1474,99 @@
    "tolerated": {
     "delta_pct": null
    },
+   "linear_delta_pct": null,
+   "out_of_box_pct": null,
    "sigma": {
     "delta_pct": 0.1724137931034483
    },
    "headroom_sigma": Infinity,
    "sensitivity": {
-    "v_undershoot_mv": -0.042
+    "v_undershoot_mv": -0.015
    },
    "binds": null,
    "note": "one unit of the array",
    "unit": "%dC/C on 1 of 4"
   }
  ],
+ "half_matching": [
+  {
+   "class": "ea_in_pair",
+   "half_card": "XM1A",
+   "vs_whole": "dvt_XM1_10m",
+   "d_v_out_v": 0.010405,
+   "ratio_v_out_v": 0.522,
+   "d_i_q_ua": -0.00095,
+   "ratio_i_q_ua": 0.508,
+   "d_v_undershoot_mv": 0.125,
+   "ratio_v_undershoot": 0.425,
+   "d_psrr_db": 2.8534,
+   "ratio_psrr": 51.974
+  },
+  {
+   "class": "ea_in_pair",
+   "half_card": "XM2A",
+   "vs_whole": "dvt_XM2_10m",
+   "d_v_out_v": -0.010409,
+   "ratio_v_out_v": 0.522,
+   "d_i_q_ua": 0.00293,
+   "ratio_i_q_ua": 0.527,
+   "d_v_undershoot_mv": -0.179,
+   "ratio_v_undershoot": 0.653,
+   "d_psrr_db": -3.442,
+   "ratio_psrr": 18.116
+  },
+  {
+   "class": "ea_nmos_load",
+   "half_card": "XM3A",
+   "vs_whole": "dvt_XM3_10m",
+   "d_v_out_v": 0.008227,
+   "ratio_v_out_v": 0.481,
+   "d_i_q_ua": -0.00154,
+   "ratio_i_q_ua": 0.48,
+   "d_v_undershoot_mv": 102.563,
+   "ratio_v_undershoot": 0.763,
+   "d_psrr_db": 3.2961,
+   "ratio_psrr": -0.566
+  },
+  {
+   "class": "bias_n_group",
+   "half_card": "XMB0A",
+   "vs_whole": "dvt_XMB0_10m",
+   "d_v_out_v": -2e-06,
+   "ratio_v_out_v": 0.5,
+   "d_i_q_ua": 1.7533,
+   "ratio_i_q_ua": 0.48,
+   "d_v_undershoot_mv": -4.72,
+   "ratio_v_undershoot": 0.53,
+   "d_psrr_db": 0.2885,
+   "ratio_psrr": 0.499
+  },
+  {
+   "class": "bias_n_group",
+   "half_card": "XMSA",
+   "vs_whole": "dvt_XMS_10m",
+   "d_v_out_v": -8e-06,
+   "ratio_v_out_v": 0.471,
+   "d_i_q_ua": -1.17138,
+   "ratio_i_q_ua": 0.501,
+   "d_v_undershoot_mv": 5.268,
+   "ratio_v_undershoot": 0.055,
+   "d_psrr_db": -0.0171,
+   "ratio_psrr": 0.429
+  }
+ ],
  "devices": [
   {
    "name": "XMB0",
-   "id_na": 2514.61,
-   "id_na_10ma": 2514.6,
-   "vds_mv": 366.53,
-   "vgs_mv": 366.53,
+   "cards": 2,
+   "card_names": [
+    "XMB0A",
+    "XMB0B"
+   ],
+   "id_na": 2495.67,
+   "id_na_10ma": 2495.7,
+   "vds_mv": 365.48,
+   "vgs_mv": 365.48,
    "vsb_mv": 0.0,
    "flavour": "lv_nmos",
    "well": "vss",
@@ -986,10 +1574,15 @@
   },
   {
    "name": "XMB1",
-   "id_na": 4561.32,
-   "id_na_10ma": 4561.3,
-   "vds_mv": 1061.87,
-   "vgs_mv": 366.53,
+   "cards": 2,
+   "card_names": [
+    "XMB1A",
+    "XMB1B"
+   ],
+   "id_na": 4333.33,
+   "id_na_10ma": 4333.3,
+   "vds_mv": 1065.2,
+   "vgs_mv": 365.48,
    "vsb_mv": 0.0,
    "flavour": "lv_nmos",
    "well": "vss",
@@ -997,54 +1590,77 @@
   },
   {
    "name": "XMBP",
-   "id_na": -4561.3,
-   "id_na_10ma": -4561.3,
-   "vds_mv": 438.13,
-   "vgs_mv": 438.13,
-   "vsb_mv": 0.0,
+   "cards": 1,
+   "card_names": [
+    "XMBP"
+   ],
+   "id_na": -4333.31,
+   "id_na_10ma": -4333.3,
+   "vds_mv": 434.8,
+   "vgs_mv": 434.8,
+   "vsb_mv": -0.0,
    "flavour": "lv_pmos",
    "well": "vdd",
    "group": "bias"
   },
   {
    "name": "XMT",
-   "id_na": -4566.37,
-   "id_na_10ma": -4566.4,
-   "vds_mv": 448.57,
-   "vgs_mv": 438.13,
-   "vsb_mv": 0.0,
+   "cards": 1,
+   "card_names": [
+    "XMT"
+   ],
+   "id_na": -4341.2,
+   "id_na_10ma": -4341.2,
+   "vds_mv": 451.91,
+   "vgs_mv": 434.8,
+   "vsb_mv": -0.0,
    "flavour": "lv_pmos",
    "well": "vdd",
    "group": "error amp"
   },
   {
    "name": "XM1",
-   "id_na": -2282.33,
-   "id_na_10ma": -2282.7,
-   "vds_mv": 765.22,
-   "vgs_mv": 451.39,
-   "vsb_mv": 448.57,
+   "cards": 2,
+   "card_names": [
+    "XM1A",
+    "XM1B"
+   ],
+   "id_na": -2176.18,
+   "id_na_10ma": -2176.5,
+   "vds_mv": 757.13,
+   "vgs_mv": 448.34,
+   "vsb_mv": 451.91,
    "flavour": "lv_pmos",
    "well": "vdd",
    "group": "error amp"
   },
   {
    "name": "XM2",
-   "id_na": -2284.04,
-   "id_na_10ma": -2283.6,
-   "vds_mv": 764.3,
-   "vgs_mv": 451.43,
-   "vsb_mv": 448.57,
+   "cards": 2,
+   "card_names": [
+    "XM2A",
+    "XM2B"
+   ],
+   "id_na": -2165.02,
+   "id_na_10ma": -2164.6,
+   "vds_mv": 763.5,
+   "vgs_mv": 448.09,
+   "vsb_mv": 451.91,
    "flavour": "lv_pmos",
    "well": "vdd",
    "group": "error amp"
   },
   {
    "name": "XM3",
-   "id_na": 2282.33,
-   "id_na_10ma": 2282.7,
-   "vds_mv": 286.21,
-   "vgs_mv": 286.21,
+   "cards": 2,
+   "card_names": [
+    "XM3A",
+    "XM3B"
+   ],
+   "id_na": 2176.17,
+   "id_na_10ma": 2176.5,
+   "vds_mv": 290.96,
+   "vgs_mv": 290.96,
    "vsb_mv": 0.0,
    "flavour": "lv_nmos",
    "well": "vss",
@@ -1052,10 +1668,15 @@
   },
   {
    "name": "XM4",
-   "id_na": 2284.04,
-   "id_na_10ma": 2283.6,
-   "vds_mv": 287.13,
-   "vgs_mv": 286.21,
+   "cards": 2,
+   "card_names": [
+    "XM4A",
+    "XM4B"
+   ],
+   "id_na": 2165.02,
+   "id_na_10ma": 2164.6,
+   "vds_mv": 284.59,
+   "vgs_mv": 290.96,
    "vsb_mv": 0.0,
    "flavour": "lv_nmos",
    "well": "vss",
@@ -1063,10 +1684,14 @@
   },
   {
    "name": "XM5",
-   "id_na": 2646.47,
-   "id_na_10ma": 2644.3,
-   "vds_mv": 763.46,
-   "vgs_mv": 287.13,
+   "cards": 1,
+   "card_names": [
+    "XM5"
+   ],
+   "id_na": 2514.76,
+   "id_na_10ma": 2512.8,
+   "vds_mv": 767.3,
+   "vgs_mv": 284.59,
    "vsb_mv": 0.0,
    "flavour": "lv_nmos",
    "well": "vss",
@@ -1074,32 +1699,44 @@
   },
   {
    "name": "XM6",
-   "id_na": -2646.47,
-   "id_na_10ma": -2644.3,
-   "vds_mv": 736.54,
-   "vgs_mv": 438.13,
-   "vsb_mv": 0.0,
+   "cards": 1,
+   "card_names": [
+    "XM6"
+   ],
+   "id_na": -2514.75,
+   "id_na_10ma": -2512.8,
+   "vds_mv": 732.7,
+   "vgs_mv": 434.8,
+   "vsb_mv": -0.0,
    "flavour": "lv_pmos",
    "well": "vdd",
    "group": "error amp"
   },
   {
    "name": "XMC",
-   "id_na": -4835.07,
-   "id_na_10ma": -3542.6,
-   "vds_mv": 921.17,
-   "vgs_mv": 436.61,
-   "vsb_mv": 299.93,
+   "cards": 1,
+   "card_names": [
+    "XMC"
+   ],
+   "id_na": -4356.01,
+   "id_na_10ma": -3197.7,
+   "vds_mv": 925.06,
+   "vgs_mv": 432.2,
+   "vsb_mv": 300.5,
    "flavour": "lv_pmos",
    "well": "vdd",
    "group": "FVF"
   },
   {
    "name": "XMA",
-   "id_na": 4835.07,
-   "id_na_10ma": 3542.6,
-   "vds_mv": 278.9,
-   "vgs_mv": 278.9,
+   "cards": 1,
+   "card_names": [
+    "XMA"
+   ],
+   "id_na": 4356.01,
+   "id_na_10ma": 3197.7,
+   "vds_mv": 274.44,
+   "vgs_mv": 274.44,
    "vsb_mv": 0.0,
    "flavour": "lv_nmos",
    "well": "vss",
@@ -1107,10 +1744,14 @@
   },
   {
    "name": "XMB",
-   "id_na": 8454.64,
-   "id_na_10ma": 6518.0,
-   "vds_mv": 1047.68,
-   "vgs_mv": 278.9,
+   "cards": 1,
+   "card_names": [
+    "XMB"
+   ],
+   "id_na": 7751.04,
+   "id_na_10ma": 5978.1,
+   "vds_mv": 1053.43,
+   "vgs_mv": 274.44,
    "vsb_mv": 0.0,
    "flavour": "lv_nmos",
    "well": "vss",
@@ -1118,32 +1759,45 @@
   },
   {
    "name": "XMCP",
-   "id_na": -8454.63,
-   "id_na_10ma": -6518.0,
-   "vds_mv": 452.32,
-   "vgs_mv": 452.32,
-   "vsb_mv": 0.0,
+   "cards": 1,
+   "card_names": [
+    "XMCP"
+   ],
+   "id_na": -7751.03,
+   "id_na_10ma": -5978.1,
+   "vds_mv": 446.57,
+   "vgs_mv": 446.57,
+   "vsb_mv": -0.0,
    "flavour": "lv_pmos",
    "well": "vdd",
    "group": "FVF"
   },
   {
    "name": "XMD",
-   "id_na": -8155.29,
-   "id_na_10ma": -6875.8,
-   "vds_mv": 285.87,
-   "vgs_mv": 452.32,
-   "vsb_mv": 0.0,
+   "cards": 1,
+   "card_names": [
+    "XMD"
+   ],
+   "id_na": -7474.2,
+   "id_na_10ma": -6308.0,
+   "vds_mv": 280.66,
+   "vgs_mv": 446.57,
+   "vsb_mv": -0.0,
    "flavour": "lv_pmos",
    "well": "vdd",
    "group": "FVF"
   },
   {
    "name": "XMS",
-   "id_na": 8155.32,
-   "id_na_10ma": 6876.5,
-   "vds_mv": 1214.13,
-   "vgs_mv": 366.53,
+   "cards": 2,
+   "card_names": [
+    "XMSA",
+    "XMSB"
+   ],
+   "id_na": 7474.22,
+   "id_na_10ma": 6308.7,
+   "vds_mv": 1219.34,
+   "vgs_mv": 365.48,
    "vsb_mv": 0.0,
    "flavour": "lv_nmos",
    "well": "vss",
@@ -1151,20 +1805,32 @@
   },
   {
    "name": "XMP",
-   "id_na": -5378.43,
-   "id_na_10ma": -10004100.0,
-   "vds_mv": 299.93,
-   "vgs_mv": 285.87,
-   "vsb_mv": 0.0,
+   "cards": 1,
+   "card_names": [
+    "XMP"
+   ],
+   "id_na": -4895.18,
+   "id_na_10ma": -10003700.0,
+   "vds_mv": 300.5,
+   "vgs_mv": 280.66,
+   "vsb_mv": -0.0,
    "flavour": "lv_pmos",
    "well": "vdd",
    "group": "output"
   },
   {
    "name": "XRB",
-   "id_na": 2514.61,
-   "id_na_10ma": 2514.6,
-   "vds_mv": 1500.0,
+   "cards": 5,
+   "card_names": [
+    "XRB_1",
+    "XRB_2",
+    "XRB_3",
+    "XRB_4",
+    "XRB_5"
+   ],
+   "id_na": 2495.67,
+   "id_na_10ma": 2495.7,
+   "vds_mv": 1134.52,
    "vgs_mv": null,
    "vsb_mv": 0.0,
    "flavour": "rhigh",
@@ -1173,9 +1839,20 @@
   },
   {
    "name": "XR1",
-   "id_na": 543.36,
-   "id_na_10ma": 543.3,
-   "vds_mv": 600.03,
+   "cards": 8,
+   "card_names": [
+    "XR1_1",
+    "XR1_2",
+    "XR1_3",
+    "XR1_4",
+    "XR1_5",
+    "XR1_6",
+    "XR1_7",
+    "XR1_8"
+   ],
+   "id_na": 539.16,
+   "id_na_10ma": 539.1,
+   "vds_mv": 599.75,
    "vgs_mv": null,
    "vsb_mv": 0.0,
    "flavour": "rhigh",
@@ -1184,9 +1861,20 @@
   },
   {
    "name": "XR2",
-   "id_na": 543.36,
-   "id_na_10ma": 543.3,
-   "vds_mv": 600.04,
+   "cards": 8,
+   "card_names": [
+    "XR2_1",
+    "XR2_2",
+    "XR2_3",
+    "XR2_4",
+    "XR2_5",
+    "XR2_6",
+    "XR2_7",
+    "XR2_8"
+   ],
+   "id_na": 539.17,
+   "id_na_10ma": 539.2,
+   "vds_mv": 599.75,
    "vgs_mv": null,
    "vsb_mv": 0.0,
    "flavour": "rhigh",
@@ -1194,184 +1882,357 @@
    "group": "feedback"
   }
  ],
+ "currents": [
+  {
+   "net": "vdd",
+   "segment": "vdd strap, TopMetal1 over the stack",
+   "i_ma": 10.02971,
+   "kind": "dc",
+   "source": "SG13G2_os_process_spec section 2.15 (11 y @ 105 C)",
+   "drawn": "topmetal1 2um",
+   "limit_ma": 30.0,
+   "over_factor": 0.3343,
+   "rule": "TopMetal1 15 mA/um x 2 um"
+  },
+  {
+   "net": "vout",
+   "segment": "vout strap, TopMetal1 over the stack",
+   "i_ma": 10.0037,
+   "kind": "dc",
+   "source": "SG13G2_os_process_spec section 2.15 (11 y @ 105 C)",
+   "drawn": "topmetal1 2um",
+   "limit_ma": 30.0,
+   "over_factor": 0.3335,
+   "rule": "TopMetal1 15 mA/um x 2 um"
+  },
+  {
+   "net": "vdd",
+   "segment": "pass-array Metal2 comb spine (worst segment)",
+   "i_ma": 10.02971,
+   "kind": "dc",
+   "source": "SG13G2_os_process_spec section 2.15 (11 y @ 105 C)",
+   "drawn": "metal2 6um",
+   "limit_ma": 12.0,
+   "over_factor": 0.8358,
+   "rule": "Metal2 2 mA/um x 6 um"
+  },
+  {
+   "net": "vout",
+   "segment": "pass-array Metal2 comb spine, drain side",
+   "i_ma": 10.0037,
+   "kind": "dc",
+   "source": "SG13G2_os_process_spec section 2.15 (11 y @ 105 C)",
+   "drawn": "metal2 6um",
+   "limit_ma": 12.0,
+   "over_factor": 0.8336,
+   "rule": "Metal2 2 mA/um x 6 um"
+  },
+  {
+   "net": "vdd",
+   "segment": "pass source column riser, shared (2 fingers)",
+   "i_ma": 0.26326,
+   "kind": "dc",
+   "source": "SG13G2_os_process_spec section 2.15 (11 y @ 105 C)",
+   "drawn": "metal1 0.2um",
+   "limit_ma": 0.36,
+   "over_factor": 0.7313,
+   "rule": "Metal1 0.36 mA total (0.16-0.36 um wide)"
+  },
+  {
+   "net": "vout",
+   "segment": "pass drain column riser, shared (2 fingers)",
+   "i_ma": 0.26326,
+   "kind": "dc",
+   "source": "SG13G2_os_process_spec section 2.15 (11 y @ 105 C)",
+   "drawn": "metal1 0.2um",
+   "limit_ma": 0.36,
+   "over_factor": 0.7313,
+   "rule": "Metal1 0.36 mA total (0.16-0.36 um wide)"
+  },
+  {
+   "net": "vdd",
+   "segment": "Via1 per shared S/D column (2 cuts, F4)",
+   "i_ma": 0.26326,
+   "kind": "dc",
+   "source": "SG13G2_os_process_spec section 2.15 (11 y @ 105 C)",
+   "drawn": "via1 x2",
+   "limit_ma": 0.8,
+   "over_factor": 0.3291,
+   "rule": "Via1 0.4 mA/via x 2"
+  },
+  {
+   "net": "vout",
+   "segment": "Via1 per shared S/D column (2 cuts, F4)",
+   "i_ma": 0.26326,
+   "kind": "dc",
+   "source": "SG13G2_os_process_spec section 2.15 (11 y @ 105 C)",
+   "drawn": "via1 x2",
+   "limit_ma": 0.8,
+   "over_factor": 0.3291,
+   "rule": "Via1 0.4 mA/via x 2"
+  },
+  {
+   "net": "vout",
+   "segment": "diffusion contacts per shared column (PDK cell)",
+   "i_ma": 0.26326,
+   "kind": "dc",
+   "source": "SG13G2_os_process_spec section 2.15 (11 y @ 105 C)",
+   "drawn": "contact x7",
+   "limit_ma": 2.1,
+   "over_factor": 0.1254,
+   "rule": "Contact 0.3 mA/cnt x 7"
+  },
+  {
+   "net": "vout",
+   "segment": "pass drain END column riser (1 finger)",
+   "i_ma": 0.13163,
+   "kind": "dc",
+   "source": "SG13G2_os_process_spec section 2.15 (11 y @ 105 C)",
+   "drawn": "metal1 0.2um",
+   "limit_ma": 0.36,
+   "over_factor": 0.3656,
+   "rule": "Metal1 0.36 mA total (0.16-0.36 um wide)"
+  },
+  {
+   "net": "vss",
+   "segment": "cell vss rail (Iq only)",
+   "i_ma": 0.02601,
+   "kind": "dc",
+   "source": "SG13G2_os_process_spec section 2.15 (11 y @ 105 C)",
+   "drawn": "metal1 0.8um",
+   "limit_ma": 0.8,
+   "over_factor": 0.0325,
+   "rule": "Metal1 1 mA/um x 0.8 um"
+  }
+ ],
  "power_path": {
   "minima": {
-   "vdd_topmetal1_um": 0.6688,
-   "vout_topmetal1_um": 0.6669,
-   "vdd_metal1_um": 10.0318,
-   "vout_metal1_um": 10.0041,
-   "vout_metal5_um": 5.002,
-   "vout_metal2_um": 5.002,
-   "vout_via1_n": 25.0102,
-   "vout_topvia1_n": 7.1458,
-   "vdd_topvia1_n": 7.1656,
-   "vout_topvia2_n": 1.0004,
-   "col_metal1_um": 1.0531,
-   "col_metal2_um": 0.5265,
-   "col_via1_n": 2.6327,
-   "col_contact_n": 3.5102
+   "vdd_topmetal1_um": 0.66865,
+   "vout_topmetal1_um": 0.66691,
+   "vdd_metal1_um": 10.02971,
+   "vout_metal1_um": 10.0037,
+   "vout_metal5_um": 5.00185,
+   "vout_metal2_um": 5.00185,
+   "vout_via1_n": 25.00925,
+   "vout_topvia1_n": 7.1455,
+   "vdd_topvia1_n": 7.16408,
+   "vout_topvia2_n": 1.00037,
+   "col_metal1_um": 0.26326,
+   "col_metal2_um": 0.13163,
+   "col_via1_n": 0.65814,
+   "col_contact_n": 0.87752,
+   "vss_metal1_um": 0.02601
   },
   "measured": {
-   "i_vdd_a": 0.01003177,
-   "i_out_a": 0.0100041,
-   "i_finger_a": 0.0005265315789473685,
-   "i_column_a": 0.001053063157894737,
-   "i_vss_cell_a": 2.7670000000000472e-05,
-   "n_fingers": 19
+   "i_vdd_a": 0.01002971,
+   "i_out_a": 0.0100037,
+   "i_finger_a": 0.0001316276315789474,
+   "i_column_a": 0.0002632552631578948,
+   "i_vss_cell_a": 2.6009999999999922e-05,
+   "n_fingers": 76,
+   "w_finger_um": 2.5
   },
   "as_drawn": [
    {
     "net": "vdd",
-    "segment": "cell vdd rail (rail_w)",
-    "carries_ma": 10.0318,
-    "drawn": "metal1 0.8um",
-    "layer": "metal1",
-    "width_um": 0.8,
-    "n_vias": 1,
-    "limit_ma": 0.8,
-    "over_factor": 12.54,
-    "rule": "Metal1 1 mA/um x 0.8 um"
-   },
-   {
-    "net": "vout",
-    "segment": "pass drain bus / m1h strap bar (one conductor)",
-    "carries_ma": 10.0041,
-    "drawn": "metal1 0.6um",
-    "layer": "metal1",
-    "width_um": 0.6,
-    "n_vias": 1,
-    "limit_ma": 0.6,
-    "over_factor": 16.674,
-    "rule": "Metal1 1 mA/um x 0.6 um"
-   },
-   {
-    "net": "vout",
-    "segment": "vout channel track / pin (W_M1)",
-    "carries_ma": 10.0041,
-    "drawn": "metal1 0.2um",
-    "layer": "metal1",
-    "width_um": 0.2,
-    "n_vias": 1,
-    "limit_ma": 0.36,
-    "over_factor": 27.789,
-    "rule": "Metal1 0.36 mA total (0.16-0.36 um wide)"
-   },
-   {
-    "net": "vout",
-    "segment": "vout M1->M2 riser (to_track, W_M2)",
-    "carries_ma": 10.0041,
-    "drawn": "metal2 0.2um",
-    "layer": "metal2",
-    "width_um": 0.2,
-    "n_vias": 1,
-    "limit_ma": 0.6,
-    "over_factor": 16.674,
-    "rule": "Metal2 0.6 mA total (0.2-0.3 um wide)"
-   },
-   {
-    "net": "vout",
-    "segment": "vout riser Via1 (vstack, VPAD=0.38)",
-    "carries_ma": 10.0041,
-    "drawn": "via1 x1",
-    "layer": "via1",
-    "width_um": 0.0,
-    "n_vias": 1,
-    "limit_ma": 0.4,
-    "over_factor": 25.01,
-    "rule": "Via1 0.4 mA/via x 1"
-   },
-   {
-    "net": "vdd",
-    "segment": "pass source column (shared, 2 fingers)",
-    "carries_ma": 1.0531,
-    "drawn": "metal1 0.2um",
-    "layer": "metal1",
-    "width_um": 0.2,
-    "n_vias": 1,
-    "limit_ma": 0.36,
-    "over_factor": 2.925,
-    "rule": "Metal1 0.36 mA total (0.16-0.36 um wide)"
-   },
-   {
-    "net": "vout",
-    "segment": "pass drain column (shared, 2 fingers)",
-    "carries_ma": 1.0531,
-    "drawn": "metal1 0.2um",
-    "layer": "metal1",
-    "width_um": 0.2,
-    "n_vias": 1,
-    "limit_ma": 0.36,
-    "over_factor": 2.925,
-    "rule": "Metal1 0.36 mA total (0.16-0.36 um wide)"
-   },
-   {
-    "net": "vout",
-    "segment": "pass drain END column (1 finger)",
-    "carries_ma": 0.5265,
-    "drawn": "metal1 0.2um",
-    "layer": "metal1",
-    "width_um": 0.2,
-    "n_vias": 1,
-    "limit_ma": 0.36,
-    "over_factor": 1.463,
-    "rule": "Metal1 0.36 mA total (0.16-0.36 um wide)"
-   },
-   {
-    "net": "vss",
-    "segment": "cell vss rail (Iq only)",
-    "carries_ma": 0.0277,
-    "drawn": "metal1 0.8um",
-    "layer": "metal1",
-    "width_um": 0.8,
-    "n_vias": 1,
-    "limit_ma": 0.8,
-    "over_factor": 0.035,
-    "rule": "Metal1 1 mA/um x 0.8 um"
-   }
-  ],
-  "as_drawn_passed": false,
-  "as_drawn_worst": 27.78916666666667,
-  "required": [
-   {
-    "net": "vdd",
     "segment": "vdd strap, TopMetal1 over the stack",
-    "carries_ma": 10.0318,
+    "carries_ma": 10.02971,
     "drawn": "topmetal1 2um",
     "layer": "topmetal1",
     "width_um": 2.0,
     "n_vias": 1,
     "limit_ma": 30.0,
-    "over_factor": 0.334,
+    "over_factor": 0.3343,
     "rule": "TopMetal1 15 mA/um x 2 um"
    },
    {
     "net": "vout",
     "segment": "vout strap, TopMetal1 over the stack",
-    "carries_ma": 10.0041,
+    "carries_ma": 10.0037,
     "drawn": "topmetal1 2um",
     "layer": "topmetal1",
     "width_um": 2.0,
     "n_vias": 1,
     "limit_ma": 30.0,
-    "over_factor": 0.333,
+    "over_factor": 0.3335,
+    "rule": "TopMetal1 15 mA/um x 2 um"
+   },
+   {
+    "net": "vdd",
+    "segment": "pass-array Metal2 comb spine (worst segment)",
+    "carries_ma": 10.02971,
+    "drawn": "metal2 6um",
+    "layer": "metal2",
+    "width_um": 6.0,
+    "n_vias": 1,
+    "limit_ma": 12.0,
+    "over_factor": 0.8358,
+    "rule": "Metal2 2 mA/um x 6 um"
+   },
+   {
+    "net": "vout",
+    "segment": "pass-array Metal2 comb spine, drain side",
+    "carries_ma": 10.0037,
+    "drawn": "metal2 6um",
+    "layer": "metal2",
+    "width_um": 6.0,
+    "n_vias": 1,
+    "limit_ma": 12.0,
+    "over_factor": 0.8336,
+    "rule": "Metal2 2 mA/um x 6 um"
+   },
+   {
+    "net": "vdd",
+    "segment": "pass source column riser, shared (2 fingers)",
+    "carries_ma": 0.26326,
+    "drawn": "metal1 0.2um",
+    "layer": "metal1",
+    "width_um": 0.2,
+    "n_vias": 1,
+    "limit_ma": 0.36,
+    "over_factor": 0.7313,
+    "rule": "Metal1 0.36 mA total (0.16-0.36 um wide)"
+   },
+   {
+    "net": "vout",
+    "segment": "pass drain column riser, shared (2 fingers)",
+    "carries_ma": 0.26326,
+    "drawn": "metal1 0.2um",
+    "layer": "metal1",
+    "width_um": 0.2,
+    "n_vias": 1,
+    "limit_ma": 0.36,
+    "over_factor": 0.7313,
+    "rule": "Metal1 0.36 mA total (0.16-0.36 um wide)"
+   },
+   {
+    "net": "vdd",
+    "segment": "Via1 per shared S/D column (2 cuts, F4)",
+    "carries_ma": 0.26326,
+    "drawn": "via1 x2",
+    "layer": "via1",
+    "width_um": 0.0,
+    "n_vias": 2,
+    "limit_ma": 0.8,
+    "over_factor": 0.3291,
+    "rule": "Via1 0.4 mA/via x 2"
+   },
+   {
+    "net": "vout",
+    "segment": "Via1 per shared S/D column (2 cuts, F4)",
+    "carries_ma": 0.26326,
+    "drawn": "via1 x2",
+    "layer": "via1",
+    "width_um": 0.0,
+    "n_vias": 2,
+    "limit_ma": 0.8,
+    "over_factor": 0.3291,
+    "rule": "Via1 0.4 mA/via x 2"
+   },
+   {
+    "net": "vout",
+    "segment": "diffusion contacts per shared column (PDK cell)",
+    "carries_ma": 0.26326,
+    "drawn": "contact x7",
+    "layer": "contact",
+    "width_um": 0.0,
+    "n_vias": 7,
+    "limit_ma": 2.1,
+    "over_factor": 0.1254,
+    "rule": "Contact 0.3 mA/cnt x 7"
+   },
+   {
+    "net": "vout",
+    "segment": "pass drain END column riser (1 finger)",
+    "carries_ma": 0.13163,
+    "drawn": "metal1 0.2um",
+    "layer": "metal1",
+    "width_um": 0.2,
+    "n_vias": 1,
+    "limit_ma": 0.36,
+    "over_factor": 0.3656,
+    "rule": "Metal1 0.36 mA total (0.16-0.36 um wide)"
+   },
+   {
+    "net": "vss",
+    "segment": "cell vss rail (Iq only)",
+    "carries_ma": 0.02601,
+    "drawn": "metal1 0.8um",
+    "layer": "metal1",
+    "width_um": 0.8,
+    "n_vias": 1,
+    "limit_ma": 0.8,
+    "over_factor": 0.0325,
+    "rule": "Metal1 1 mA/um x 0.8 um"
+   }
+  ],
+  "as_drawn_passed": true,
+  "as_drawn_worst": 0.0,
+  "required": [
+   {
+    "net": "vdd",
+    "segment": "vdd strap, TopMetal1 over the stack",
+    "carries_ma": 10.02971,
+    "drawn": "topmetal1 2um",
+    "layer": "topmetal1",
+    "width_um": 2.0,
+    "n_vias": 1,
+    "limit_ma": 30.0,
+    "over_factor": 0.3343,
     "rule": "TopMetal1 15 mA/um x 2 um"
    },
    {
     "net": "vout",
+    "segment": "vout strap, TopMetal1 over the stack",
+    "carries_ma": 10.0037,
+    "drawn": "topmetal1 2um",
+    "layer": "topmetal1",
+    "width_um": 2.0,
+    "n_vias": 1,
+    "limit_ma": 30.0,
+    "over_factor": 0.3335,
+    "rule": "TopMetal1 15 mA/um x 2 um"
+   },
+   {
+    "net": "vdd",
+    "segment": "pass-array Metal2 comb spine (1.5x headroom)",
+    "carries_ma": 10.02971,
+    "drawn": "metal2 9um",
+    "layer": "metal2",
+    "width_um": 9.0,
+    "n_vias": 1,
+    "limit_ma": 18.0,
+    "over_factor": 0.5572,
+    "rule": "Metal2 2 mA/um x 9 um"
+   },
+   {
+    "net": "vout",
+    "segment": "pass-array Metal2 comb spine, drain side",
+    "carries_ma": 10.0037,
+    "drawn": "metal2 9um",
+    "layer": "metal2",
+    "width_um": 9.0,
+    "n_vias": 1,
+    "limit_ma": 18.0,
+    "over_factor": 0.5558,
+    "rule": "Metal2 2 mA/um x 9 um"
+   },
+   {
+    "net": "vout",
     "segment": "vout M5->TopMetal1 stitch",
-    "carries_ma": 10.0041,
+    "carries_ma": 10.0037,
     "drawn": "topvia1 x12",
     "layer": "topvia1",
     "width_um": 0.0,
     "n_vias": 12,
     "limit_ma": 16.8,
-    "over_factor": 0.595,
+    "over_factor": 0.5955,
     "rule": "TopVia1 1.4 mA/via x 12"
    },
    {
     "net": "vdd",
     "segment": "vdd M5->TopMetal1 stitch",
-    "carries_ma": 10.0318,
+    "carries_ma": 10.02971,
     "drawn": "topvia1 x12",
     "layer": "topvia1",
     "width_um": 0.0,
@@ -1383,189 +2244,182 @@
    {
     "net": "vout",
     "segment": "vout M5 landing pad under the TopVia1 row",
-    "carries_ma": 10.0041,
+    "carries_ma": 10.0037,
     "drawn": "metal5 8um",
     "layer": "metal5",
     "width_um": 8.0,
     "n_vias": 1,
     "limit_ma": 16.0,
-    "over_factor": 0.625,
+    "over_factor": 0.6252,
     "rule": "Metal5 2 mA/um x 8 um"
    },
    {
     "net": "vdd",
     "segment": "vdd M5 landing pad",
-    "carries_ma": 10.0318,
+    "carries_ma": 10.02971,
     "drawn": "metal5 8um",
     "layer": "metal5",
     "width_um": 8.0,
     "n_vias": 1,
     "limit_ma": 16.0,
-    "over_factor": 0.627,
+    "over_factor": 0.6269,
     "rule": "Metal5 2 mA/um x 8 um"
    },
    {
     "net": "vout",
-    "segment": "vout M1->M2 stitch",
-    "carries_ma": 10.0041,
+    "segment": "vout M1->M2 stitch (whole-current riser)",
+    "carries_ma": 10.0037,
     "drawn": "via1 x40",
     "layer": "via1",
     "width_um": 0.0,
     "n_vias": 40,
     "limit_ma": 16.0,
-    "over_factor": 0.625,
+    "over_factor": 0.6252,
     "rule": "Via1 0.4 mA/via x 40"
    },
    {
     "net": "vout",
     "segment": "vout M2->M3",
-    "carries_ma": 10.0041,
+    "carries_ma": 10.0037,
     "drawn": "via2 x40",
     "layer": "via2",
     "width_um": 0.0,
     "n_vias": 40,
     "limit_ma": 16.0,
-    "over_factor": 0.625,
+    "over_factor": 0.6252,
     "rule": "Via2 0.4 mA/via x 40"
    },
    {
     "net": "vout",
     "segment": "vout M3->M4",
-    "carries_ma": 10.0041,
+    "carries_ma": 10.0037,
     "drawn": "via3 x40",
     "layer": "via3",
     "width_um": 0.0,
     "n_vias": 40,
     "limit_ma": 16.0,
-    "over_factor": 0.625,
+    "over_factor": 0.6252,
     "rule": "Via3 0.4 mA/via x 40"
    },
    {
     "net": "vout",
     "segment": "vout M4->M5",
-    "carries_ma": 10.0041,
+    "carries_ma": 10.0037,
     "drawn": "via4 x40",
     "layer": "via4",
     "width_um": 0.0,
     "n_vias": 40,
     "limit_ma": 16.0,
-    "over_factor": 0.625,
+    "over_factor": 0.6252,
     "rule": "Via4 0.4 mA/via x 40"
    },
    {
     "net": "vdd",
     "segment": "vdd M1->M2 stitch (same count as vout)",
-    "carries_ma": 10.0318,
+    "carries_ma": 10.02971,
     "drawn": "via1 x40",
     "layer": "via1",
     "width_um": 0.0,
     "n_vias": 40,
     "limit_ma": 16.0,
-    "over_factor": 0.627,
+    "over_factor": 0.6269,
     "rule": "Via1 0.4 mA/via x 40"
    },
    {
     "net": "vdd",
-    "segment": "pass source column, shared (Metal1)",
-    "carries_ma": 1.0531,
-    "drawn": "metal1 1.1um",
+    "segment": "pass source column riser, shared (2 fingers)",
+    "carries_ma": 0.26326,
+    "drawn": "metal1 0.2um",
     "layer": "metal1",
-    "width_um": 1.1,
+    "width_um": 0.2,
     "n_vias": 1,
-    "limit_ma": 1.1,
-    "over_factor": 0.957,
-    "rule": "Metal1 1 mA/um x 1.1 um"
+    "limit_ma": 0.36,
+    "over_factor": 0.7313,
+    "rule": "Metal1 0.36 mA total (0.16-0.36 um wide)"
    },
    {
     "net": "vout",
-    "segment": "pass drain column, shared (Metal1)",
-    "carries_ma": 1.0531,
-    "drawn": "metal1 1.1um",
+    "segment": "pass drain column riser, shared (2 fingers)",
+    "carries_ma": 0.26326,
+    "drawn": "metal1 0.2um",
     "layer": "metal1",
-    "width_um": 1.1,
+    "width_um": 0.2,
     "n_vias": 1,
-    "limit_ma": 1.1,
-    "over_factor": 0.957,
-    "rule": "Metal1 1 mA/um x 1.1 um"
+    "limit_ma": 0.36,
+    "over_factor": 0.7313,
+    "rule": "Metal1 0.36 mA total (0.16-0.36 um wide)"
    },
    {
     "net": "vdd",
-    "segment": "pass source column, shared (Metal2 plate)",
-    "carries_ma": 1.0531,
-    "drawn": "metal2 1um",
-    "layer": "metal2",
-    "width_um": 1.0,
-    "n_vias": 1,
-    "limit_ma": 2.0,
-    "over_factor": 0.527,
-    "rule": "Metal2 2 mA/um x 1 um"
+    "segment": "Via1 per shared S/D column",
+    "carries_ma": 0.26326,
+    "drawn": "via1 x2",
+    "layer": "via1",
+    "width_um": 0.0,
+    "n_vias": 2,
+    "limit_ma": 0.8,
+    "over_factor": 0.3291,
+    "rule": "Via1 0.4 mA/via x 2"
    },
    {
     "net": "vout",
-    "segment": "pass drain column, shared (Metal2 plate)",
-    "carries_ma": 1.0531,
-    "drawn": "metal2 1um",
-    "layer": "metal2",
-    "width_um": 1.0,
-    "n_vias": 1,
-    "limit_ma": 2.0,
-    "over_factor": 0.527,
-    "rule": "Metal2 2 mA/um x 1 um"
-   },
-   {
-    "net": "vdd",
-    "segment": "Via1 per shared column up to the Metal2 plate",
-    "carries_ma": 1.0531,
-    "drawn": "via1 x3",
+    "segment": "Via1 per shared S/D column",
+    "carries_ma": 0.26326,
+    "drawn": "via1 x2",
     "layer": "via1",
     "width_um": 0.0,
-    "n_vias": 3,
-    "limit_ma": 1.2,
-    "over_factor": 0.878,
-    "rule": "Via1 0.4 mA/via x 3"
-   },
-   {
-    "net": "vout",
-    "segment": "Via1 per shared column up to the Metal2 plate",
-    "carries_ma": 1.0531,
-    "drawn": "via1 x3",
-    "layer": "via1",
-    "width_um": 0.0,
-    "n_vias": 3,
-    "limit_ma": 1.2,
-    "over_factor": 0.878,
-    "rule": "Via1 0.4 mA/via x 3"
+    "n_vias": 2,
+    "limit_ma": 0.8,
+    "over_factor": 0.3291,
+    "rule": "Via1 0.4 mA/via x 2"
    },
    {
     "net": "vout",
     "segment": "diffusion contacts per shared column",
-    "carries_ma": 1.0531,
+    "carries_ma": 0.26326,
     "drawn": "contact x4",
     "layer": "contact",
     "width_um": 0.0,
     "n_vias": 4,
     "limit_ma": 1.2,
-    "over_factor": 0.878,
+    "over_factor": 0.2194,
     "rule": "Contact 0.3 mA/cnt x 4"
    },
    {
     "net": "vss",
     "segment": "cell vss rail, unchanged",
-    "carries_ma": 0.0277,
+    "carries_ma": 0.02601,
     "drawn": "metal1 0.8um",
     "layer": "metal1",
     "width_um": 0.8,
     "n_vias": 1,
     "limit_ma": 0.8,
-    "over_factor": 0.035,
+    "over_factor": 0.0325,
     "rule": "Metal1 1 mA/um x 0.8 um"
    }
   ],
-  "required_passed": true
+  "required_passed": true,
+  "required_worst": 0.0
+ },
+ "divider_mismatch_mc": {
+  "seg8_ratio_sigma_pct": 0.28726,
+  "seg8_ratio_mean": 0.4999759,
+  "seg8_sd_v": 0.001436287,
+  "mono_ratio_sigma_pct": 0.29091,
+  "mono_ratio_mean": 0.5000334,
+  "mono_sd_v": 0.001454546,
+  "samples": 2000,
+  "models": "res_typ_mismatch",
+  "decks": [
+   "mc/mc_seg8.spice (8+8 segments, the drawn set)",
+   "mc/mc_2k.spice (monolithic 340 um arms)"
+  ],
+  "sigma_vout_mv": 3.4457,
+  "quarter_margin_vout_mv": 5.8748
  },
  "structure": {
   "axis": "vertical, one local axis per matched pair; the cell has NO global differential axis",
-  "axis_why": "The only differential net pair is (fb, vref) at the error-amp inputs and `vref` is driven by an ideal source inside the subckt, so balanced and one-sided injection measure the same thing (c_fbvref_bal_10f == c_fb_vss_10f, S7 103.72 mV / PM 71.311 deg in both)",
+  "axis_why": "the only differential net pair is (fb, vref) at the error-amp inputs and `vref` is driven by an ideal source inside the subckt, so balanced and one-sided injection measure the same thing (`c_fbvref_bal_10f` and `c_fb_vss_10f` both give S7 112.859 mV and PM 71.3695 deg)",
   "mirror_pairs": [
    [
     "XM1",
@@ -1592,12 +2446,17 @@
     "XR2"
    ]
   ],
+  "on_axis": [
+   "XM3/XM4 -- the tightest matching class in the cell and the one whose diode side crosses the S7 step; its two drains (`ea_n`, `ea_o1`) must sit symmetrically about the local axis",
+   "XMBP/XMT -- second tightest, and the leg that carries the bias step",
+   "XR1/XR2 -- the only thing that sets Vout against Vref"
+  ],
   "pins": {
    "top": [
     "vdd (= vin; TopMetal1 strap over the device stack)"
    ],
    "bottom": [
-    "vss (Metal1 rail is enough: the cell carries only Iq on it)"
+    "vss (a BUDGETED net now: 11 Ohm while XCOUT shares the return, 16 Ohm if XCOUT gets its own strap to the pin -- see section 4a)"
    ],
    "right": [
     "vout (TopMetal1, beside the pass device; the divider must tap HERE)"
@@ -1612,19 +2471,9 @@
    "vout",
    "vss"
   ],
-  "keep_apart": [
-   "XMP dissipates 3.0 mW at 10 mA (0.30 V x 10.0 mA). rhigh tc1 = -2300 ppm/K, and 1 % of single-arm dR/R costs 5.87 mV of Vout, so 1 K of gradient across XR1<->XR2 costs 1.35 mV = 23 % of the S1 quarter-margin. Keep the divider serpentines at the far end from XMP (the 005 floorplan already does) and interdigitate them ABBA.",
-   "XRB sets every branch current from the same tc1: keep it out of XMP's heat too.",
-   "`gate` and `vout` carry the fast edges (gate slews 1.21 -> 0.63 V in ~125 ns). Keep them off `fb`, `lp_brk` and `ea_o1`."
-  ],
-  "wells": [
-   "All nine PMOS have bulk = vdd in the netlist of record. XMC's source is `vout` (Vsb = 300 mV) and XM1/XM2's source is `ea_tail` (Vsb = 449 mV): these are DELIBERATE. Do not give XMC or the input pair its own nwell tied to its source -- that is a design change, not a layout fix.",
-   "Separate nwell islands are therefore for ISOLATION only, all tied to vdd: (a) XMP alone (hot, 10 mA, fast dV/dt); (b) quiet: XMBP/XMT/XM1/XM2/XM6; (c) FVF: XMC/XMCP/XMD.",
-   "All eight NMOS have bulk = vss in the common p-substrate; the rhigh bodies (`bn`) are vss as well. Put a continuous ptap ring around the error amp and a second one between XMP and everything else; the 005 cell uses periodic point taps every 12 um instead."
-  ],
   "mim_plates": [
-   "XCFF: bottom plate (Metal5, the plate kpex extracts) on `lp_brk`, not on `fb` -- `fb` has a 28 fF budget and `lp_brk` has none.",
-   "XCOUT: bottom plate on `vss`.",
+   "XCFF: bottom plate (Metal5, the plate kpex extracts) on `lp_brk`, not on `fb`. Both ends are now constrained -- `fb` has a 27.1 fF to-rail budget and the fb<->lp_brk coupling itself has a 6 fF hard limit -- so this is no longer a free choice; it is the cheaper of two constrained ends.",
+   "XCOUT: bottom plate on `vss` -- **and on its own strap straight to the `vss` pin.** Section 4a shows the 11 Ohm undershoot cliff is a shared-impedance effect between this plate's return current and the active devices' return; separate the two and the cliff is gone. Cheapest constraint relief in the brief, and it costs one strap.",
    "XCC: bottom plate on `ea_out` (the lower-Z stage-2 side); the C sensitivities of `ea_o1` and `ea_out` are equal to 3 digits, so this is a tie broken by impedance."
   ]
  },
@@ -1636,7 +2485,6 @@
    "ea_tail",
    "nbias",
    "pbias",
-   "ea_n",
    "ea_o1",
    "ea_out",
    "vref",
@@ -1646,8 +2494,7 @@
    "lp_brk",
    "gate",
    "fb",
-   "vref",
-   "vss"
+   "vref"
   ],
   "leakage": [
    "lp_brk",
@@ -1661,81 +2508,80 @@
   "matching": [
    "XMA/XMB",
    "XMCP/XMD",
-   "XMB0/XMB1",
-   "XMBP/XM6 (as a pair; the XMBP/XMT leg is NOT)",
    "XMP fingers",
    "XCOUT unit-to-unit",
    "XCC",
-   "XCFF"
+   "XR2 segment-to-segment inside one arm"
   ]
  },
  "op_nodes": {
   "noload": {
-   "vout": 1.200072,
+   "vout": 1.199499,
    "vdd": 1.5,
    "vss": 0.0,
-   "fb": 0.600037,
-   "lp_brk": 1.200072,
+   "fb": 0.5997502,
+   "lp_brk": 1.199499,
    "vref": 0.6,
-   "nbias": 0.3665335,
-   "pbias": 1.061865,
-   "ea_tail": 1.051427,
-   "ea_n": 0.2862057,
-   "ea_o1": 0.2871264,
-   "ea_out": 0.7634605,
-   "x1": 0.2788971,
-   "y": 1.047684,
-   "gate": 1.214135
+   "nbias": 0.3654756,
+   "pbias": 1.065205,
+   "ea_tail": 1.048088,
+   "ea_n": 0.290959,
+   "ea_o1": 0.2845898,
+   "ea_out": 0.7673009,
+   "x1": 0.2744435,
+   "y": 1.053434,
+   "gate": 1.219343
   },
   "i10m": {
-   "vout": 1.200036,
+   "vout": 1.199465,
    "vdd": 1.5,
    "vss": 0.0,
-   "fb": 0.6000192,
-   "lp_brk": 1.200036,
+   "fb": 0.5997334,
+   "lp_brk": 1.199465,
    "vref": 0.6,
-   "nbias": 0.3665335,
-   "pbias": 1.061865,
-   "ea_tail": 1.051419,
-   "ea_n": 0.2862147,
-   "ea_o1": 0.2866924,
-   "ea_out": 0.7765574,
-   "x1": 0.2659095,
-   "y": 1.064399,
-   "gate": 0.6294008
+   "nbias": 0.3654756,
+   "pbias": 1.065205,
+   "ea_tail": 1.04808,
+   "ea_n": 0.2909675,
+   "ea_o1": 0.2841719,
+   "ea_out": 0.7800308,
+   "x1": 0.2618097,
+   "y": 1.069637,
+   "gate": 0.6351364
   },
   "i0p1m": {
-   "vout": 1.200064,
+   "vout": 1.199491,
    "vdd": 1.5,
    "vss": 0.0,
-   "fb": 0.600033,
-   "lp_brk": 1.200064,
+   "fb": 0.5997463,
+   "lp_brk": 1.199491,
    "vref": 0.6,
-   "nbias": 0.3665335,
-   "pbias": 1.061865,
-   "ea_tail": 1.051426,
-   "ea_n": 0.2862077,
-   "ea_o1": 0.2870301,
-   "ea_out": 0.7663549,
-   "x1": 0.2760305,
-   "y": 1.051387,
-   "gate": 1.097252
+   "nbias": 0.3654756,
+   "pbias": 1.065205,
+   "ea_tail": 1.048087,
+   "ea_n": 0.2909609,
+   "ea_o1": 0.2844932,
+   "ea_out": 0.7702295,
+   "x1": 0.2715398,
+   "y": 1.057174,
+   "gate": 1.097814
   }
  },
  "not_measured": [
-  "corners and Monte Carlo (all budgets are tt/27 C)",
+  "corners and Monte Carlo on the cell (all budgets are tt/27 C)",
   "vref and vss capacitance (unmeasurable: ideal source / reference node)",
-  "the full net-to-net coupling matrix (3 pairs run)",
-  "per-finger resistance inside XMP (one card, m=19)",
+  "the full net-to-net coupling matrix (4 pairs run)",
+  "whether the six step-limited axes are independent",
+  "per-finger resistance inside XMP (one card, m=76)",
   "absolute junction/gate leakage per um^2 (budgets are in nA)",
-  "self-heating (3.0 mW is Vds*Id, not a thermal simulation)",
-  "the location of the gate-to-vout step (in box at 100 fF, out at 300 fF)",
-  "the S/D column pitch and contact count of the drawn XMP (no gdsfactory in this venv; the 4-contact requirement is stated, not counted)"
+  "self-heating (Vds*Id, not a thermal simulation)",
+  "the drawn geometry -- section 8's as-drawn rows are quoted from REVIEW.md"
  ],
  "evidence": {
-  "ledger": "runs/ledger.ndjson, tags brief_*, LDO_EXP=005",
-  "cases": 163,
-  "driver": "$SX_SCRATCH/ldo-brief/{pert,campaign,emit}.py",
-  "platform": "spicexplorer_signoff.{sensitivity,current_density}"
+  "ledger": "runs/ledger.ndjson, tags brief2_*, LDO_EXP=006",
+  "cases": 261,
+  "driver": "$SX_SCRATCH/ldo-brief2/{pert,campaign,emit_tables,emit}.py",
+  "platform": "spicexplorer_signoff.{sensitivity,current_density}",
+  "review": "layout/ldo_ihp_capless/REVIEW.md findings F1, F3, F6, F8, F9, F16, F19"
  }
 }
