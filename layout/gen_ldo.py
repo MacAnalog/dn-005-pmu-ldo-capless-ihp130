@@ -12,7 +12,7 @@ rejected on four counts, all fixed here and all planned in `layout/ldo_ihp_caple
 * **B1** — the 10 mA path was 12–28x over the process metal limit.  The load current now never
   touches a Metal1 conductor wider than one pass-array column: TopMetal1 straps (`pwr_w`), Metal5
   landing pads stitched with `pwr_stitch` TopVia1, `pwr_riser_vias` cuts per Via2/3/4 level, a
-  Metal2 comb over the pass array, and `xmp_nf_mult` x as many fingers so a shared diffusion
+  Metal2 comb over the pass array, and the certified `ng` fingers so a shared diffusion
   column carries 0.26 mA against a 0.36 mA allowance (§3 of the PLAN).
 * **m3** — matched pairs are common-centroid or same-row-same-orientation *by class*, with tied
   dummies at both ends of every group, and every well island carries a **closed** guard ring
@@ -25,7 +25,7 @@ rejected on four counts, all fixed here and all planned in `layout/ldo_ihp_caple
 Floorplan (all y derived from live device bounding boxes; see the PLAN for the sketch):
 
     vdd TopMetal1 strap  (top edge)                                  <- vdd pin
-    XMP island: nwell + ntap ring, m*xmp_nf_mult fingers, Metal2 combs
+    XMP island: nwell + ntap ring, the certified card's `ng` fingers, Metal2 combs
     vdd Metal1 rail
     row B: [nwell island "quiet": bias_p_group | ea_in_pair]  [nwell island "fvf": XMC XMCP XMD]
     channel: one Metal1 track per internal net, every vertical is Metal2
@@ -84,6 +84,13 @@ TM1_MIN_SP = 1.64  # TM1.b
 COL_M1_W = 0.16    # the mos cell's own S/D column Metal1 width (measured from _mos_core)
 
 _um, _count = NR.um, NR.count
+
+
+def _val(expr: str, sz: dict) -> float:
+    """A card parameter in micrometres (`NR.value` is in the file's own units, i.e. metres)."""
+    return NR.value(expr, sz) * 1e6
+
+
 SIZING: dict[str, object] = NR.load_sizing()
 
 
@@ -109,12 +116,9 @@ class LayoutParams:
     pwr_stitch: int = 12       # TopVia1 cuts per Metal5 -> TopMetal1 stitch
     pwr_riser_vias: int = 48   # Via2/3/4 cuts per riser level
     pwr_band_w: float = 6.0    # Metal2 comb spine / riser pad width
-    xmp_nf_mult: int = 4       # fingers per `m` unit of the pass device (PLAN §3)
     col_vias: int = 2          # Via1 per pass-array S/D column
     mim_gap: float = 3.0       # gap between MIM units
     res_pitch: float = 2.0     # serpentine segment pitch (rhigh cell is 0.9 wide)
-    r_segs: int = 8            # divider segments per arm (even: the ABBA pattern needs pairs)
-    rb_segs: int = 5           # bias resistor segments (l/rb_segs must land on 0.01 um)
     blk_gap: float = 6.0       # transistor stack -> passive band
     tap_pitch: float = 12.0    # (unused by the rings; kept for the optimizer's search space)
 
@@ -124,8 +128,8 @@ BOUNDS: dict[str, tuple[float, float]] = {
     "ch_margin": (0.8, 2.0), "rail_w": (0.5, 2.0), "rail_gap": (1.4, 2.5),
     "ring_w": (0.5, 1.5), "ring_gap": (0.6, 3.0), "isl_gap": (1.3, 6.0), "n_dummy": (0, 2),
     "pwr_w": (1.64, 6.0), "pwr_stitch": (8, 24), "pwr_riser_vias": (28, 72),
-    "pwr_band_w": (5.0, 12.0), "xmp_nf_mult": (3, 8), "col_vias": (1, 4),
-    "mim_gap": (2.5, 8.0), "res_pitch": (1.8, 4.0), "r_segs": (2, 8), "rb_segs": (1, 6),
+    "pwr_band_w": (5.1, 12.0), "col_vias": (1, 2),
+    "mim_gap": (2.5, 8.0), "res_pitch": (1.8, 4.0),
     "blk_gap": (4.0, 15.0), "tap_pitch": (6.0, 18.0),
 }
 
@@ -140,9 +144,10 @@ _VIA = {  # bottom layer -> (via layer, size, space, min enclosure)
 
 # ---------------------------------------------------------------- placement ----
 # A row is a list of GROUPS; a group is a list of SLOTS.  One slot = one placed instance:
-# (device name, fraction of the device's total W, fingers).  Splitting a device across several
-# slots is what makes a matching pattern: the LVS deck (`--combine_devices`) folds the parallel
-# instances back into one device of the summed width, so the pattern costs nothing at the compare.
+# (card name, fraction of that card's W, fingers).  A matching pattern draws unit devices, so the
+# **certified netlist names each unit** (`XM1A`/`XM1B`, review F19): the fraction is 1.0 for every
+# matched member and the split is a certified device parameter, not a layout liberty the compare
+# happens to tolerate.  `--combine_devices` still folds the pair, which is why LVS never saw it.
 # Patterns are the brief's (§6), by measured headroom.
 Slot = tuple[str, float, int]
 Group = tuple[str, str, list[Slot]]
@@ -153,11 +158,11 @@ Group = tuple[str, str, list[Slot]]
 ROW_A: list[Group] = [
     ("ea_stage2", "any", [("XM5", 1.0, 1)]),
     ("ea_nmos_load", "common_centroid",
-     [("XM3", 0.5, 1), ("XM4", 0.5, 1), ("XM4", 0.5, 1), ("XM3", 0.5, 1)]),
+     [("XM3A", 1.0, 1), ("XM4A", 1.0, 1), ("XM4B", 1.0, 1), ("XM3B", 1.0, 1)]),
     ("fvf_fold_n", "same_row_same_orientation", [("XMA", 1.0, 1), ("XMB", 1.0, 1)]),
     ("bias_n_group", "common_centroid",
-     [("XMS", 0.5, 1), ("XMB1", 0.5, 1), ("XMB0", 0.5, 1),
-      ("XMB0", 0.5, 1), ("XMB1", 0.5, 1), ("XMS", 0.5, 1)]),
+     [("XMSA", 1.0, 1), ("XMB1A", 1.0, 1), ("XMB0A", 1.0, 1),
+      ("XMB0B", 1.0, 1), ("XMB1B", 1.0, 1), ("XMSB", 1.0, 1)]),
 ]
 # row B — PMOS, in two nwell islands (brief §7): "quiet" and "fvf", both tied to vdd.
 ROW_B_QUIET: list[Group] = [
@@ -166,7 +171,7 @@ ROW_B_QUIET: list[Group] = [
     ("bias_p_group", "same_row_same_orientation",
      [("XMBP", 1.0, 1), ("XMT", 1.0, 1), ("XM6", 1.0, 1)]),
     ("ea_in_pair", "common_centroid",
-     [("XM1", 0.5, 1), ("XM2", 0.5, 1), ("XM2", 0.5, 1), ("XM1", 0.5, 1)]),
+     [("XM1A", 1.0, 1), ("XM2A", 1.0, 1), ("XM2B", 1.0, 1), ("XM1B", 1.0, 1)]),
 ]
 ROW_B_FVF: list[Group] = [
     ("fvf_ctrl", "any", [("XMC", 1.0, 1)]),
@@ -719,7 +724,13 @@ def build_full(p: LayoutParams = LayoutParams(),
     # ================= the pass device: own island, Metal2 combs, TopMetal1 straps ======
     y_out_band = _s(y_vdd + p.rail_w / 2 + p.blk_gap + p.ring_w + p.pwr_band_w / 2 + 1.5)
     yC = _s(y_out_band + p.pwr_band_w / 2 + 1.4 + GATE + GPAD / 2 + 0.6)
-    nf = MD["XMP"].m * p.xmp_nf_mult
+    # The certified XMP card is m unit fingers (review F19): the drawn finger count is a device
+    # parameter the benches simulate, not a layout knob, so it is read here, never chosen.
+    nf = MD["XMP"].m
+    if abs(round(MD["XMP"].w, 2) - MD["XMP"].w) > 1e-9:
+        raise AssertionError(
+            f"XMP: unit finger {MD['XMP'].w:g} um is not a multiple of 0.01 um; the drawn finger "
+            f"would round and LVS would see a different device")
     xC = _s(max(0.6, boxF[2] - 1.4 - (nf + 1) * 0.52))
     dP = b.mos("XMP", W["XMP"], L["XMP"], nf, True, xC, yC, d_top=False, g_top=False)
     i_col = 2 * I_XMP / nf                    # interior diffusion columns are SHARED by 2 fingers
@@ -781,21 +792,26 @@ def build_full(p: LayoutParams = LayoutParams(),
     # ================= passives: the left column ===============================
     # Everything with a channel connection lives at x < 0, so its Metal2 riser reaches the tracks
     # without crossing a device row.  XCOUT (§below) needs no track and goes under the stack.
-    r_w = _um(sz[PC["XR1"].params["w"]])
-    r_l = _um(sz[PC["XR1"].params["l"]])
-    rb_l = _um(sz[PC["XRB"].params["l"]])
-    ccw = _um(sz[PC["XCC"].params["w"]])
-    cffw = _um(sz[PC["XCFF"].params["w"]])
-    if p.r_segs % 2:
-        raise AssertionError("r_segs must be even: the A B B A pattern is built from pairs")
-    seg_l = _seg_len(r_l, p.r_segs, "XR1/XR2")
+    # The divider and the bias resistor are SEGMENT CHAINS in the certified netlist (F19), so the
+    # segment count and length are read from it, not chosen here: `XR1_1..XR1_n` is n drawn
+    # serpentines of `l`, and n is what the benches simulate.
+    chains = {k: sorted((c for c in passives if c.name.startswith(k + "_")),
+                        key=lambda c: int(c.name.rsplit("_", 1)[1])) for k in ("XR1", "XR2", "XRB")}
+    r_segs, rb_segs = len(chains["XR1"]), len(chains["XRB"])
+    assert r_segs == len(chains["XR2"]), "XR1 and XR2 must be drawn with the same segment count"
+    r_w = _val(chains["XR1"][0].params["w"], sz)
+    seg_l = _seg_len(_val(chains["XR1"][0].params["l"], sz), 1, "XR1/XR2")
+    rb_seg_l = _seg_len(_val(chains["XRB"][0].params["l"], sz), 1, "XRB")
+    ccw = _val(PC["XCC"].params["w"], sz)
+    cffw = _val(PC["XCFF"].params["w"], sz)
+    if r_segs % 2:
+        raise AssertionError("XR1/XR2 need an even segment count: A B B A is built from pairs")
     # XR1 / XR2: one common-centroid block, [A B B A] repeated, both centroids at the block
     # centre, with a tied dummy segment at each end.  brief §6 makes this the tightest matching
     # class in the cell (1.71 sigma) and brief §9 asks for ABBA specifically.
     order: list[str] = []
-    for _ in range(p.r_segs // 2):
+    for _ in range(r_segs // 2):
         order += ["XR1", "XR2", "XR2", "XR1"]
-    order += ["XR1", "XR2"] * (p.r_segs % 2)
     n_cols = len(order) + 2 * p.n_dummy
     x_res1 = _s(-p.blk_gap - max(n_cols * p.res_pitch, ccw + 6.0))
     y_res = _s(y_vss - 7.0 - seg_l)
@@ -858,8 +874,7 @@ def build_full(p: LayoutParams = LayoutParams(),
     b.to_track("vss", r2b[0], r2b[1])
     # XRB beside the divider block, equally far from XMP (brief §9: its tc1 sets every current)
     x_rb = _s(x_res1 + n_cols * p.res_pitch + 1.0)
-    _seg_len(rb_l, p.rb_segs, "XRB")
-    rba, rbb, _ = b.serpentine(r_w, rb_l, p.rb_segs, x_rb, y_res, pitch=1.6)
+    rba, rbb, _ = b.serpentine(r_w, rb_seg_l * rb_segs, rb_segs, x_rb, y_res, pitch=1.6)
     b.to_track("vdd", rba[0], rba[1])
     b.to_track("nbias", rbb[0], rbb[1])
 
@@ -879,15 +894,15 @@ def build_full(p: LayoutParams = LayoutParams(),
     bt, tp, bbff = b.mim(cffw, _s(x_res1 + 1.4), y_cff, escape=2.0)
     b.to_track(PC["XCFF"].nodes[1], *bt)
     b.to_track(PC["XCFF"].nodes[0], *tp)
-    x_pass_r = _s(max(bbcc[2] + 3.2, x_rb + p.rb_segs * 1.6 + 1.0))
+    x_pass_r = _s(max(bbcc[2] + 3.2, x_rb + rb_segs * 1.6 + 1.0))
 
     # ================= XCOUT: a 2x2 common-centroid unit array under the stack ==========
     # A3 of the PLAN: `m = 4` already IS the unit array; the four certified 58 um units are drawn
     # on a common centroid about a central TopMetal1 top-plate spine, the right column mirrored so
     # the block has ONE plate-connection side per terminal.  No MIM dummy ring: brief §6 gives
     # `mim_cout_unit` no bound, and a ring of 58 um units would triple the block.
-    cw = _um(sz[PC["XCOUT"].params["w"]])
-    cm = _count(sz[PC["XCOUT"].params["m"]])
+    cw = _val(PC["XCOUT"].params["w"], sz)
+    cm = _count(NR.value(PC["XCOUT"].params["m"], sz))
     cols_ = 2 if cm > 1 else 1
     rows_ = -(-cm // cols_)
     y_cout_top = _s(y_vss - 8.0)

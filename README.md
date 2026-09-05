@@ -28,11 +28,18 @@ via `ldo.metrics.evaluate`; the reference row is quoted from its own certificati
 |---|---|---|---|---|---|---|---|---|---|
 | **spec box** | [1.176, 1.224] | ≤ 5 | ≤ 2 | ≤ 200 | ≤ 50 | ≥ 40 | ≤ 150 | ≥ 60 | |
 | reference `ldo_005` (certified, 3.3 V / 1 µF) | 1.609 | 1.274 | 4.32 | 169.7 | 758.7 | 44.53 | 1.957 | 46.39 | not at this challenge's point |
-| sized, tt / 27 °C (design of record) | 1.200 | 0.028 | 0.059 | 106.1 | **36.28** | 69.95 | 104.8 | 72.42 | **PASS** |
+| sized, tt / 27 °C (design of record) | 1.199 | 0.026 | 0.056 | 104.7 | **33.81** | 70.01 | 115.1 | 72.51 | **PASS** |
 | post-layout, extracted, tt / 27 °C | 1.199 | 0.026 | 0.056 | 104.7 | **33.81** | 70.11 | 127.6 | 68.76 | **PASS** |
 | worst corner (5 MOS × −40/27/125 °C) | 1.198 | 0.056 | 0.248 | 135.0 | **61.9** @ ff/125 | 59.66 | **310.8** @ ss/−40 | 70.35 | 12/15 PASS |
 
-The headline is met: the reference's regulation and PSRR class at **4.8 % of its quiescent
+**Re-certified 2026-09-05** on the *drawn* device set (layout review F19): the pass array as 76
+unit fingers, every common-centroid member as two half-width cards, the resistors as segment
+chains. Iq 36.28 → 33.81 µA and S7 104.8 → 115.1 mV with no layout parasitic involved — the
+schematic of record simply did not describe the devices the generator has drawn since its first
+round ([`layout/ldo_ihp_capless/PLAN.md` §0.1](layout/ldo_ihp_capless/PLAN.md)). Every S7-derived
+parasitic budget in the layout brief tightens ~23 % as a result.
+
+The headline is met: the reference's regulation and PSRR class at **4.5 % of its quiescent
 current**, with the output capacitor on chip (21 pF) and phase margin 26° better. The box is
 judged at tt/27 °C and passes there before *and* after layout. Sign-off over corners does not:
 S5 binds at ff/125 °C and S7 at ss/−40 °C, and both are the **same** cause — a resistor-referenced

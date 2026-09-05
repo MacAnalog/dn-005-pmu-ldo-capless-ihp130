@@ -11,6 +11,13 @@ second table. It parses the **certified binding** and hands out:
 
 Both come from the same parse, so the drawing and the compare cannot disagree about a device.
 
+Since the **F19 re-certification** (2026-09-05) the certified netlist carries the *drawn* device
+set — `XMP` as one shared-diffusion device with `ng` fingers, every common-centroid member as two
+half-width cards, the resistors as segment chains — so this module and
+`circuits/…/netlist.spice` describe the same devices in the same numbers, and the benches simulate
+what the layout draws.  Card parameters may therefore be `{expressions}` over sizing knobs
+(`w={x_dut_xm1_w/2}`), which :func:`value` evaluates.
+
 **The one thing the reference adds** to the certified netlist is the layout's **dummy devices**.
 They are not optional and they are not schematic: a matched row needs tied-off dummies at both
 ends (`review-002` m3), and the IHP LVS deck extracts a fully shorted dummy MOS as a real device
@@ -45,6 +52,33 @@ _MODELS = {
 }
 
 _SI = {"a": 1e-18, "f": 1e-15, "p": 1e-12, "n": 1e-9, "u": 1e-6, "m": 1e-3, "k": 1e3, "meg": 1e6}
+
+
+def _num(v: object) -> float:
+    """One sizing value as a plain float: a string carries an SI suffix and means metres
+    (``"340u"`` -> 3.4e-4); a bare number is already in the file's own unit (metres for a length,
+    a count for `m`/`ng`)."""
+    if isinstance(v, str):
+        m = re.match(r"^\s*([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s*(meg|[afpnumk])?\s*$", v, re.I)
+        if not m:
+            raise ValueError(f"bad sizing value {v!r}")
+        return float(m.group(1)) * _SI.get((m.group(2) or "").lower(), 1.0)
+    return float(v)
+
+
+def value(expr: str, sizing: dict[str, object]) -> float:
+    """A card parameter: either a bare sizing-knob name or a ``{...}`` arithmetic expression over
+    knob names.  The namespace is every knob through :func:`_num`, so an expression mixes freely
+    with the file's units — ``{r_fb_l/8}`` is metres, ``{x_dut_xmp_m*x_dut_xmp_nf_mult}`` a count.
+    Only arithmetic on knob names is allowed; there are no calls and no builtins."""
+    e = expr.strip()
+    if not (e.startswith("{") and e.endswith("}")):
+        return _num(sizing[e])
+    body = e[1:-1]
+    if not re.fullmatch(r"[A-Za-z0-9_+\-*/(). ]+", body):
+        raise ValueError(f"unsupported parameter expression {expr!r}")
+    ns = {k: _num(v) for k, v in sizing.items()}
+    return float(eval(body, {"__builtins__": {}}, ns))  # noqa: S307 - vetted charset, no builtins
 
 
 def um(v: object) -> float:
@@ -120,9 +154,13 @@ class MosDev:
     gate: str
     source: str
     bulk: str
-    w: float           # per unit, um
+    w: float           # the card's width, um (with `ng` fingers this is the TOTAL width)
     l: float           # um
     m: int             # parallel units (the layout folds them into fingers)
+    # The PDK subckt's own finger parameter.  The certified netlist does NOT use it -- see
+    # netlist.spice's header -- but a card that did would break `w_total`, so it is parsed and
+    # asserted rather than silently ignored.
+    ng: int = 1
 
     @property
     def w_total(self) -> float:
@@ -136,8 +174,10 @@ def devices(sizing: dict[str, object], path: Path | None = None) -> tuple[list[M
         if c.kind in ("n", "p"):
             d, g, s, b = c.nodes
             mos.append(MosDev(c.name, c.kind, d, g, s, b,
-                              um(sizing[c.params["w"]]), um(sizing[c.params["l"]]),
-                              count(sizing[c.params["m"]]) if "m" in c.params else 1))
+                              value(c.params["w"], sizing) * 1e6,
+                              value(c.params["l"], sizing) * 1e6,
+                              count(value(c.params["m"], sizing)) if "m" in c.params else 1,
+                              count(value(c.params["ng"], sizing)) if "ng" in c.params else 1))
         else:
             passives.append(c)
     return mos, passives
@@ -168,10 +208,12 @@ def lvs_reference(sizing: dict[str, object], dummies: list[Dummy] | None = None,
 
     * ``X<name> ... <model> w=<key> l=<key>`` -> a primitive ``M``/``R``/``C`` card with the
       sizing values substituted (the deck reads primitives, not subcircuit calls);
-    * a transistor's ``m`` is folded into ``w`` — the layout draws the ``m`` parallel units as
-      fingers of one device, which the deck (with ``--combine_devices``) sees as one device of the
-      summed width. **This is the side the deck is on**: a folded multi-finger device carries less
-      junction area/perimeter than ``m`` separate ones, and the deck compares W and L only;
+    * a transistor's ``m`` is folded into ``w``: ``m`` parallel units of the same net set are one
+      device of the summed width to the deck (``--combine_devices``).  ``ng`` needs no
+      transformation — a shared-diffusion device's ``w`` is already its total width — and the
+      difference between the two, which is junction area and perimeter, is invisible to a deck
+      that compares W and L.  That is exactly why it is in the **certified netlist** now (F19)
+      rather than left for LVS to notice, which it cannot;
     * ``rhigh``'s third (poly body) node is dropped: the standalone IHP LVS deck extracts the poly
       resistor as a 2-terminal device;
     * the layout's dummy devices are appended, each asserted electrically inert.
@@ -180,11 +222,12 @@ def lvs_reference(sizing: dict[str, object], dummies: list[Dummy] | None = None,
     lines = [f"* {CELL} — LVS reference, derived from {NETLIST.name} (layout/netlist_ref.py)",
              f".subckt {CELL} {' '.join(PINS)}"]
     for d in mos:
+        assert d.ng == 1, f"{d.name}: ng={d.ng}; w_total = w*m assumes one finger per card"
         lines.append(f"M{d.name[1:]} {d.drain} {d.gate} {d.source} {d.bulk} "
                      f"sg13_lv_{d.kind}mos w={d.w_total:g}u l={d.l:g}u")
     for c in passives:
-        w, l = um(sizing[c.params["w"]]), um(sizing[c.params["l"]])
-        m = f" m={count(sizing[c.params['m']])}" if "m" in c.params else ""
+        w, l = value(c.params["w"], sizing) * 1e6, value(c.params["l"], sizing) * 1e6
+        m = f" m={count(value(c.params['m'], sizing))}" if "m" in c.params else ""
         if c.kind == "r":
             lines.append(f"R{c.name[1:]} {c.nodes[0]} {c.nodes[1]} rhigh w={w:g}u l={l:g}u{m}")
         else:

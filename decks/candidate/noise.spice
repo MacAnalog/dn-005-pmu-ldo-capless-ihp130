@@ -51,23 +51,48 @@ XDUT vdd vout vss ldo_ihp_capless
 .param x_dut_xmp_w=10u
 .param x_dut_xmp_l=0.13u
 .param x_dut_xmp_m=19
+.param x_dut_xmp_nf_mult=4
 .param c_out_w=58u
 .param c_out_m=4
 .subckt ldo_ihp_capless vdd vout vss
 VREF vref vss dc {vref_val}
 VLP lp_brk vout dc 0
-XR1 lp_brk fb vss rhigh w=r_w l=r_fb_l
+XR1_1 lp_brk n_r1_1 vss rhigh w=r_w l={r_fb_l/8}
+XR1_2 n_r1_1 n_r1_2 vss rhigh w=r_w l={r_fb_l/8}
+XR1_3 n_r1_2 n_r1_3 vss rhigh w=r_w l={r_fb_l/8}
+XR1_4 n_r1_3 n_r1_4 vss rhigh w=r_w l={r_fb_l/8}
+XR1_5 n_r1_4 n_r1_5 vss rhigh w=r_w l={r_fb_l/8}
+XR1_6 n_r1_5 n_r1_6 vss rhigh w=r_w l={r_fb_l/8}
+XR1_7 n_r1_6 n_r1_7 vss rhigh w=r_w l={r_fb_l/8}
+XR1_8 n_r1_7 fb vss rhigh w=r_w l={r_fb_l/8}
 XCFF lp_brk fb cap_cmim w=c_ff_w l=c_ff_w
-XR2 fb vss vss rhigh w=r_w l=r_fb_l
-XRB vdd nbias vss rhigh w=r_w l=r_bias_l
-XMB0 nbias nbias vss vss sg13_lv_nmos l=x_dut_xmb0_l w=x_dut_xmb0_w
-XMB1 pbias nbias vss vss sg13_lv_nmos l=x_dut_xmb0_l w=x_dut_xmb1_w
+XR2_1 fb n_r2_1 vss rhigh w=r_w l={r_fb_l/8}
+XR2_2 n_r2_1 n_r2_2 vss rhigh w=r_w l={r_fb_l/8}
+XR2_3 n_r2_2 n_r2_3 vss rhigh w=r_w l={r_fb_l/8}
+XR2_4 n_r2_3 n_r2_4 vss rhigh w=r_w l={r_fb_l/8}
+XR2_5 n_r2_4 n_r2_5 vss rhigh w=r_w l={r_fb_l/8}
+XR2_6 n_r2_5 n_r2_6 vss rhigh w=r_w l={r_fb_l/8}
+XR2_7 n_r2_6 n_r2_7 vss rhigh w=r_w l={r_fb_l/8}
+XR2_8 n_r2_7 vss vss rhigh w=r_w l={r_fb_l/8}
+XRB_1 vdd n_rb_1 vss rhigh w=r_w l={r_bias_l/5}
+XRB_2 n_rb_1 n_rb_2 vss rhigh w=r_w l={r_bias_l/5}
+XRB_3 n_rb_2 n_rb_3 vss rhigh w=r_w l={r_bias_l/5}
+XRB_4 n_rb_3 n_rb_4 vss rhigh w=r_w l={r_bias_l/5}
+XRB_5 n_rb_4 nbias vss rhigh w=r_w l={r_bias_l/5}
+XMB0A nbias nbias vss vss sg13_lv_nmos l=x_dut_xmb0_l w={x_dut_xmb0_w/2}
+XMB0B nbias nbias vss vss sg13_lv_nmos l=x_dut_xmb0_l w={x_dut_xmb0_w/2}
+XMB1A pbias nbias vss vss sg13_lv_nmos l=x_dut_xmb0_l w={x_dut_xmb1_w/2}
+XMB1B pbias nbias vss vss sg13_lv_nmos l=x_dut_xmb0_l w={x_dut_xmb1_w/2}
 XMBP pbias pbias vdd vdd sg13_lv_pmos l=x_dut_xmbp_l w=x_dut_xmbp_w
 XMT ea_tail pbias vdd vdd sg13_lv_pmos l=x_dut_xmbp_l w=x_dut_xmt_w
-XM1 ea_n fb ea_tail vdd sg13_lv_pmos l=x_dut_xm1_l w=x_dut_xm1_w
-XM2 ea_o1 vref ea_tail vdd sg13_lv_pmos l=x_dut_xm1_l w=x_dut_xm1_w
-XM3 ea_n ea_n vss vss sg13_lv_nmos l=x_dut_xm3_l w=x_dut_xm3_w
-XM4 ea_o1 ea_n vss vss sg13_lv_nmos l=x_dut_xm3_l w=x_dut_xm3_w
+XM1A ea_n fb ea_tail vdd sg13_lv_pmos l=x_dut_xm1_l w={x_dut_xm1_w/2}
+XM1B ea_n fb ea_tail vdd sg13_lv_pmos l=x_dut_xm1_l w={x_dut_xm1_w/2}
+XM2A ea_o1 vref ea_tail vdd sg13_lv_pmos l=x_dut_xm1_l w={x_dut_xm1_w/2}
+XM2B ea_o1 vref ea_tail vdd sg13_lv_pmos l=x_dut_xm1_l w={x_dut_xm1_w/2}
+XM3A ea_n ea_n vss vss sg13_lv_nmos l=x_dut_xm3_l w={x_dut_xm3_w/2}
+XM3B ea_n ea_n vss vss sg13_lv_nmos l=x_dut_xm3_l w={x_dut_xm3_w/2}
+XM4A ea_o1 ea_n vss vss sg13_lv_nmos l=x_dut_xm3_l w={x_dut_xm3_w/2}
+XM4B ea_o1 ea_n vss vss sg13_lv_nmos l=x_dut_xm3_l w={x_dut_xm3_w/2}
 XM5 ea_out ea_o1 vss vss sg13_lv_nmos l=x_dut_xm5_l w=x_dut_xm5_w
 XM6 ea_out pbias vdd vdd sg13_lv_pmos l=x_dut_xmbp_l w=x_dut_xm6_w
 XCC ea_out ea_o1 cap_cmim w=c_comp_w l=c_comp_w
@@ -76,8 +101,9 @@ XMA x1 x1 vss vss sg13_lv_nmos l=x_dut_xma_l w=x_dut_xma_w
 XMB y x1 vss vss sg13_lv_nmos l=x_dut_xma_l w=x_dut_xma_w
 XMCP y y vdd vdd sg13_lv_pmos l=x_dut_xmcp_l w=x_dut_xmcp_w
 XMD gate y vdd vdd sg13_lv_pmos l=x_dut_xmcp_l w=x_dut_xmcp_w
-XMS gate nbias vss vss sg13_lv_nmos l=x_dut_xms_l w=x_dut_xms_w
-XMP vout gate vdd vdd sg13_lv_pmos l=x_dut_xmp_l w=x_dut_xmp_w m=x_dut_xmp_m
+XMSA gate nbias vss vss sg13_lv_nmos l=x_dut_xms_l w={x_dut_xms_w/2}
+XMSB gate nbias vss vss sg13_lv_nmos l=x_dut_xms_l w={x_dut_xms_w/2}
+XMP vout gate vdd vdd sg13_lv_pmos l=x_dut_xmp_l w={x_dut_xmp_w/x_dut_xmp_nf_mult} m={x_dut_xmp_m*x_dut_xmp_nf_mult}
 XCOUT vout vss cap_cmim w=c_out_w l=c_out_w m=c_out_m
 .ends
 .end

@@ -28,11 +28,81 @@ listed again in the PR body.
 | A2 | **Aspect ratio ceiling 2:1**, target ~1.1:1 | coordinator | 005 is 2.34:1 (287.4 x 122.9). The cap block (XCOUT 2x2 ~ 125 x 125 um) dominates; it goes *under* the transistor stack rather than beside it. |
 | A3 | **Cap plan: XCOUT is the unit-cell array (2x2 common centroid of the certified 58 um unit); XCC and XCFF are single certified units inside the same block, same orientation, same plate side. NO MIM dummy ring.** | deviates from the coordinator's "ONE unit-cell array with a dummy ring" | Arithmetic: the three plate areas are 64 / 2916 / 13456 um^2; a common unit needs `u^2` to divide all three, i.e. `u = 2 um` and ~3400 tiles. Any coarser unit rounds XCC/XCOUT by >= 0.8 %, which changes the drawn device and is a **sizing change** (re-certify), not a layout choice. `m = 4` on XCOUT already *is* a unit array. The dummy ring is dropped because it is measured to buy nothing: brief §6 gives `mim_cout_unit` **no bound**, `mim_feedforward` 133 sigma and `mim_miller` 794 sigma of headroom, while a ring of 58 um units triples the block area. A Metal5/TopMetal1 keep-out frame is drawn instead (metal-density environment, no extracted device). |
 | A4 | **Strap plan**: TopMetal1 `vdd` along the top edge and `vout` along the right edge, `pwr_w = 2.0 um` (TM1.a floor is 1.64); each stitched to a Metal5 landing pad with **12 TopVia1**, and down to the pass array through **48 cuts per level** on Via2/3/4 and 2 Via1 per S/D column | brief §8 | See §3. The Metal1 rails keep `rail_w = 0.8 um` because after this change **no Metal1 in the cell carries more than 0.27 mA**. |
-| A5 | **The pass array is redrawn with 4x the fingers (`xmp_nf_mult = 4`: 76 fingers of 2.5 um, total W unchanged at 190 um)** | not in the brief; see §3 | This is the only way the shared-diffusion column riser gets legal, and unlike the brief's option (ii) it is **not** a sizing change: `w = 10 um, m = 19` is untouched in `design.json`, and the layout already folds `m` into fingers (LVS compares W and L, `--combine_devices`). Discussed in §3. |
+| A5 | **The pass array is redrawn with 4x the fingers (`x_dut_xmp_nf_mult = 4`: 76 unit fingers of 2.5 um, total W unchanged at 190 um)** | not in the brief; see §3 | This is the only way the shared-diffusion column riser gets legal. **A5 originally filed it as "not a sizing change" because `w`/`m` were untouched; review F19 overturned that and the ruling is adopted** — see §0.1. The knob now lives in `sizing.yaml`, the certified netlist draws the unit fingers, and the benches simulate them. |
 | A6 | **Matched-row dummies are real, fully-tied devices declared in the LVS reference** (G=S=D=B on one rail) | none | Measured: the IHP LVS deck extracts a fully shorted dummy MOS as a device and `--purge --purge_nets` does **not** remove it (probe log `lvs_d2`/`lvs_d2p`); LVS matches only when the dummy is in the reference. The reference is therefore `lower(certified netlist) + dummy cards`, and the emitter asserts every added card has all four nodes on one rail — a divergence in a *real* device still fails. |
 | A7 | **Density / fill and sealring are out of scope**; DRC runs with the density tables off by default (`--density` re-enables them) and the REPORT names the flag | 005 precedent, `review-002` m1 | Fill is a chip-assembly step and distorts the PEX of a bare cell. |
 | A8 | **The GDS is not committed**; the layout of record is `layout/gen_ldo.py`. The render PNG *is* committed at `experiments/005-layout/figs/ldo_ihp_capless.png` | 005 precedent + `.gitignore` | An 845 kB binary can only drift from the generator. |
 | A9 | **`LDO_GF_PYTHON` stays `~/miniconda3/envs/ai_env/bin/python`** | — | The coordinator's `LDO_GDS_PYTHON=…/envs/pex/bin/python` has **no gdsfactory** (verified). `pex` is the kpex interpreter; `ai_env` is the gdsfactory one. |
+
+### 0.1 Re-certification of `decks/candidate` on the drawn device set (review F19, adopted)
+
+A5 argued that folding `m` into fingers is a file-level detail because LVS compares W and L. The
+reviewer measured that argument and it does not hold: three things the generator has drawn since
+**it01** — the pass array's finger split, every common-centroid member as two half-width units,
+and the resistors as segment chains — are electrical, and the certified deck described none of
+them. Every budget in `BRIEF.md` is 25 % of a margin measured on that deck, so the yardstick was
+being read against a device that is not drawn.
+
+`circuits/ldo_ihp_capless/pdk/ihp-sg13g2/netlist.spice` now carries the drawn set, so it and the
+LVS reference `layout/netlist_ref.py` emits are the same devices in the same numbers:
+
+| certified before | certified now | why |
+|---|---|---|
+| `XMP … w=x_dut_xmp_w m=x_dut_xmp_m` (19 units of 10 um) | `w={x_dut_xmp_w/x_dut_xmp_nf_mult} m={x_dut_xmp_m*x_dut_xmp_nf_mult}` (76 unit fingers of 2.5 um) | the drawn array; `x_dut_xmp_nf_mult` is a new `sizing.yaml` knob (default 4, 2–8) and `LayoutParams.xmp_nf_mult` is **gone** — a number that moves a bench number is not a layout knob |
+| `XM1 … w=x_dut_xm1_w` (one card) | `XM1A`/`XM1B … w={x_dut_xm1_w/2}` — and the same for XM2/XM3/XM4/XMS/XMB1/XMB0 | a matching pattern draws unit devices whichever pattern it is; interdigitation would draw the same halves |
+| `XR1 … l=r_fb_l` | `XR1_1..XR1_8 … l={r_fb_l/8}` chained; `XR2` the same, `XRB` 5 | the drawn serpentines; `LayoutParams.r_segs`/`rb_segs` are gone, the generator reads the chain length |
+
+Card parameters may now be `{expressions}` over sizing knobs; `netlist_ref.value()` evaluates them
+(arithmetic on knob names only, no builtins). `--combine_devices` folds the halves and the chains,
+so **LVS is unaffected** and matched at DRC 0 on the first build after the change.
+
+**The new certified row** (`decks/candidate/scorecard.json`, all 13 benches, tt/27 °C, `make
+freeze` re-run). "reviewer" is the same quantity measured independently in `REVIEW.md` from the
+extracted device set with every `Cext_` card deleted:
+
+| spec | certified before | certified now | delta | reviewer's what-if |
+|---|---|---|---|---|
+| `i_q_ua` (S5 ≤ 50) | 36.2771 | **33.8054** | **−2.472** | 33.80539 |
+| `v_out_v` (S1 ∈ [1.176, 1.224]) | 1.200072 | **1.199499** | −0.573 mV | 1.199499 |
+| `v_undershoot_mv` (S7 ≤ 150) | 104.847 | **115.057** | **+10.21** | 115.065 |
+| `pm_loop_deg` (S8 ≥ 60) | 72.4188 | **72.5064** | +0.088° | 72.50641 |
+| `v_dropout_mv` (S4 ≤ 200) | 106.143 | **104.671** | −1.47 (below the 2 mV bench resolution) | — |
+| `load_reg_mv` / `line_reg_mv` | 0.028 / 0.059 | 0.026 / 0.056 | −0.002 / −0.003 | — |
+| `ugf_loop_khz` / `ms_peak_db` / `t_transient_us` | 836.5 / 7.150 / 0.1254 | 801.5 / 7.813 / 0.1563 | −35.0 / +0.66 / +0.031 | — |
+
+Still PASS on all eight spec lines, and the four rows the reviewer measured independently agree to
+4–6 digits. **What that costs the brief**: the S7 margin is 150 − 115.1 = **34.9 mV**, not 45.2,
+so every parasitic budget derived from it tightens by ~23 %. The brief is re-derived on this row
+before the fix round is judged.
+
+**One encoding fork, measured rather than argued.** The PDK subckt has its own finger parameter
+`ng`, which looks like the better model of a shared-diffusion array (it recomputes as/ad/ps/pd for
+the shared columns). It is **not** used, because at constant total width and constant junction
+geometry it alone reads a different S7:
+
+| pass-device card, everything else the drawn set | S7 | `t_transient_us` |
+|---|---|---|
+| `m=76 w=2.5u` (the certified card) | **115.057** | 0.1563 |
+| `m=76 w=2.5u` with kpex's own measured `as/ad/ps/pd` forced on | 115.065 | 0.1563 |
+| `ng=76 w=190u` (PDK finger formula) | 105.231 | 0.1166 |
+| `ng=76 w=190u` with the old `m=19` card's `as/ad/ps/pd` forced on | 105.214 | 0.1166 |
+| `ng=1 w=190u` (one 190 um finger) | 252.650 | 0.5273 |
+| `m=19 w=10u` (the old card) inside the otherwise-drawn set | 115.318 | 0.1591 |
+
+Rows 1–4 show the 9.8 mV is **entirely the PSP `nf` parameter**, not junction area or perimeter:
+forcing the areas equal moves S7 by 0.02 mV either way. kpex extracts the drawn array as **76
+separate `ng=1` cards** (counted: 76 cards, 190.0 um total, half with drain and source swapped),
+so `ng=76` in the certified deck would bank a ~10 mV pre→post credit that is a model parameter
+rather than a layout. The unit-finger card puts the yardstick and the extracted measurement on one
+device model, which is the whole point of re-certifying.
+
+**Not done here, and why.** F14 asks for the resolved sizing inside `decks/candidate/design.json`.
+`design.json` is what the `deck-rebuild` lint round-trips through `Design.from_dict`, so resolved
+values there would pin the frozen dir to a snapshot of `sizing.yaml`; and writing them from
+`certify()` edits `ldo/metrics.py`, which is the `script` of **both** scorecards' provenance
+blocks — measured: it invalidates all 33 of `decks/reference`'s computation hashes, and only the
+verifier may re-sign that dir. F14's second option is taken instead: the sizing of record is
+`circuits/ldo_ihp_capless/pdk/ihp-sg13g2/sizing.yaml`, named as such in `BRIEF.md` and `REPORT.md`.
 
 ---
 
