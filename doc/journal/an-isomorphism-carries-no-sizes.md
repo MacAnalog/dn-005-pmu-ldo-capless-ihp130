@@ -34,8 +34,13 @@ bindings, normalise the SI suffixes, then compare. Two rules keep that honest:
 build and re-runnable against any drawing with `--check-sch`. The step now **exits non-zero** on
 a skipped device, a vacuous or failed equivalence, or one drifted parameter.
 
+**Update, 2026-09-05.** Both gaps below are fixed upstream (`spicexplorer-platform @1775a67`): a
+two-terminal PDK primitive now resolves to its own PDK symbol, and a braced value now survives the
+attribute round trip. The parameter assertion reads **114 of 114 rows green** on the schematic of
+record, with `VREF` at 0.6 V. The rule above is unchanged, and so is the corollary at the end.
+
 **Two platform gaps it found, both siblings of the resistor bug**
-(`prefix-precedence-drops-drawable-devices.md`), both still open:
+(`prefix-precedence-drops-drawable-devices.md`), both since FIXED upstream:
 
 1. **A 2-node PDK primitive shipped as a subckt loses its size.** `cap_cmim` has exactly two
    nets, so the prefix test in `spicexplorer_netlist2xschem/ingest.py` succeeds and the instance

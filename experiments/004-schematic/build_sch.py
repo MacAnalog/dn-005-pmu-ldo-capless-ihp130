@@ -5,7 +5,12 @@ provably IS the certified netlist. So:
 
 1. The input is the frozen `decks/candidate/dc_op.spice` -- the certified deck, byte for byte,
    not a rebuild -- and `--into XDUT` descends into the cell itself.
-2. `spicexplorer_netlist2xschem` places and wires every device; `--render png` gives the figure.
+2. `spicexplorer_netlist2xschem` places and wires every device -- no coordinate is hand-written.
+   The drawing of record is a HIERARCHY: `circuits/<cell>/xschem/<cell>.blocks.json` names the five
+   functional blocks, each becomes a child `.sch` + a generated symbol under `blocks/`, and the
+   parent sheet instantiates them in signal order. The flat sheet is emitted beside it
+   (`<cell>_flat.sch`) and gated identically, so the two together show the hierarchy changed the
+   DRAWING and not the circuit.
 3. `spicexplorer_circuitgraph` re-netlists nothing and compares nothing by eye: it builds the
    device/connectivity graph of the ORIGINAL netlist and of the netlist xschem writes back out
    of the drawing, and reports whether they are the same circuit.
@@ -21,6 +26,7 @@ provably IS the certified netlist. So:
 Re-run only the parameter assertion against any drawing (e.g. an older committed one):
 
     uv run --no-sync python experiments/004-schematic/build_sch.py --check-sch <path/to.sch>
+        [--hierarchical-check]   # when that drawing is a hierarchy
 """
 from __future__ import annotations
 
@@ -210,116 +216,171 @@ def _report(par: dict) -> None:
               f"drawn={f['drawn']!r}  ({f['why']})")
 
 
+# ----------------------------------------------------------------------------------------------
+# The hierarchy: five blocks, drawn as subcircuits
+# ----------------------------------------------------------------------------------------------
+PDK = "ihp-sg13g2"
+BLOCKS = SCH_DIR / f"{CELL}.blocks.json"
+# The certified deck's own `.subckt` port order. xschem writes the child's `.subckt` header from
+# the order of the pin records in the symbol, so the cell symbol must carry these three in THIS
+# order or a bench's `XDUT vdd vout vss` line stops matching the deck's.
+DUT_PORTS = ["vdd", "vout", "vss"]
+DUT_SIDES = {"vdd": "top", "vout": "right", "vss": "bottom"}
+DUT_DIRS = {"vdd": "inout", "vout": "out", "vss": "inout"}
+CHILD_DIR = SCH_DIR / "blocks"
+
+
+def library_path() -> str:
+    """xschem's symbol search path: the PDK and generic libraries plus this cell's own symbols."""
+    import os
+
+    from spicexplorer_netlist2xschem.sym_library import default_search_paths
+    return os.pathsep.join([*(str(p) for p in default_search_paths()),
+                            str(SCH_DIR), str(CHILD_DIR)])
+
+
+def build_hierarchy(deck: Path) -> dict:
+    """Parent sheet + one child `.sch`/`.sym` per block + the cell's own symbol."""
+    import sch_support
+    from spicexplorer_netlist2xschem.annotation import BlockAnnotationSet
+    from spicexplorer_netlist2xschem.hierarchy import write_hierarchy
+    from spicexplorer_netlist2xschem.ingest import from_file
+    from spicexplorer_netlist2xschem.sym_library import SymLibrary
+
+    applied = sch_support.apply_platform_proposals()
+    circuit = from_file(deck, name=CELL, into="XDUT")
+    blocks = BlockAnnotationSet.load(BLOCKS)
+    lib = SymLibrary([Path(p) for p in library_path().split(":")])
+    res = sch_support.build_hierarchy(circuit, blocks, pdk=PDK, lib=lib, title=CELL,
+                                      show_device_params=True)
+    parent = write_hierarchy(res, SCH_DIR, parent_name=CELL)
+    sch_support.append_port_symbols(parent, [(p, DUT_DIRS[p]) for p in DUT_PORTS])
+    pin_dirs = sch_support.sync_symbol_pin_dirs(CHILD_DIR)
+    sym = sch_support.write_cell_symbol(SCH_DIR / f"{CELL}.sym", CELL, DUT_PORTS,
+                                        DUT_SIDES, DUT_DIRS)
+    return {"parent": str(parent), "symbol": str(sym), "patches": applied,
+            "pin_dirs_synced": pin_dirs,
+            "blocks": res.block_count, "devices_in_blocks": res.device_count,
+            "children": sorted(res.children), "warnings": list(res.warnings),
+            "block_pins": {k: list(v) for k, v in res.block_pins.items()}}
+
+
+# ----------------------------------------------------------------------------------------------
+# The two gates, run on any drawing of the cell
+# ----------------------------------------------------------------------------------------------
+def gate(sch: Path, work: Path, deck: Path, rcfile: Path, *, hierarchical: bool) -> dict:
+    """Netlist `sch` back out, flatten it, and run BOTH assertions against the certified cell."""
+    import sch_support
+    from spicexplorer_circuitgraph import compare_netlists
+
+    work.mkdir(parents=True, exist_ok=True)
+    back, log = sch_support.xschem_netlist(sch, rcfile, work)
+    flat = work / f"{sch.stem}_from_sch.spice"
+    rec: dict = {"sch": str(sch), "netlist": str(back),
+                 "xschem_log": [ln for ln in log.splitlines() if "arning" in ln or "rror" in ln]}
+    if hierarchical:
+        rec["flatten"] = sch_support.flatten_hierarchy(back, flat, note=sch.name)
+    else:
+        _flatten_xschem_netlist(back, flat, sch.name)
+    src = work / f"{CELL}_certified.spice"
+    src.write_text(_certified_subckt(deck))
+
+    cmp = compare_netlists(str(src), str(flat))
+    n_dev = len(getattr(cmp, "component_mapping", {}) or {})
+    rec["equivalence"] = {"equivalent": bool(getattr(cmp, "equivalent", cmp)),
+                          "components_matched": n_dev,
+                          "nets_matched": len(getattr(cmp, "net_mapping", {}) or {}),
+                          # A comparison that matched nothing is a vacuous pass, not a proof.
+                          "vacuous": n_dev == 0,
+                          "reason": str(getattr(cmp, "reason", ""))[:400]}
+    rec["parameters"] = check_parameters(src, flat)
+    rec["ok"] = (rec["equivalence"]["equivalent"] and not rec["equivalence"]["vacuous"]
+                 and rec["parameters"]["ok"])
+    return rec
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--deck", default=str(DECK))
     ap.add_argument("--check-sch", default=None,
-                    help="netlist this .sch and run ONLY the parameter assertion against the "
-                         "certified cell (used to show the assertion fails on an older drawing)")
+                    help="netlist this .sch and run both gates (equivalence + parameters) "
+                         "against the certified cell, without rebuilding any drawing")
+    ap.add_argument("--hierarchical-check", action="store_true",
+                    help="with --check-sch: the drawing is a hierarchy, so splice its block "
+                         "subcircuits back inline before comparing")
     ap.add_argument("--rcfile", default=None,
                     help="xschem rcfile with the PDK symbol libraries "
                          "(default: the one the render step writes into figs/)")
     ap.add_argument("--workdir", default=None,
                     help="where --check-sch writes its scratch netlists (default: out/)")
+    ap.add_argument("--no-render", action="store_true", help="skip the PNG renders")
     a = ap.parse_args()
+    sys.path.insert(0, str(HERE))
     FIGS.mkdir(parents=True, exist_ok=True)
     OUT.mkdir(parents=True, exist_ok=True)
     SCH_DIR.mkdir(parents=True, exist_ok=True)
-    sch, png = SCH_DIR / f"{CELL}.sch", FIGS / f"{CELL}.png"
+    deck = Path(a.deck)
+
+    import sch_support
+    from spicexplorer_netlist2xschem.render import write_xschemrc
+    rcfile = Path(a.rcfile).resolve() if a.rcfile else write_xschemrc(FIGS, library_path())
 
     if a.check_sch:
         probe = Path(a.check_sch).resolve()
         work = Path(a.workdir).resolve() if a.workdir else OUT
-        work.mkdir(parents=True, exist_ok=True)
-        rcfile = Path(a.rcfile).resolve() if a.rcfile else RCFILE
-        back = work / f"{probe.stem}.spice"   # xschem names its output after the .sch stem
-        back.unlink(missing_ok=True)   # a previous run's netlist must never stand in for this one
-        xs = _run_xschem(probe, rcfile, work)
-        print(json.dumps(xs, indent=1))
-        if not back.is_file():
-            raise SystemExit(f"xschem produced no netlist for {probe}")
-        wrapped = work / f"{probe.stem}_from_sch.spice"
-        _flatten_xschem_netlist(back, wrapped, probe.name)
-        src = work / f"{CELL}_certified.spice"
-        src.write_text(_certified_subckt(Path(a.deck)))
-        par = check_parameters(src, wrapped)
-        _report(par)
-        return 0 if par["ok"] else 1
+        rec = gate(probe, work, deck, rcfile, hierarchical=a.hierarchical_check)
+        print(json.dumps({k: v for k, v in rec.items() if k != "parameters"}, indent=1, default=str))
+        _report(rec["parameters"])
+        return 0 if rec["ok"] else 1
 
-    cmd = [sys.executable, "-m", "spicexplorer_netlist2xschem.cli", a.deck,
-           "--into", "XDUT", "--name", CELL, "-o", str(sch),
-           "--render", "png", "--out-image", str(png), "--show-params"]
+    rec: dict = {"deck": str(deck)}
+    # --- 1. the flat sheet, exactly as before ---------------------------------------------------
+    # Built through the CLI, in its own process, so the patches this script applies for the
+    # hierarchy cannot reach it: the flat drawing stays the stock generator's output.
+    flat_sch = SCH_DIR / f"{CELL}_flat.sch"
+    cmd = [sys.executable, "-m", "spicexplorer_netlist2xschem.cli", str(deck),
+           "--into", "XDUT", "--name", CELL, "-o", str(flat_sch), "--show-params"]
     print("$", " ".join(cmd), flush=True)
     r = subprocess.run(cmd, capture_output=True, text=True)
-    print((r.stdout + r.stderr)[-1500:])
-    if not sch.is_file():
-        raise SystemExit("no .sch produced")
+    print((r.stdout + r.stderr)[-1200:])
+    if not flat_sch.is_file():
+        raise SystemExit("no flat .sch produced")
+    rec["skipped"] = [ln.split(":")[0].replace("skipping ", "").strip()
+                      for ln in (r.stdout + r.stderr).splitlines() if ln.startswith("skipping ")]
 
-    rec: dict = {"sch": str(sch), "png": str(png) if png.is_file() else None, "deck": a.deck,
-                 "skipped": [ln.split(":")[0].replace("skipping ", "").strip()
-                             for ln in (r.stdout + r.stderr).splitlines() if ln.startswith("skipping ")]}
+    # --- 2. the hierarchy -- the drawing of record ----------------------------------------------
+    rec["hierarchy"] = build_hierarchy(deck)
+    parent = Path(rec["hierarchy"]["parent"])
 
-    # --- drawing == netlist -------------------------------------------------
+    # --- 3. both drawings pass both gates -------------------------------------------------------
     # xschem netlists the DRAWING back out; circuitgraph then compares that netlist with the
     # certified one as graphs (devices, models, connectivity), which is the only comparison worth
     # making -- a .sch is a drawing file, not a netlist, so it is never handed to circuitgraph.
-    back = OUT / f"{CELL}.spice"
-    rcfile = Path(a.rcfile).resolve() if a.rcfile else RCFILE
-    back.unlink(missing_ok=True)   # never let a previous run's netlist stand in for this one
-    xs = _run_xschem(sch, rcfile, OUT)
-    rec["xschem"] = xs
-    ok = True
-    if back.is_file():
-        wrapped = OUT / f"{CELL}_from_sch.spice"
-        _flatten_xschem_netlist(back, wrapped, sch.name)
-        src = OUT / f"{CELL}_certified.spice"
-        src.write_text(_certified_subckt(Path(a.deck)))
-        try:
-            from spicexplorer_circuitgraph import compare_netlists
-            cmp = compare_netlists(str(src), str(wrapped))
-            n_dev = len(getattr(cmp, "component_mapping", {}) or {})
-            rec["equivalence"] = {
-                "equivalent": bool(getattr(cmp, "equivalent", cmp)),
-                "components_matched": n_dev,
-                "nets_matched": len(getattr(cmp, "net_mapping", {}) or {}),
-                # A comparison that matched nothing is a vacuous pass, not a proof.
-                "vacuous": n_dev == 0,
-                "reason": str(getattr(cmp, "reason", ""))[:400]}
-            ok = ok and rec["equivalence"]["equivalent"] and not rec["equivalence"]["vacuous"]
-            # Second comparison: the certified cell MINUS whatever netlist2xschem could not place.
-            # It only means anything while something IS skipped -- it separates "the drawing is
-            # wrong" from "the tool cannot draw this device". With nothing skipped it would just
-            # restate the row above, so it is not run.
-            skipped = set(rec["skipped"])
-            if skipped:
-                src_min = OUT / f"{CELL}_certified_minus_skipped.spice"
-                src_min.write_text("\n".join(
-                    ln for ln in src.read_text().splitlines()
-                    if ln.split()[:1] and ln.split()[0] not in skipped) + "\n")
-                cmp_min = compare_netlists(str(src_min), str(wrapped))
-                rec["equivalence_minus_skipped"] = {
-                    "equivalent": bool(getattr(cmp_min, "equivalent", cmp_min)),
-                    "components_matched": len(getattr(cmp_min, "component_mapping", {}) or {}),
-                    "nets_matched": len(getattr(cmp_min, "net_mapping", {}) or {}),
-                    "reason": str(getattr(cmp_min, "reason", ""))[:400]}
-            else:
-                rec["equivalence_minus_skipped"] = None
-                rec["equivalence_minus_skipped_note"] = (
-                    "not run: no device was skipped, so it would restate the row above")
-        except Exception as exc:  # noqa: BLE001
-            rec["equivalence_error"] = f"{type(exc).__name__}: {exc}"
-            ok = False
-        # --- drawing carries the SIZES too (review-002 M3) --------------------
-        rec["parameters"] = check_parameters(src, wrapped)
-        ok = ok and rec["parameters"]["ok"]
-    else:
-        rec["xschem_error"] = "xschem wrote no netlist"
-        ok = False
-    if rec["skipped"]:
-        ok = False
+    rec["gate_hierarchical"] = gate(parent, OUT, deck, rcfile, hierarchical=True)
+    rec["gate_flat"] = gate(flat_sch, OUT, deck, rcfile, hierarchical=False)
+    ok = rec["gate_hierarchical"]["ok"] and rec["gate_flat"]["ok"] and not rec["skipped"]
+
+    # --- 4. the figures -------------------------------------------------------------------------
+    rec["figs"] = {}
+    if not a.no_render:
+        libp = library_path()
+        for name, sch in [(CELL, parent), (f"{CELL}_flat", flat_sch)] + [
+                (f"blocks_{c[:-4]}", CHILD_DIR / c) for c in rec["hierarchy"]["children"]]:
+            png = sch_support.render_png(sch, FIGS, libp, width=2400)
+            if png and name != sch.stem:
+                png = png.replace(FIGS / f"{name}.png")
+            rec["figs"][name] = str(png) if png else None
+            print(f"rendered {rec['figs'][name]}")
+        ok = ok and all(rec["figs"].values())
+
     (OUT / "schematic.json").write_text(json.dumps(rec, indent=1, default=str) + "\n")
-    print(json.dumps({k: v for k, v in rec.items() if k != "parameters"}, indent=1, default=str)[:1200])
-    _report(rec["parameters"]) if "parameters" in rec else None
+    slim = {k: v for k, v in rec.items() if k not in ("gate_hierarchical", "gate_flat")}
+    print(json.dumps(slim, indent=1, default=str)[:1600])
+    for tag in ("gate_hierarchical", "gate_flat"):
+        g = rec[tag]
+        print(f"\n== {tag}: {g['sch']}")
+        print(json.dumps(g["equivalence"], indent=1))
+        _report(g["parameters"])
     # The step is an ASSERTION, not a report: a skipped device, a vacuous or failed equivalence,
     # or one drifted parameter all exit non-zero.
     return 0 if ok else 1

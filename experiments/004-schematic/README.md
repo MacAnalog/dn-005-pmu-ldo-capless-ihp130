@@ -1,86 +1,180 @@
 # 004 — schematic of record: the drawing that provably IS the certified netlist
 
 **Paper(s):** none
-**Hypothesis:** `spicexplorer_netlist2xschem` can turn the frozen `decks/candidate/dc_op.spice` into a reviewable xschem schematic of the cell, and `spicexplorer_circuitgraph` can prove the drawing and the certified netlist are the same circuit — every device, model, size expression and net — so the figure a reviewer reads carries no claim the simulator has not already scored. Falsified if the round trip loses or invents any device, or if the equivalence check cannot be made non-vacuous.
-**Control:** the certified deck itself, byte for byte (`decks/candidate/dc_op.spice`, SHA-locked) — never a rebuild.
-**Verdict:** **TOPOLOGY CONFIRMED, SIZES PARTLY FALSIFIED.** The drawing is the certified cell for all **25 of its 25 devices — 25 components and 15 nets matched under a wiring-preserving isomorphism**, with nothing skipped (§1). The parameter check added for review-002 finding **M3** then compares the sizes too, and it is **red on 8 of 114 parameter rows** (§2): the three `cap_cmim` capacitors are drawn without `w`/`l`, and `VREF` is drawn as 3 V instead of the design's 0.6 V. Both are named platform gaps in the *emitter*, not errors in this cell (§3). **The reproduce command therefore exits 1 today, on purpose.**
+**Hypothesis:** the certified cell can be drawn as a hierarchy a reviewer can read — a top sheet of
+five functional blocks in signal order, one child sheet per block — and the drawing can be *proved*
+to be the certified netlist: the same devices and wiring under `spicexplorer_circuitgraph`, and the
+same sizes under a per-device parameter assertion. Falsified if the round trip loses or invents a
+device, if the equivalence check cannot be made non-vacuous, or if any parameter drifts.
+**Control:** the certified deck itself, byte for byte (`decks/candidate/dc_op.spice`, SHA-locked) —
+never a rebuild. The flat drawing is built beside the hierarchy from the same deck and put through
+the same two gates, so a difference between them would be visible.
+**Verdict:** **CONFIRMED.** The hierarchy is the certified cell: **25 of 25 components and 15 nets**
+matched under a wiring-preserving isomorphism, nothing skipped, and **114 of 114 parameter rows**
+green over the 25 devices, including the 0.6 V reference by name. The flat drawing returns the same
+two verdicts. Both `w`/`l` gaps and the 3 V reference this experiment reported in its previous round
+were emitter defects and are fixed upstream (`spicexplorer-platform @1775a67`).
 
-## 1. Drawing ≡ netlist (topology)
+## 1. The hierarchy
 
-The chain is: frozen deck → `netlist2xschem --into XDUT` → `.sch` → **xschem netlists the drawing back out** → `circuitgraph.compare_netlists` on the two netlists. A `.sch` is a drawing file, so it is never handed to circuitgraph directly; the thing compared is what the drawing *means*.
+`circuits/ldo_ihp_capless/xschem/ldo_ihp_capless.blocks.json` names the blocks — the
+`spicexplorer/xschem-block-annotations@1` contract, hand-authored from `doc/design-reference.md`.
+`circuitgraph.find_subcircuits` was run first and does detect the mirrors, but its matches straddle
+the functional boundaries (the `XMA`/`XMB` fold mirror and the `XMCP`/`XMD` mirror are found as
+pairs, not as one output stage), so the hand decomposition is the one drawn and the detector is not
+used here.
 
-| comparison | components | nets | verdict |
+| block | devices | what it is | boundary nets |
 |---|---|---|---|
-| certified cell vs the drawing's netlist | **25 vs 25** | **15** | **equivalent** — wiring-preserving isomorphism, non-vacuous |
-| devices `netlist2xschem` could not place | **0** | — | — |
+| `bias_ref` | `XRB` `XMB0` `XMB1` `XMBP` | resistor-referenced bias | `nbias` `pbias` `vdd` `vss` |
+| `ea_stage1` | `XMT` `XM1` `XM2` `XM3` `XM4` | 5T OTA, PMOS input | `vref` `fb` `ea_o1` `pbias` `vdd` `vss` |
+| `ea_stage2` | `XM5` `XM6` `XCC` | NMOS common source + Miller cap | `ea_o1` `ea_out` `pbias` `vdd` `vss` |
+| `fvf_output` | `XMC` `XMA` `XMB` `XMCP` `XMD` `XMS` `XMP` | FVF double-mirror output stage | `ea_out` `vout` `nbias` `vdd` `vss` |
+| `fb_divider` | `XR1` `XR2` `XCFF` | 1:1 divider + feed-forward cap | `lp_brk` `fb` `vss` |
 
-The three `rhigh` resistors (`XR1`, `XR2`, `XRB`) that the first run of this experiment reported as "not drawable" are drawn. They were never undrawable: the cause was a prefix-precedence bug in the schematic writer, now fixed upstream (platform #129 — `c846437`, `f0b78c5`, `b37afcc`). The PDK's `rhigh.sym` has two pins and carries the substrate node on a `body=` attribute, so the `.sch` holds `body=vss` and the netlist round trip reproduces `XR1 lp_brk fb vss rhigh w=r_w l=r_fb_l` exactly. The second comparison this experiment used to run — the certified cell *minus* the skipped devices — is no longer run when nothing is skipped, because it would only restate the row above; `build_sch.py` records why in `out/schematic.json`.
+Three devices stay at the cell level and are drawn on the top sheet: `VREF`, the loop-break marker
+`VLP`, and the output capacitor `XCOUT`. `VLP` staying at the top level is a **requirement, not a
+preference**: the three `ac_loopgain` decks reach it as `@v.xdut.vlp[acmag]` and read
+`v(xdut.lp_brk)`, so moving it into `fb_divider` would rename both paths to `xdut.xfb_divider.*` and
+break the benches that measure phase margin. The Miller cap `XCC` is folded into `ea_stage2` rather
+than left loose because the hierarchy generator does not make a subcircuit of a single device, and a
+one-capacitor block would be noise on the sheet.
 
-Two earlier attempts at this check were **vacuous passes** and are recorded because they are the trap: comparing the two files while each only *defines* a subckt returns `equivalent=True, matched 0 components`, and wrapping the cell in a subckt with one `XDUT` instance returns `equivalent=True, matched 1 component`. Only the flat comparison actually walks the devices. `build_sch.py` therefore reports `components_matched` and a `vacuous` flag beside every verdict — an equivalence result that matched nothing is not evidence.
+## 2. Drawing ≡ netlist (topology and sizes)
 
-## 2. Drawing ≡ netlist (the sizes) — review finding M3
+The chain is: frozen deck → hierarchy → **xschem netlists the drawing back out** → the block
+subcircuits are spliced back inline → `circuitgraph.compare_netlists`, then the parameter assertion.
+A `.sch` is a drawing file, so it is never handed to circuitgraph; the thing compared is what the
+drawing *means*. The splice (`sch_support.flatten_hierarchy`) uses only the platform's netlist
+parser: a leaf line's net tokens are identified by position from the parser's own node count for
+that device, formals are mapped to actuals through the block instance, and **leaf instance names are
+preserved** (`XM1` stays `XM1`), which is what lets the parameter assertion join the two netlists
+device by device. It refuses to run if two blocks share a leaf name or an internal net name.
 
-An isomorphism compares devices, models and connectivity. It does **not** compare parameters, and review-002 M3 showed what that costs: the drawing netlisted `cap_cmim` with no `w`/`l` and `VREF vref vss 3`, and the equivalence check passed anyway. `build_sch.py::check_parameters` now closes that hole. It joins the certified netlist and the drawing's netlist device by device — through `spicexplorer_core.spice_engine.NetlistView`, the platform's own parser, never a new one — and compares **every parameter by number**: each token is resolved against the deck's own `.param` bindings (the drawing carries the sizing symbolically, which is the point of it) and normalised through `spicexplorer_core.eng.parse_value`, so `c_out_w` and `58u` and `5.8e-05` are one value.
+| drawing | components | nets | vacuous | parameter rows |
+|---|---|---|---|---|
+| `ldo_ihp_capless.sch` (hierarchy, 5 blocks) | **25 vs 25** | **15** | no | **114 / 114** |
+| `ldo_ihp_capless_flat.sch` (one sheet) | **25 vs 25** | **15** | no | **114 / 114** |
+
+15 nets, not 16, is also the check that the three `rhigh` resistors kept their substrate terminal:
+the PDK symbol carries it on a `body=` attribute rather than a pin, and a split `vss` would show up
+here as an extra net.
+
+The parameter assertion is what an isomorphism cannot do. It joins the two netlists device by device
+through `spicexplorer_core.spice_engine.NetlistView` — the platform's own parser, never a new one —
+and compares every parameter **by number**: each token is resolved against the deck's `.param`
+bindings (the drawing carries the sizing symbolically, which is the point of it) and normalised
+through `spicexplorer_core.eng.parse_value`, so `c_out_w` and `58u` and `5.8e-05` are one value.
 
 - A device present on one side only is its own finding, so a lost device cannot hide inside the join.
-- A model or subckt name (`rhigh`, `cap_cmim`, `sg13_lv_pmos`) is compared as a **case-insensitive string**, not semantically: the check would not notice a symbol that renamed a device to an equivalent model.
-- **`w` and `l` may never be defaulted.** An absent size is a failure, not a device at its model default — a `cap_cmim` with no size is 7 µm × 7 µm ≈ 74 fF, which is exactly the drift being looked for. Only no-op counts default: `m`/`ng`/`nf` → 1 and the poly resistor's bend count `b` → 0, each the value the model library itself declares.
-- `VREF` gets its own named check against `vref_val` (0.6 V, `circuits/ldo_ihp_capless/pdk/ihp-sg13g2/sizing.yaml`, `min == max`; quoted as `vref.typical` in `datasheet.yaml`), so a wrong reference can never be reported as just one more parameter row.
+- A model or subckt name is compared as a case-insensitive string, not semantically: the check would
+  not notice a symbol that renamed a device to an equivalent model.
+- **`w` and `l` may never be defaulted.** An absent size is a failure, not a device at its model
+  default — a `cap_cmim` with no size is 7 µm × 7 µm ≈ 74 fF, which is exactly the drift being
+  looked for. Only no-ops default: `m`/`ng`/`nf` → 1 and the poly resistor's bend count `b` → 0.
+- `VREF` gets its own named check against `vref_val` (0.6 V, `pdk/ihp-sg13g2/sizing.yaml`,
+  `min == max`), so a wrong reference can never be reported as just one more parameter row. It reads
+  0.6 V drawn against 0.6 V certified.
 
-**Result: 114 parameter rows over 25 devices, 8 rows red on 4 devices.**
-
-| device | parameter | certified | drawn | |
-|---|---|---|---|---|
-| `XCFF` | `w`, `l` | `c_ff_w` = 8 µm | **absent** | falls back to the model's 7 µm × 7 µm |
-| `XCC` | `w`, `l` | `c_comp_w` = 54 µm | **absent** | " |
-| `XCOUT` | `w`, `l` | `c_out_w` = 58 µm | **absent** | " (`m=c_out_m` = 4 does survive) |
-| `VREF` | `value`, `dc` | `dc {vref_val}` = 0.6 V | **3 V** | the render draws the `3`, so the figure carries the bug |
-
-Everything else matches: all 17 MOSFETs carry `w`/`l`/`m` symbolically, `XMP` keeps `m=x_dut_xmp_m` (19), and the three resistors carry `w`/`l` with the substrate on `body=vss`.
-
-**The assertion is proven to bite.** Against the drawing committed at `6bd5aba` — the one M3 was written about — it reports **11** rows and exits 1: the 8 rows above on the same 4 devices, *plus* one row each for `XR1`/`XR2`/`XRB`, which are missing from that drawing entirely.
+**Both gates bite.** Run against the drawing committed at `6bd5aba` — a sheet of the previous
+topology — the same command reports `equivalent: false, components_matched: 0, vacuous: true`
+(`net count differs: 33 vs 15`) and names all 14 devices of that revision that the certified cell
+does not have. And the value half of the same machinery, reused for the bench sheets in
+[006](../006-visual-benches/README.md), caught a live silent corruption: the emitter abbreviated any
+attribute over 24 characters, so `pulse(0.1m 10m 1u 100n 100n 10u 20u)` was **netlisted** as
+`…00n 10u 20u)` while every topology check passed.
 
 ```
-# figs/xschemrc is git-ignored and is written by the render step, so run the main build once
-# first (or point --rcfile at any xschemrc that has the PDK symbol libraries on XSCHEM_LIBRARY_PATH)
-git show 6bd5aba:circuits/ldo_ihp_capless/xschem/ldo_ihp_capless.sch > $SX_SCRATCH/pre/ldo_ihp_capless.sch
-uv run --no-sync python experiments/004-schematic/build_sch.py \
-    --check-sch $SX_SCRATCH/pre/ldo_ihp_capless.sch \
-    --rcfile experiments/004-schematic/figs/xschemrc --workdir $SX_SCRATCH/pre
+uv run --no-sync python experiments/004-schematic/build_sch.py --check-sch <path/to.sch> \
+    [--hierarchical-check] --rcfile experiments/004-schematic/figs/xschemrc --workdir $SX_SCRATCH/pre
 ```
 
-## 3. What is still wrong is in the emitter
+## 3. What the generator needed, and what it still needs
 
-Both remaining failures are siblings of the resistor bug — a device typed by its reference prefix and then written through a symbol that has no slot for its size. Neither is a defect in this cell, and neither can be fixed from this repo. Journal: `doc/journal/an-isomorphism-carries-no-sizes.md`; both are added to `doc/journal/template-gaps-t8.md`.
+Four changes were needed in `spicexplorer_netlist2xschem` to draw this cell and its benches. They
+are applied here as documented patches in `sch_support.py::apply_platform_proposals()`, each with a
+guard that fails loudly the moment the upstream code changes, and proposed upstream as a diff that
+applies cleanly at `1775a67` (`$SX_SCRATCH/ldo-schematic/platform-proposal/`). Nothing is worked
+around silently, and no coordinate is hand-written: placement and wiring stay the generator's job.
 
-1. **A 2-node PDK primitive shipped as a subckt loses its size.** `XCFF a b cap_cmim w=.. l=..` has exactly two nets, so the prefix test in `ingest.py` succeeds and types it `CAP` — it never reaches the subcircuit fallback that rescued the 3-node `rhigh`. `mapping._GENERIC_SYMREF[CAP]` picks `devices/capa.sym`, whose `format` is `@name @pinlist @value m=@m`, and the two-terminal branch of `emit._device_attrs` writes only `value` + `m`. The PDK *does* ship `sg13g2_pr/cap_cmim.sym` with `format="@spiceprefix@name @pinlist @model w=@w l=@l m=@m"` — the `rhigh` shape minus `body` — but the PDK symbol table is keyed on `DeviceKind.SUBCKT` only.
-2. **A braced expression cannot ride in a quoted xschem attribute.** `emit._fmt_value` quotes any value containing a space, so `dc {vref_val}` is written `value="dc {vref_val}"`. xschem treats `{}` as its own attribute delimiters, trips on the brace inside the quotes (`SKIPPING |"}|` on stderr, exit status still 0) and falls back to the `vsource.sym` template default, which is `value=3`. `VLP`'s `dc 0` has no braces and round-trips. Any source whose value is a `.param` expression is affected.
+| | change | why the drawing needed it |
+|---|---|---|
+| **P1+P2** | a declared supply port stays a port; the child inherits the parent's supply map | without both, a child is drawn as one flat row of transistors — the rail-banded floorplan is off, because `supply={}` tells the placer the block has no rails |
+| **P3** | `register_subckt_symbol` for a design's own cell symbol | a bench's `XDUT ... ldo_ihp_capless` had no symbol and was dropped from the drawing |
+| **P4** | a display shortening must not reach the netlist | see the truncated `pulse(...)` above |
 
-## 4. The render
+Two smaller inconsistencies are post-processed here and reported upstream rather than patched:
+`sync_symbol_pin_dirs` gives each block symbol the pin directions its own child sheet declares (the
+two are computed independently, and xschem reported three `Unmatched subcircuit schematic pin
+direction` errors and one spurious shorted-output warning on a hierarchy that netlists perfectly),
+and `append_port_symbols` draws the top sheet's own three ports, which the parent emitter omits.
+With both, xschem netlists the whole hierarchy with no warnings and no errors.
 
-`figs/ldo_ihp_capless.png` (1600 × 438, `--show-params`) is legible and every device, net label and size expression is on it — but it is a single wide row, so it is a zoom-in figure, not a page figure. Three items, all cosmetic and all in the placer rather than the circuit:
+**What is still not right, and is not fixable from this repo:**
 
-- `XR1` and `XRB` sit on the same row and the long `R={…}` expression the PDK `rhigh.sym` draws for each of them **overlaps horizontally**.
-- `XCFF`'s rotated instance label crosses the `ea_o1`/`lp_brk` wire.
-- MOS parameter text is drawn over the symbol bodies.
+1. **The top sheet is label-connected, not wire-connected.** The parent emitter lays the blocks in
+   one row and joins them with a stub and a net-name label per pin; it draws no wires between
+   blocks. Each pin carries both its functional name and its net, and the render colours every net,
+   so the signal path reads left to right — but the loop is not visible *as* a loop. A block-level
+   router (and a routing channel for the `fb` return path) is the proposal.
+2. **`fb_divider`'s functional `in` and `out` both sit on the right.** A pin's side comes from the
+   device roles its net touches, not from the contract's port names.
+3. **The `cap_cmim` symbol draws its own capacitance formula.** Under `--show-params` the PDK symbol
+   renders a ~90-character `tcleval(C=[ev {…}])` expression that runs across the sheet and collides
+   with the neighbouring device's `w`/`l` text (visible on `blocks_ea_stage2.png` and on the top
+   sheet at `XCOUT`). It is the PDK symbol's own text layout, identical at any placement, so no
+   placer change can help; the platform vendors "no-params" symbol twins for MOS devices but
+   explicitly not for PDK subcircuit primitives.
 
-The resistors' substrate net is on the `body=vss` attribute and is **not drawn** — documented here, not visible in the figure. `VREF` is drawn showing `3`, which is the M3 failure of §2 visible in the artefact itself.
+## 4. The figures
+
+| figure | what it shows |
+|---|---|
+| `figs/ldo_ihp_capless.png` | the top sheet: five blocks left to right in signal order, `VREF`/`VLP` at the bottom left, `XCOUT` on `vout` |
+| `figs/blocks_bias_ref.png` | the bias reference |
+| `figs/blocks_ea_stage1.png` | the 5T OTA — rails top and bottom, symmetric input pair, mirror row |
+| `figs/blocks_ea_stage2.png` | the common-source stage and the Miller cap |
+| `figs/blocks_fvf_output.png` | the output stage, PMOS band over NMOS band |
+| `figs/blocks_fb_divider.png` | the divider and the feed-forward cap |
+| `figs/ldo_ihp_capless_flat.png` | the same circuit on one sheet — the previous drawing of record, kept as the control |
+
+Renders are produced headlessly and rasterized at 2400 px wide. xschem sizes its canvas to the
+geometry bounding box, which clips every label that overhangs its anchor, so the export measures the
+text extents and pads the canvas before rasterizing; the `.sch` is not touched. Only the PNGs are
+committed — the SVG is the padding step's intermediate and is removed after rasterizing, so the
+previously committed `figs/ldo_ihp_capless.svg` is gone.
 
 ## 5. Artefacts
 
 | file | what it is |
 |---|---|
-| `circuits/ldo_ihp_capless/xschem/ldo_ihp_capless.sch` | **the schematic of record** (25 devices, 48 labels) — committed beside the circuit it draws, because it is the deliverable and `experiments/*/out/` is git-ignored |
-| `figs/ldo_ihp_capless.png`, `.svg` | the render a reviewer reads |
-| `out/ldo_ihp_capless.spice` | the netlist xschem writes back out of the drawing |
+| `circuits/ldo_ihp_capless/xschem/ldo_ihp_capless.sch` | **the schematic of record** — committed beside the circuit it draws |
+| `circuits/ldo_ihp_capless/xschem/blocks/*.sch`, `*.sym` | the five child sheets and their generated symbols |
+| `circuits/ldo_ihp_capless/xschem/ldo_ihp_capless.sym` | the cell symbol, pins in the certified `.subckt` port order `vdd vout vss` |
+| `circuits/ldo_ihp_capless/xschem/ldo_ihp_capless.blocks.json` | the block decomposition that drives the hierarchy |
+| `circuits/ldo_ihp_capless/xschem/ldo_ihp_capless_flat.sch` | the flat drawing, same two gates |
+| `experiments/004-schematic/sch_support.py` | the generator patches, the hierarchy→flat splice, and the render/netlist helpers (006 imports it) |
+| `out/ldo_ihp_capless_from_sch.spice` | the drawing's netlist, spliced flat, as compared |
 | `out/ldo_ihp_capless_certified.spice` | the certified cell, flat, out of the frozen deck |
-| `out/ldo_ihp_capless_from_sch.spice` | the drawing's netlist, flat, as compared |
-| `out/schematic.json` | the equivalence verdict, the parameter findings, the skipped list, the xschem command |
+| `out/schematic.json` | both gates' verdicts, the parameter findings, xschem's own log |
 
-Reproduce: `LDO_EXP=004 uv run --no-sync python experiments/004-schematic/build_sch.py`. It **exits 1** while §2 is red — the step is an assertion, not a report, and it also exits non-zero on a skipped device or a vacuous equivalence. xschem runs headless (`-n -q -r`); it needs the interpreter that has the PDK symbol libraries on `XSCHEM_LIBRARY_PATH`, which `netlist2xschem` writes into an `xschemrc` beside the **render** (`figs/`, not beside the `.sch`). That `xschemrc` holds absolute host PDK paths and is git-ignored — it is regenerated by every run.
+Reproduce: `LDO_EXP=004 uv run --no-sync python experiments/004-schematic/build_sch.py`. The step is
+an assertion, not a report: a skipped device, a vacuous or failed equivalence, one drifted parameter
+or a missing figure all exit non-zero. xschem runs headless and needs the PDK symbol libraries on
+`XSCHEM_LIBRARY_PATH`, which the build writes into an `xschemrc` beside the render (`figs/`). That
+file holds absolute host PDK paths and is git-ignored; every run regenerates it.
 
 ## Lessons to graduate
 
-- (`004`) An equivalence check that matched **zero** components is a vacuous pass, and both natural ways to call `compare_netlists` on a cell produce one. Always report `components_matched` next to `equivalent`, and compare the cell **flat**. Journal: `doc/journal/vacuous-equivalence-passes.md`.
-- (`004`) A wiring-preserving isomorphism carries **no sizes**. After topology, join the two netlists device by device and compare every parameter by number — and never default `w`/`l`, because the model default is the drift being looked for. With that check in place the honest claim is that the drawing **cannot drift unnoticed**, not that it cannot drift: the netlist stays the design of record, and the drawing is evidence only while the check is green. Journal: `doc/journal/an-isomorphism-carries-no-sizes.md`.
-- (`004`) "The tool cannot draw it" is a claim about the tool and needs the same evidence as a claim about a circuit. The three `rhigh` resistors were recorded here as undrawable; they were a precedence bug, now fixed upstream. Journal: `doc/journal/prefix-precedence-drops-drawable-devices.md` (resolved), superseding `doc/journal/netlist2xschem-skips-3-terminal-resistors.md`.
+- (`004`) An equivalence check that matched **zero** components is a vacuous pass, and both natural
+  ways to call `compare_netlists` on a cell produce one. Always report `components_matched` next to
+  `equivalent`, and compare the cell flat. Journal: `doc/journal/vacuous-equivalence-passes.md`.
+- (`004`) A wiring-preserving isomorphism carries **no sizes**. After topology, join the two
+  netlists device by device and compare every parameter by number — and never default `w`/`l`.
+  Journal: `doc/journal/an-isomorphism-carries-no-sizes.md`.
+- (`004`) A hierarchy is a drawing change, so it has to be *proved* to be one: splice the blocks back
+  inline, keep the leaf names, and re-run the gates the flat sheet passes. Journal:
+  `doc/journal/a-readable-hierarchy-must-flatten-back.md`.
+- (`004`) "The tool cannot draw this" is a claim about the tool and needs the same evidence as a
+  claim about a circuit — and when it is true, the answer is a proposed diff, not a workaround.
+  Journal: `doc/journal/prefix-precedence-drops-drawable-devices.md`.
