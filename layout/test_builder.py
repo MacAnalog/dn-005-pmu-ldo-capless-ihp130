@@ -154,6 +154,127 @@ def test_alloc_raises_with_a_hint_when_nothing_fits():
         raise AssertionError("alloc should have refused every column")
 
 
+# ---------------------------------------------------------------------------------------------
+# review-004 **F27**: which extracted netlist do the benches measure?
+#
+# The platform writes TWO files for an RC run -- `..._k25d_pex_netlist.spice` (kpex's own, whose
+# resistor mesh is an electrical island) and `..._k25d_pex_netlist_stitched.spice` (the repaired
+# one `PexResult.netlist_path` names).  `postlayout.py` used to glob `*_pex_netlist.spice`, which
+# does NOT match the stitched name: with both files present it found exactly one, reported no
+# ambiguity, and measured the file the extractor did not name.  These cases pin the selection
+# rule.  They import `layout/postlayout.py`, so they run in the repo venv like the rest.
+def _select(**kw):
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from postlayout import select_pex_netlist
+    return select_pex_netlist(**kw)
+
+
+def _pex_dir(raw: bool, stitched: bool):
+    import tempfile
+    d = Path(tempfile.mkdtemp(prefix="pextest_"))
+    if raw:
+        (d / "cell_k25d_pex_netlist.spice").write_text("* raw\n")
+    if stitched:
+        (d / "cell_k25d_pex_netlist_stitched.spice").write_text("* stitched\n")
+    return d
+
+
+def test_an_rc_pair_resolves_to_the_stitched_netlist_never_the_raw_one():
+    d = _pex_dir(raw=True, stitched=True)
+    path, kind = _select(pex_dir=d)
+    assert kind == "stitched" and path.name.endswith("_stitched.spice"), (path, kind)
+
+
+def test_two_unrelated_netlists_are_an_error_not_a_silent_choice():
+    d = _pex_dir(raw=True, stitched=True)
+    (d / "other_k25d_pex_netlist.spice").write_text("* a second run\n")
+    try:
+        got = _select(pex_dir=d)
+    except SystemExit as exc:
+        assert "stitched" in str(exc) and "other" in str(exc), exc
+        return
+    raise AssertionError(f"selection must refuse to guess between two runs; it returned {got}")
+
+
+def test_a_lone_stitched_netlist_is_the_one_measured():
+    d = _pex_dir(raw=False, stitched=True)
+    path, kind = _select(pex_dir=d)
+    assert kind == "stitched" and path.name.endswith("_stitched.spice"), (path, kind)
+
+
+def test_a_lone_raw_netlist_still_works():
+    d = _pex_dir(raw=True, stitched=False)
+    path, kind = _select(pex_dir=d)
+    assert kind == "raw" and path.name == "cell_k25d_pex_netlist.spice", (path, kind)
+
+
+def test_an_explicit_netlist_wins_over_both():
+    d = _pex_dir(raw=True, stitched=True)
+    want = d / "cell_k25d_pex_netlist_stitched.spice"
+    path, kind = _select(pex_dir=d, explicit=str(want))
+    assert path == want and kind == "stitched", (path, kind)
+
+
+def test_the_signoff_record_names_the_netlist():
+    import json
+    d = _pex_dir(raw=True, stitched=True)
+    rec = d / "signoff.json"
+    rec.write_text(json.dumps(
+        {"pex": {"netlist": str(d / "cell_k25d_pex_netlist_stitched.spice"), "mode": "RC"}}))
+    path, kind = _select(pex_dir=d, record=str(rec))
+    assert path.name.endswith("_stitched.spice") and kind == "stitched", (path, kind)
+
+
+# review-004 **F26**/**F24**: the sign-off record must say whether an RC mesh was connected, and
+# must not lose the stages a previous invocation of the same round wrote.
+def _signoff():
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import signoff
+    return signoff
+
+
+class _FakePex:
+    """The fields `spicexplorer_signoff.results.PexResult` carries, with nothing else."""
+    def __init__(self, **kw):
+        d = dict(ok=True, available=True, mode="CC", netlist_path="/x/n.spice",
+                 raw_netlist_path=None, n_c=3, n_r=0, per_net_c_ff={"vdd": 1.5, "vss": 0.25},
+                 coupling_ff={}, log="", reason="", mesh_connected=None, mesh={})
+        d.update(kw)
+        self.__dict__.update(d)
+
+
+def test_the_pex_record_carries_the_mesh_verdict():
+    sg = _signoff()
+    rec = sg._pex_record(_FakePex(mode="RC", n_r=8548, mesh_connected=True,
+                                  mesh={"device_pins": 243, "device_pins_on_mesh": 220,
+                                        "n_open_nets": 0, "n_stub_nets": 19},
+                                  raw_netlist_path="/x/raw.spice"))
+    assert rec["mesh_connected"] is True, rec
+    assert rec["mesh"]["device_pins_on_mesh"] == 220 and rec["mesh"]["n_stub_nets"] == 19, rec
+    assert rec["raw_netlist"] == "/x/raw.spice", rec
+
+
+def test_an_open_rc_mesh_is_refused_and_a_cc_run_is_not():
+    sg = _signoff()
+    open_rc = sg._pex_record(_FakePex(mode="RC", n_r=8548, mesh_connected=False,
+                                      mesh={"device_pins": 243, "device_pins_on_mesh": 0,
+                                            "n_open_nets": 33}))
+    why = sg.pex_gate(open_rc)
+    assert why and "not connected" in why, why
+    assert sg.pex_gate(sg._pex_record(_FakePex())) == "", "CC has no mesh — it must pass"
+
+
+def test_a_second_invocation_does_not_erase_the_first_stages():
+    import json, tempfile
+    sg = _signoff()
+    d = Path(tempfile.mkdtemp(prefix="signoffrec_"))
+    sg._write_record(d, {"build": {"area_um2": 44266}, "lvs": {"matched": True}})
+    sg._write_record(d, {"pex": {"mode": "RC", "ok": True}})
+    got = json.loads((d / "signoff.json").read_text())
+    assert set(got) == {"build", "lvs", "pex"}, got
+    assert got["lvs"]["matched"] is True and got["pex"]["mode"] == "RC", got
+
+
 def main() -> int:
     fails = 0
     for name, fn in sorted(globals().items()):

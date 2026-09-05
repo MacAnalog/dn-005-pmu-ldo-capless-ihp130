@@ -679,8 +679,8 @@ iterations:
     diff_from_it09: diff_it09_it10.png
   drc_hits: {}
 - id: it11
-  note: 'Metal2 comb registered per-layer + gate track on Metal3 + ea_in_pair leftmost: DRC 0, LVS
-    matched, PM 68.76->69.30'
+  note: 'Metal2 comb registered per-layer + gate track on Metal3 + ea_in_pair leftmost: DRC 0, LVS matched,
+    PM 68.76->69.30'
   detail: 'Fix round for layout review-003 (blockers F1-F3, majors F4-F9, minors F10-F14).
 
 
@@ -773,8 +773,8 @@ iterations:
     diff_from_it10: diff_it10_it11.png
   drc_hits: {}
 - id: it12
-  note: 'vss cliff is shared impedance, not width: XCOUT gets its own strap to the pin, right riser
-    deleted -> return 4.9 ohm, 40/40 endpoints clean'
+  note: 'vss cliff is shared impedance, not width: XCOUT gets its own strap to the pin, right riser deleted
+    -> return 4.9 ohm, 40/40 endpoints clean'
   detail: 'Second round of the fix, after the brief author re-derived every budget on the re-certified
 
     schematic row (BRIEF.md @ 223373e). Two brief changes drive it.
@@ -877,4 +877,70 @@ iterations:
     gen: it12/gen.py
     png: it12/layout.png
     diff_from_it11: diff_it11_it12.png
+  drc_hits: {}
+- id: it13
+  note: 'port labels were not pins: 0.2 um pin-purpose square under all 17 -> kpex anchors 15/15 ports
+    on [Pin], CC netlist byte-identical'
+  detail: 'review-004 round. The only geometry change is PLAN A14: a 0.2 um square on the layer''s PIN
+
+    purpose (Metal1 8/2, Metal3 30/2, TopMetal1 126/2) centred on each of the 17 port labels, because
+
+    kpex emits a [Pin] node only when the text sits inside a pin-purpose polygon (platform probe
+
+    @7d55218). Before: 0 [Pin] markers, the RC stitch anchored every port on a proxy node ~100 um from
+
+    the drawn port, so every port-referred series-R number was referred to the wrong place. After:
+
+    15 of 15 named ports anchor on ''pin'', 18 proxies left (the anonymous $NN divider nets).
+
+    Electrically inert, and that is measured rather than argued: DRC 0, LVS matched, current density
+
+    30/30 worst 0.836x, and the CC extracted netlist is byte-identical to it12''s (418/418 lines,
+
+    0 differing). So scorecard_post.json, the per-net budget table and experiments/007''s corner grid
+
+    all stand on the same numbers.
+
+    RC on this drawing: mesh_connected=True, 220/243 device pins, 0 open nets, 19 stub nets,
+
+    n_R=8583 (platform @d708816/@b61f6c7/@9df117b fixed the island). The stitched netlist still does
+
+    not regulate through the frozen benches (v_out 1.4999 V, i_q 12.66 uA); the record row stays CC
+
+    and scorecard_post_rc.json carries the RC row verbatim.
+
+    Also this round, no geometry: F27 select_pex_netlist (the benches measure the file the extractor
+
+    named), F26 mesh_connected/mesh/raw_netlist in the record + a gate on an open mesh, F24 signoff.json
+
+    merges instead of replacing, F22 router.py/netlist_ref.py copied beside gen.py, F9 rail_solve.py
+
+    (common element 4.74 Ohm, worst device 20.56 Ohm, in-circuit -2.76 dB of a 27 dB PSRR margin).
+
+    modules copied beside gen.py: router.py d93b46ae8a273de3, netlist_ref.py 75df5e6b08d871b4'
+  gen_sha256: 59c4659e1c5271273d36e2327a98e8bde055581dd4b84f5421d68b53b5ecae1f
+  gds_sha256: e638b89e8666319b6b84c6c3a56d85a6801cfb1762e6ef402d54a0a51c2e0ed9
+  params:
+    area_um2: 44266
+    current_density_worst_over: 0.836
+  area_um2: 44266
+  drc:
+    passed: true
+    n: 0
+    rules: {}
+  lvs:
+    passed: true
+    matched: true
+    unmatched: {}
+    netlist_sha: f573b653cd022e639fbe1c97c7c3cb08db32c5c08b8edf920c1e34067951fcfd
+  pex:
+    ok: true
+    mode: CC
+    n_c: 186
+    n_r: 21
+  scorecard: {}
+  files:
+    gen: it13/gen.py
+    png: it13/layout.png
+    diff_from_it12: diff_it12_it13.png
   drc_hits: {}

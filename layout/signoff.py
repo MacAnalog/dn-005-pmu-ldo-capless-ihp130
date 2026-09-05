@@ -47,9 +47,11 @@ evidence":
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -253,12 +255,12 @@ def pex(gds: Path, lvs_netlist: Path, out: Path, mode: str = "CC") -> dict:
     sch = gds.with_name(f"{CELL}_pex_schematic.spice")
     sch.write_text(pex_schematic(lvs_netlist.read_text()))
     # kpex drives its own KLayout LVS pass and does NOT pass `-rd target_netlist=` to the runset
-    # (`klayout_pex/klayout/lvs_runner.py:49-69`), so `sg13g2.lvs:227-237` falls into its else
-    # branch and writes `<cell>_extracted.cir` next to `RBA::CellView.active.filename` — which in
-    # batch resolves to the PROCESS cwd, i.e. wherever this driver was started.  We cannot fix the
-    # runset from here, so we contain it: the stage runs with the run directory as its cwd, and
-    # the stray lands inside the run dir with everything else.  (Our own `spicexplorer_signoff.lvs`
-    # path is unaffected — it already writes into its own run dir.)
+    # (`klayout_pex/klayout/lvs_runner.py:49-69`), so `sg13g2.lvs:232-236` falls into its else
+    # branch: `Pathname.new(RBA::CellView.active.filename).parent.realpath`.  That has TWO
+    # destinations — the input GDS's own directory when a layout is loaded, and the PARENT of the
+    # process cwd when the active cellview filename is empty (`Pathname.new("").parent` is `..`,
+    # not `.`), which is how one landed a level above this repo.  The platform contains it at
+    # `97cc0be`, so the chdir below is belt-and-braces for the second branch only.
     out.mkdir(parents=True, exist_ok=True)
     cwd0 = Path.cwd()
     try:
@@ -266,15 +268,53 @@ def pex(gds: Path, lvs_netlist: Path, out: Path, mode: str = "CC") -> dict:
         r = run_pex(pex_gds, CELL, sch, out, mode=mode)
     finally:
         os.chdir(cwd0)
-    print(f"  PEX: ok={r.ok} n_C={r.n_c} n_R={r.n_r}")
+    rec = _pex_record(r)
+    print(f"  PEX: ok={r.ok} n_C={rec['n_c']} n_R={rec['n_r']}"
+          + ("" if rec["mesh_connected"] is None else
+             f" mesh_connected={rec['mesh_connected']} "
+             f"pins_on_mesh={rec['mesh'].get('device_pins_on_mesh')}/"
+             f"{rec['mesh'].get('device_pins')} open_nets={rec['mesh'].get('n_open_nets')} "
+             f"stub_nets={rec['mesh'].get('n_stub_nets')}"))
+    return rec
+
+
+def _pex_record(r) -> dict:
+    """The JSON row for one PEX run — pure, so a constructed `PexResult` can test it.
+
+    review-004 **F26**: this used to drop `PexResult.mesh_connected`, `.mesh` and
+    `.raw_netlist_path`, which are the fields that separate "RC ran" from "RC measured
+    something": kpex writes the resistor mesh as an electrical island, so `n_r > 0` is not
+    evidence that any resistance is in the circuit.  With them dropped, an RC row and a
+    stitched-but-open RC row are the same three numbers in the record.
+    """
     # EVERY net, not the top twelve (review-003 **F10**): `x1` and `y` read "< 17.7" in the last
     # report only because the twelfth net was 17.7 fF — they are 11.28 and 11.50, i.e. a quarter
     # of their budgets, and a table that truncates cannot say that.
     rows = sorted(((v, k) for k, v in (r.per_net_c_ff or {}).items()), reverse=True)
     return {"ok": bool(r.ok), "available": bool(r.available), "mode": r.mode,
-            "netlist": r.netlist_path, "n_c": int(r.n_c), "n_r": int(r.n_r),
+            "netlist": r.netlist_path, "raw_netlist": getattr(r, "raw_netlist_path", None),
+            "n_c": int(r.n_c), "n_r": int(r.n_r),
+            "mesh_connected": getattr(r, "mesh_connected", None),
+            "mesh": dict(getattr(r, "mesh", None) or {}),
             "per_net_c_ff": {k: round(v, 3) for v, k in rows}, "reason": r.reason,
             "log_tail": (r.log or "")[-1500:] if not r.ok else ""}
+
+
+def pex_gate(rec: dict) -> str:
+    """`""` if this PEX row may be scored, else why it may not (review-004 **F26**).
+
+    CC carries no mesh, so `mesh_connected is None` is "not applicable" and passes.  An RC/R row
+    whose mesh is open measures the CC numbers with a floating resistor island attached — the
+    one failure mode that looks like success in every other field.
+    """
+    if not rec.get("ok"):
+        return f"PEX did not run: {rec.get('reason') or 'no reason given'}"
+    if rec.get("mesh_connected") is False:
+        m = rec.get("mesh") or {}
+        return ("RC/R mesh is not connected to the devices — "
+                f"{m.get('device_pins_on_mesh')}/{m.get('device_pins')} device pins on the mesh, "
+                f"{m.get('n_open_nets')} open net(s); the netlist would measure the CC numbers")
+    return ""
 
 
 def _snapshot(iter_dir: Path, out: Path, rec: dict, note: str, detail: str) -> None:
@@ -292,7 +332,53 @@ def _snapshot(iter_dir: Path, out: Path, rec: dict, note: str, detail: str) -> N
                          "current_density_worst_over": (rec.get("current_density") or {}).get("worst_over")},
                  drc=drc, lvs=rec.get("lvs"), pex=rec.get("pex"),
                  area_um2=(rec.get("build") or {}).get("area_um2"), keep_gds=False)
-    print("snapshot:", e.id)
+    # review-004 **F22**: `gen.py` alone is not a snapshot.  It carries
+    # `import netlist_ref as NR` / `from router import ObstacleMap`, resolved from the caller's
+    # path — so running an old `it<N>/gen.py` builds it against TODAY's router, which is the file
+    # that changed in exactly the rounds the trail records.  Copy both beside it and record their
+    # shas, so `PYTHONPATH=it<N> python it<N>/gen.py` reproduces `gds_sha256` from the snapshot.
+    here = Path(__file__).resolve().parent
+    extra = []
+    for mod in ("router.py", "netlist_ref.py"):
+        src = here / mod
+        if src.is_file():
+            shutil.copy2(src, Path(a_iter := iter_dir) / e.id / mod)
+            extra.append(f"{mod} {hashlib.sha256(src.read_bytes()).hexdigest()[:16]}")
+    if extra:
+        _append_detail(Path(a_iter), e.id, "modules copied beside gen.py: " + ", ".join(extra))
+    print("snapshot:", e.id, "+", ", ".join(extra))
+
+
+def _append_detail(iter_dir: Path, entry_id: str, line: str) -> None:
+    """Add one line to an iteration's `detail` in the YAML (the log is the record, not a print)."""
+    import yaml
+
+    f = iter_dir / "iterations.yaml"
+    log = yaml.safe_load(f.read_text())
+    for it in log.get("iterations", []):
+        if it.get("id") == entry_id:
+            it["detail"] = ((it.get("detail") or "").rstrip() + "\n" + line).strip()
+            break
+    f.write_text(yaml.safe_dump(log, sort_keys=False, width=100, allow_unicode=True))
+
+
+def _write_record(out: Path, rec: dict) -> None:
+    """Merge this invocation's stages into `signoff.json` instead of replacing the file.
+
+    review-004 **F24**: `rec` holds only the stages THIS invocation ran, and it was written
+    whole — so the documented two-step flow (a CC round, then `--stages pex --pex-mode RC`)
+    left the file containing nothing but the RC row, and the build / current-density / DRC / LVS
+    verdicts of the same round survived only in the console log.
+    """
+    f = out / "signoff.json"
+    old: dict = {}
+    if f.is_file():
+        try:
+            old = json.loads(f.read_text())
+        except json.JSONDecodeError:
+            old = {}
+    old.update(rec)
+    f.write_text(json.dumps(old, indent=1) + "\n")
 
 
 def main() -> int:
@@ -325,7 +411,7 @@ def main() -> int:
         print("guards:")
         rec["guards"] = guards()
         if not rec["guards"]["passed"]:
-            (out / "signoff.json").write_text(json.dumps(rec, indent=1) + "\n")
+            _write_record(out, rec)
             raise SystemExit("router guards failed — see layout/test_builder.py")
     if "build" in stages:
         print("build:"); rec["build"] = build(out, Path(a.sizing) if a.sizing else None)
@@ -335,7 +421,7 @@ def main() -> int:
         print("current density:")
         rec["current_density"] = current_density(out / "power_path.json")
         if not rec["current_density"]["passed"]:
-            (out / "signoff.json").write_text(json.dumps(rec, indent=1) + "\n")
+            _write_record(out, rec)
             raise SystemExit("current-density stage failed — a segment is over the process limit")
     # review-003 **F2**: only `guards` and `current_density` used to stop the run, so a build
     # whose LVS did not match still produced a PEX netlist and a scorecard.  A cell that is not
@@ -343,26 +429,30 @@ def main() -> int:
     if "drc" in stages:
         print("drc:"); rec["drc"] = drc(gds, out / "drc", no_density=not a.density)
         if not rec["drc"]["passed"] and not a.no_gate:
-            (out / "signoff.json").write_text(json.dumps(rec, indent=1) + "\n")
+            _write_record(out, rec)
             raise SystemExit(f"DRC failed — {rec['drc']['n_violations']} violation(s): "
                              f"{rec['drc']['violations_per_rule']}")
     if "lvs" in stages:
         print("lvs:"); rec["lvs"] = lvs(gds, netlist, out / "lvs")
         if not rec["lvs"]["matched"] and not a.no_gate:
-            (out / "signoff.json").write_text(json.dumps(rec, indent=1) + "\n")
+            _write_record(out, rec)
             raise SystemExit("LVS did not match — the drawn cell is not the certified circuit")
     if "bounds" in stages:
         print("bounds:")
         rec["bounds"] = bounds(out, jobs=a.jobs, only=a.only)
-        (out / "signoff.json").write_text(json.dumps(rec, indent=1) + "\n")
+        _write_record(out, rec)
         if not rec["bounds"]["passed"] and not a.no_gate:
             raise SystemExit(f"{rec['bounds']['n_bad']} documented knob endpoint(s) do not build, "
                              f"do not pass DRC or do not match LVS")
     if "pex" in stages:
         print("pex:"); rec["pex"] = pex(gds, netlist, out / f"pex_{a.pex_mode.lower()}"
                                         if a.pex_mode != "CC" else out / "pex", mode=a.pex_mode)
+        why = pex_gate(rec["pex"])
+        if why and not a.no_gate:
+            _write_record(out, rec)
+            raise SystemExit(f"PEX stage failed — {why}")
 
-    (out / "signoff.json").write_text(json.dumps(rec, indent=1) + "\n")
+    _write_record(out, rec)
     print("\nwrote", out / "signoff.json")
     if a.snapshot:
         _snapshot(Path(a.snapshot), out, rec, a.note, a.detail)

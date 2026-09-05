@@ -84,6 +84,13 @@ def pex_subckt(pex_netlist: Path) -> str:
     """The extracted block, made pin-compatible with the schematic subckt."""
     from spicexplorer_signoff.postlayout import prep_pex_subckt
 
+    raw = Path(pex_netlist).read_text()
+    # An already-prepared block (`asbuilt/core_pex.sp`, `extracted_subckt.spice`) is NOT an
+    # extractor output: preparing it twice re-inserts VREF/VSUBSTIE/VLP and the three MIM cards
+    # a second time and every bench fails at the operating point.  Say so instead of doing it.
+    if "VSUBSTIE" in raw:
+        raise SystemExit(f"{pex_netlist} is already a prepared block (it carries VSUBSTIE) — "
+                         "point --netlist at the extractor's own output, or read it directly")
     txt = ngspice_cards(prep_pex_subckt(pex_netlist, CELL))
     # The header spills onto `+` continuation lines: every labelled net becomes a pin, so the
     # extracted block has ~15 of them where the schematic subckt has three.
@@ -128,6 +135,30 @@ def filter_caps(block: str, keep: str = "", drop: str = "") -> tuple[str, int, i
     return "\n".join(out) + "\n", left, gone
 
 
+def insert_vss_return(block: str, ohm: float, kelvin: str = "XCOUT") -> tuple[str, int]:
+    """What-if: put the drawn `vss` return resistance in circuit (review-004 **F9**).
+
+    The extraction is CC, so it carries no wire resistance at all: the committed `psrr_1k` is
+    measured with an IDEAL ground return. This renames `vss` to `vss_ret` on every card inside
+    the block except the subckt header and the Kelvin-returned devices (`XCOUT`, whose bottom
+    plate has its own strap to the pin — PLAN A10), and adds one resistor `vss_ret -> vss`.
+    `ohm` is therefore the COMMON series element, the quantity F9 says the budget should be
+    written on; the per-device spread beyond it is a separate, much smaller term.
+    """
+    keep = {k.strip().upper() for k in kelvin.split(",") if k.strip()}
+    out, touched = [], 0
+    for ln in block.splitlines():
+        t = ln.split()
+        if (t and not ln.lstrip().startswith("*") and not ln.lstrip().startswith(".")
+                and t[0].upper() not in keep and "vss" in t[1:]):
+            ln = " ".join([t[0]] + ["vss_ret" if x == "vss" else x for x in t[1:]])
+            touched += 1
+        out.append(ln)
+    txt = "\n".join(out)
+    i = txt.lower().rindex(".ends")
+    return txt[:i] + f"Rvssret vss_ret vss {ohm:g}\n" + txt[i:] + "\n", touched
+
+
 def run_frozen(decks: dict[str, str], tag: str) -> tuple[dict, dict]:
     """Score `decks` through the FROZEN measurement path -- `ldo.sim.run` + `ldo.metrics.promote`,
     the same two calls `ldo.metrics.evaluate` makes for the pre-layout row.
@@ -156,6 +187,60 @@ def run_frozen(decks: dict[str, str], tag: str) -> tuple[dict, dict]:
     return values, records
 
 
+def select_pex_netlist(pex_dir, explicit: str | None = None,
+                       record: str | None = None) -> tuple[Path, str]:
+    """`(path, "raw"|"stitched")` — WHICH extracted netlist the benches measure.
+
+    review-004 **F27**. For an RC/R run the platform writes two files side by side:
+
+    * ``<cell>_k25d_pex_netlist.spice`` — kpex's own output, whose resistor mesh is an
+      electrical island (no card joins a mesh node to a device pin), and
+    * ``<cell>_k25d_pex_netlist_stitched.spice`` — the repaired one, which is what
+      ``PexResult.netlist_path`` names.
+
+    The old rule here was ``rglob("*_pex_netlist.spice")`` + "exactly one match". The stitched
+    name does not match that pattern, so with both files present the glob found exactly one,
+    reported no ambiguity, and measured the netlist the extractor did **not** name — a scorecard
+    from the unstitched file, silently. Hence: an explicit path wins, else the PEX stage's own
+    record (`signoff.json` → `pex.netlist`), else the directory — and if the directory holds both
+    kinds and nobody said which, this raises instead of choosing.
+    """
+    if explicit:
+        p = Path(explicit)
+        if not p.is_file():
+            raise SystemExit(f"--netlist {p} does not exist")
+        return p, ("stitched" if p.name.endswith("_stitched.spice") else "raw")
+    if record:
+        rp = Path(record)
+        if rp.is_file():
+            named = ((json.loads(rp.read_text()).get("pex") or {}).get("netlist"))
+            if named and Path(named).is_file():
+                p = Path(named)
+                return p, ("stitched" if p.name.endswith("_stitched.spice") else "raw")
+    pex_dir = Path(pex_dir)
+    stitched = sorted(pex_dir.rglob("*_pex_netlist_stitched.spice"))
+    raw = sorted(pex_dir.rglob("*_pex_netlist.spice"))   # does NOT match the stitched name
+    hits = [(p, "stitched") for p in stitched] + [(p, "raw") for p in raw]
+    if not hits:
+        raise SystemExit(f"no kpex netlist under {pex_dir} — run layout/signoff.py first")
+    # One RC run leaves a matched PAIR: `<stem>.spice` and `<stem>_stitched.spice`.  The stitched
+    # one is the netlist `PexResult.netlist_path` names and the only one whose mesh is in the
+    # circuit, so the pair is not an ambiguity — it is answered, loudly.  Anything else (two runs
+    # under one directory) is an ambiguity and stops.
+    if len(stitched) == 1 and len(raw) == 1 and raw[0].stem + "_stitched" == stitched[0].stem:
+        print(f"note: {pex_dir} holds an RC pair; measuring the STITCHED netlist "
+              f"({stitched[0].name}) — the raw one's resistor mesh is not in the circuit. "
+              "Pass --netlist to override.", flush=True)
+        return stitched[0], "stitched"
+    if len(hits) > 1:
+        raise SystemExit(
+            f"{len(hits)} extracted netlists under {pex_dir} (stitched: {len(stitched)}, "
+            "raw: {}); name the one THIS scorecard measures with --netlist:\n  ".format(len(raw))
+            + "\n  ".join(f"{p} [{k}] ({datetime.datetime.fromtimestamp(p.stat().st_mtime)})"
+                          for p, k in hits))
+    return hits[0]
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--pex", default=str(C.WORK / "layout" / "pex"))
@@ -163,31 +248,45 @@ def main() -> int:
     ap.add_argument("--keep-c", default="", help="what-if: keep only the extracted C on these nets")
     ap.add_argument("--drop-c", default="", help="what-if: drop the extracted C on these nets")
     ap.add_argument("--no-c", action="store_true", help="what-if: drop every extracted C")
+    ap.add_argument("--add-c", default="",
+                    help="what-if: add lumped capacitance, 'net:fF[,net:fF]' to vss "
+                         "(review-004 F3: the in-situ headroom of a net)")
+    ap.add_argument("--vss-r", type=float, default=None,
+                    help="what-if: insert the drawn vss return resistance (Ohm) between the "
+                         "internal ground and the pin, XCOUT excepted (review-004 F9)")
     ap.add_argument("--out-dir", default=None,
                     help="where the scorecard goes (a what-if must NOT overwrite the record)")
+    ap.add_argument("--netlist", default=None,
+                    help="the extracted netlist to measure (review-004 F27); default: the PEX "
+                         "stage's own record, else the only one under --pex")
+    ap.add_argument("--record", default=None,
+                    help="signoff.json naming the netlist; default <--pex>/../signoff.json")
     a = ap.parse_args()
-    whatif = bool(a.keep_c or a.drop_c or a.no_c)
+    whatif = bool(a.keep_c or a.drop_c or a.no_c or a.add_c or a.vss_r is not None)
     out_dir = Path(a.out_dir) if a.out_dir else OUT
     if whatif and out_dir == OUT:
         raise SystemExit("a what-if run needs --out-dir: it must not overwrite the record")
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # review-003 **F17**: `hits[-1]` on an `rglob` is a SORT ORDER, not a freshness check — it
-    # once re-measured the first drawing's extraction with every stage reporting success.  Exactly
-    # one match, or say which ones there are and stop.
-    hits = sorted(Path(a.pex).rglob("*_pex_netlist.spice"))
-    if not hits:
-        raise SystemExit(f"no kpex netlist under {a.pex} — run layout/signoff.py first")
-    if len(hits) > 1:
-        raise SystemExit("more than one kpex netlist under "
-                         f"{a.pex}; name the run directory of THIS drawing:\n  "
-                         + "\n  ".join(f"{h} ({datetime.datetime.fromtimestamp(h.stat().st_mtime)})"
-                                        for h in hits))
-    print("pex netlist:", hits[-1], flush=True)
-    block = pex_subckt(hits[-1])
-    if whatif:
+    # review-003 **F17** (freshness) and review-004 **F27** (identity) are one decision, and it
+    # is made in `select_pex_netlist` so it can be tested without a simulator.
+    rec = a.record or str(Path(a.pex).parent / "signoff.json")
+    netlist, kind = select_pex_netlist(a.pex, explicit=a.netlist, record=rec)
+    print(f"pex netlist: {netlist} [{kind}]", flush=True)
+    block = pex_subckt(netlist)
+    if a.keep_c or a.drop_c or a.no_c:
         block, left, gone = filter_caps(block, "__none__" if a.no_c else a.keep_c, a.drop_c)
         print(f"what-if: kept {left} extracted C card(s), dropped {gone}", flush=True)
+    if a.add_c:
+        from spicexplorer_signoff.sensitivity import inject_caps
+        caps = [(n.split(":")[0], "vss", float(n.split(":")[1]) * 1e-15)
+                for n in a.add_c.split(",") if n]
+        block = inject_caps(block, CELL, caps)
+        print("what-if: added " + ", ".join(f"{a_}->{b} {v * 1e15:g} fF" for a_, b, v in caps),
+              flush=True)
+    if a.vss_r is not None:
+        block, n = insert_vss_return(block, a.vss_r)
+        print(f"what-if: {a.vss_r} Ohm vss return, {n} card(s) moved off the pin", flush=True)
     (out_dir / "extracted_subckt.spice").write_text(block)
 
     from spicexplorer_signoff.postlayout import splice_subckt
@@ -221,8 +320,9 @@ def main() -> int:
         (out_dir / "scorecard.json").write_text(json.dumps(
             {"post": {k: v for k, v in post.items() if not k.startswith("_")},
              "post_violations": post["_violations"],
-             "whatif": {"keep_c": a.keep_c, "drop_c": a.drop_c, "no_c": a.no_c},
-             "pex_netlist": str(hits[-1])}, indent=1) + "\n")
+             "whatif": {"keep_c": a.keep_c, "drop_c": a.drop_c, "no_c": a.no_c,
+                        "add_c": a.add_c, "vss_r": a.vss_r},
+             "pex_netlist": str(netlist), "pex_netlist_kind": kind}, indent=1) + "\n")
         print("\n" + table)
         return 0
     M.log_run(C.H, f"{a.tag}_pre", {k: v for k, v in pre.items() if not k.startswith("_")},
@@ -231,7 +331,8 @@ def main() -> int:
     M.log_run(C.H, f"{a.tag}_post", {k: v for k, v in post.items() if not k.startswith("_")},
               violations=post["_violations"], design=CANDIDATE.as_dict(), evidence="awaiting",
               extra={"benches": {b: r["status"] for b, r in post_rec.items()},
-                     "netlist": "extracted", "pex_netlist": str(hits[-1])})
+                     "netlist": "extracted", "pex_netlist": str(netlist),
+                     "pex_netlist_kind": kind})
 
     table = M.table({"pre-layout (schematic)": pre, "post-layout (extracted)": post},
                     cols=M.COLS_CANDIDATE)
@@ -241,7 +342,7 @@ def main() -> int:
          "post": {k: v for k, v in post.items() if not k.startswith("_")},
          "pre_violations": pre["_violations"], "post_violations": post["_violations"],
          "bench_status": {b: r["status"] for b, r in sorted(post_rec.items())},
-         "pex_netlist": str(hits[-1])}, indent=1) + "\n")
+         "pex_netlist": str(netlist), "pex_netlist_kind": kind}, indent=1) + "\n")
     print("\n" + table)
     return 0
 
