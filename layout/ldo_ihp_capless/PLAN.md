@@ -36,6 +36,7 @@ listed again in the PR body.
 | A11 | **The pass gate's channel track is Metal3, not Metal1** (`TRACK_LAYER`) | not in the brief; review-003 F3 | `gate` was the only net whose track ran the length of the cell on Metal1 0.6 um above the substrate, and gate-only parasitics alone put S7 at 204.5 mV. Metal3 is ~2 um further up and is also the layer that lets the net cross the pass array's Metal2 comb without the hard-coded hop F7 flagged. The measured effect is in REPORT §6. |
 | A12 | **`lp_brk` stays a pin and is escaped to the RIGHT edge, beside `vout`** | brief §4 + review-003 F8 | The certified netlist closes the divider with `VLP lp_brk vout dc 0` — a loop-break port the benches drive — so the cell cannot merge the two nets without deleting a pin. What the layout decides is *where* the external short lands, and brief §4 wants the sense at the OUTPUT PIN (0.026 mV of load regulation) rather than the pass drain (~10 mV against a 5.0 mV line). Drawn, labelled and stated here, so the GDS says which. |
 | A13 | **`gpad` (0.5) and `isl_gap` (2.0) are knobs; `tap_pitch` is deleted** | review-003 F11 | `tap_pitch` gave a byte-identical GDS at both ends of its range — a dead search dimension. `isl_gap` moved the floorplan and was in neither the plan nor `BOUNDS`. `gpad` sets every gate bar's own area, which is what F3 is about. §5 is now generated from the dataclass and an assertion in `gen_ldo.py` fails the build if `BOUNDS` and `LayoutParams` ever disagree again. |
+| A14 | **Every port label gets a 0.2 um square on its layer's PIN purpose** (`Metal1` 8/2, `Metal3` 30/2, `TopMetal1` 126/2), 17 in all; `PIN_SIDE` is a module constant, not a knob | review-004 F25 + the platform probe `@7d55218` | A text alone is not a pin: kpex emits a `[Pin]` node only when the label sits inside a polygon on the pin purpose, and without one the RC stitch anchors each port on a node it picks (measured: a proxy ~100 um from where the port is drawn), so every port-referred series-R number is referred to the wrong place. The purpose layer does not conduct, so this is geometry only — proved, not assumed: DRC 0, LVS matched, current density 30/30 unchanged, and the CC extracted netlist is **byte-identical** to the one the record scorecard was made from (418 of 418 lines). After it, 15 of 15 named ports anchor on `pin` instead of `proxy`. It does **not** remove the need for the RC stitch — the stitch still joins mesh to devices; what it changes is *where* the stitch anchors. Whether it also changed the two zero-ohm anchor ties REPORT §5 traces is **unmeasured**: there is no stitched netlist for `it12` to compare against. |
 | A9 | **`LDO_GF_PYTHON` stays `~/miniconda3/envs/ai_env/bin/python`** | — | The coordinator's `LDO_GDS_PYTHON=…/envs/pex/bin/python` has **no gdsfactory** (verified). `pex` is the kpex interpreter; `ai_env` is the gdsfactory one. |
 
 ### 0.1 Re-certification of `decks/candidate` on the drawn device set (review F19, adopted)
@@ -306,28 +307,75 @@ placed by TopMetal1 spacing to the XCOUT block, not by a constant margin).
 These are measured conflicts between the spec box and the topology. Layout can report them; it
 cannot resolve them.
 
-1. **`gate` to-rail cannot reach 12 fF at any legal sizing.** The re-derived brief budgets 12 fF
-   with a measured step between 12 and 13 fF. The drawn cell is **34.45 fF**. Two measurements
-   bound what can be done: the whole Metal3 gate track is worth **3.0 fF** (0.060 fF/um, from
-   `dev_gap` 3.2 -> 6.0), so a `vout` shield under it — the only routing lever left — recovers at
-   most 13 % of the 22.5 fF shortfall; and a sizing sweep at `x_dut_xmp_nf_mult` = 2 gives
-   **26.63 fF** to-rail, i.e. 3.9 fF per unit finger multiple, so the extrapolated floor as
-   nf_mult -> 0 is ~18.8 fF — still above 12 — while nf_mult = 2 is already 1.46x over the Metal1
-   current-density limit on the shared S/D column. **Owner's call**: a smaller pass device, a
-   different output stage, a deliberate certified capacitor on `ea_o1` (brief §3b: the EA-path
-   recovery is real but must be a design decision, not a routing accident), or a wider S7 spec.
-2. **S7's 34.94 mV of undershoot margin leaves sub-sigma mismatch budgets on `ea_nmos_load` and
-   `bias_p_group`.** The re-derived brief prices `ea_nmos_load` at 1.0 mV of ΔVT = **0.61 sigma**
-   and `bias_p_group` at 1.2 mV = **1.07 sigma** of the PDK's own random mismatch. Common-centroid
-   placement removes the *systematic* part only; nothing a layout can draw removes a sub-sigma
-   random budget. Recovering it needs larger EA-load / bias-p area or a wider S7 spec — **owner's
-   call**. The layout draws the best common-centroid available and reports the achieved
-   sigma-multiple per class in REPORT §8.
+1. **`gate`: certify the capacitance the cell already relies on** *(restated after review-004
+   F3 — the previous wording, "12 fF cannot be reached at any legal sizing", asked for a topology
+   decision on a number the assembled cell contradicts).* The 12 fF budget in the brief is a
+   **gate-only** figure: it is measured by injecting capacitance on `gate` with every other
+   parasitic zeroed, and in that experiment S7 steps between 12 and 13 fF. Swept **in situ** —
+   a lumped `gate`→`vss` capacitor added to the full 186-card extraction and run through the
+   frozen `tran_load_step` — there is no step at all:
+
+   | added on `gate` | +0 | +20 | +40 | +45 | +50 | +80 fF |
+   |---|---|---|---|---|---|---|
+   | S7 undershoot (mV) | 127.560 | 137.404 | 147.293 | 149.623 | **151.899** | 167.900 |
+
+   0.455 mV/fF, smooth, crossing the 150 mV line at **≈ +46 fF** — 134 % of the 34.45 fF the cell
+   draws (reviewer: ≈ +45 fF, 0.44 mV/fF; reproduced here to the digit). So the question is not
+   "the drawn `gate` capacitance fails S7". It is that **the cell's tt/27 margin depends on
+   error-amp-path capacitance it acquired by accident**: `ea_o1` alone (44 fF to-rail, drawn, not
+   designed) is what holds S7 at 89–107 mV instead of 289 mV at −40 °C (007 §3). Four options, and
+   **option 3 is what is drawn today**:
+
+   1. a smaller pass device or a different output stage — buys `gate` capacitance the cell does
+      not need;
+   2. a wider S7 spec;
+   3. **certify the EA-path capacitance** — put a deliberate, sized capacitor on `ea_o1` in the
+      netlist so the margin is a design parameter with a corner and a mismatch behaviour, instead
+      of a layout artefact that changes every time the floorplan does (brief §3b);
+   4. do nothing and accept that S7 is a layout-dependent number.
+
+   **No option should be chosen before the corner and mismatch row** (experiments/007, item 2
+   below): 007 shows S7 already leaves the box at **125 °C in four of the five corners
+   post-layout** and S5 leaves it at ff/125 in *both* rows, so the binding constraint may not be
+   `gate` at all — and item 2's control now shows the same `ea_o1` capacitance is what hides the
+   brief's mismatch cliff, so the two rulings are one decision. **Owner's call**, and it is a
+   certified-netlist decision, not a layout one.
+2. **S7's undershoot margin leaves sub-sigma mismatch budgets on `ea_nmos_load` and
+   `bias_p_group`, and the stakes are now measured.** The re-derived brief prices `ea_nmos_load`
+   at 1.0 mV of ΔVT = **0.61 sigma** and `bias_p_group` at 1.2 mV = **1.07 sigma** of the PDK's
+   own random mismatch. Common-centroid placement removes the *systematic* part only; nothing a
+   layout can draw removes a sub-sigma random budget. What 007 §4 adds is the price, and it is
+   **not** the price the brief implies. Injecting each class's offset into the extracted cell and
+   bisecting for the box edge:
+
+   | class | 1 sigma dVT | box edge | in sigma | first line out | one-sided tail |
+   |---|---|---|---|---|---|
+   | `ea_nmos_load` | 1.647 mV | **+15.0 mV** | 9.1 | S1 (dc offset) | 4e-18 % |
+   | `bias_p_group` | 1.118 mV | **+20.0 mV** | 17.9 | S7 | 7e-70 % |
+
+   So on the **drawn** cell neither class costs measurable yield at tt/27, and the reviewer's
+   ~11 % / ~9 % estimate does not reproduce. 007 §4 also says why, with the control the claim
+   needs: delete the extracted capacitance and the brief's cliff comes back exactly where the
+   brief puts it (+2.0 mV of ΔVT on `XM3` gives S7 = 198.0 mV, out of the box), and **the single
+   net `ea_o1` is enough to remove it again** (107.0 mV). The brief is right about the schematic;
+   the drawn cell is a different circuit, and it is different by the same accidental capacitance
+   ruling 1 is about. That makes the two rulings **one decision**: certify `ea_o1` (ruling 1
+   option 3) and this margin becomes a design property with a corner behaviour; leave it
+   accidental and the 9.1 sigma above is a number that moves with the floorplan. **Owner's call**;
+   the numbers are at tt/27 only, and 007 §5 says the joint corner x mismatch question is open.
+   The layout draws the best common-centroid available and reports the achieved sigma-multiple
+   per class in REPORT §8.
 
 ## 7. What this plan does NOT do
 
-Density/fill, sealring, pads, ESD, antenna diodes, corner/Monte-Carlo re-measurement post-layout,
-inductance/EM-solver claims. The post-layout row is tt/27 C, as the pre-layout one is.
+Density/fill, sealring, pads, ESD, antenna diodes, inductance/EM-solver claims. The **scorecard
+of record** is tt/27 C, as the pre-layout one is — but "post-layout is tt/27 only" is no longer
+true of the cell: `experiments/007-post-layout-corners` measures the extracted netlist over the
+five MOS corner bundles x -40/27/125 C with the schematic row beside it as the control, and
+prices the two sub-sigma matching classes by injection (review-004 F16). A **Monte Carlo over the
+PDK's own mismatch distributions is still not run**, and 007's README says why: selecting the
+`*_mismatch.lib` sections would mean editing the certified `corners.yaml`, which belongs to the
+schematic lane.
 
 ## 8. Gates
 
@@ -336,7 +384,10 @@ inductance/EM-solver claims. The post-layout row is tt/27 C, as the pre-layout o
 3. **DRC 0** with the density tables off (A7); every waiver written down with rule and count.
 4. **LVS matched** against `lower(certified netlist) + declared dummies`, at the **record sizing**
    and at the **002 hand sizing** (`git show 76eddd6:…/sizing.yaml`).
-5. **kpex** 2.5D, mode CC (and RC once for the report if it converges).
+5. **kpex** 2.5D, mode CC for the record, **and RC once for the report** — with
+   `mesh_connected` and the anchor census in the sign-off record, and the stage refusing an RC
+   row whose mesh is open (review-004 F26). Port labels carry a **pin-purpose polygon** so kpex
+   emits a `[Pin]` node and the stitch anchors on the drawn port instead of a proxy (F25).
 6. The **13 frozen benches** on the extracted netlist through `layout/postlayout.py`; per-net
    parasitic budget table against brief §2; every delta above the bench resolution explained.
 7. `iterations/` snapshot of every round, failures included; the REPORT's Iterations table is
