@@ -32,7 +32,7 @@ at 19 s pre / 71 s post, 12 mismatch rows, 13 threshold rows, 9 control rows).
 LDO_EXP=007 LDO_JOBS=12 uv run --no-sync python experiments/007-post-layout-corners/run.py --stage corners
                                                                                   ... --stage mismatch
                                                                                   ... --stage threshold
-                                                                                  ... --stage control
+                                                                                  ... --stage control --control-dvt 0,2,15
                                                                                   ... --stage tables
 ```
 
@@ -205,8 +205,12 @@ nominal point to the box edge, in units of the PDK's own σ.
 - **Corners × mismatch.** Both stages of the mismatch work are at tt/27. At 125 °C S7 is already
   out of the box, so the interesting question is a *joint* one and it is not answered here.
 - **The RC netlist.** Every row here is CC — the corner grid is 30 × 13 benches and CC is ~4×
-  cheaper. The stitched RC netlist now measures (REPORT §5, `scorecard_post_rc.json`); its tt/27
-  row is within the CC row's noise, so re-running the grid on it would buy nothing here.
+  cheaper. The stitched RC netlist now measures (REPORT §5, `scorecard_post_rc.json`), and at
+  tt/27 it differs from CC on one spec line only: S4 dropout 104.7 → 134.7 mV (+30.0 mV, the
+  drawn IR drop at 10 mA). The lines this grid finds binding — S5 and S7 — move 0.04 µA and
+  1.9 mV between CC and RC, so the CC grid stands for them. S4's worst corner here is ss/125 at
+  131.8 mV; 131.8 + 30 = 161.8 mV is still inside the 200 mV bound, but that is an **addition,
+  not a measurement** — the RC grid was not run.
 - **Supply corners.** The grid is process × temperature; the benches set their own supply.
 
 ## Lessons to graduate
