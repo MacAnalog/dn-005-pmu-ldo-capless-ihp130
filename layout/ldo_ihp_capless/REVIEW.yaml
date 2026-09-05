@@ -1,0 +1,559 @@
+schema: layout-review/1
+cell: ldo_ihp_capless
+gds: build/ldo_ihp_capless.gds
+gds_sha256: 226bf2ea97e80388441802cd031db6131c9cbe8cbd777db379fd7bdb95e52269
+generator:
+  path: layout/gen_ldo.py
+  sha256: aff30273581db1c2c299755c7ac467576e2d31c3622f65d616ba010e2fcb37e1
+  params: LayoutParams() defaults; sizing from circuits/ldo_ihp_capless/pdk/ihp-sg13g2/sizing.yaml
+verdict: FAIL
+units: um
+axis: {}
+frame: {x0: -69.5, y0: -134.4, x1: 133.0, y1: 74.15}
+reviewer: layout-reviewer (independent; did not write this generator)
+
+reproduced:
+  build: match
+  build_note: >-
+    Rebuilt from the committed layout/gen_ldo.py with $LDO_GF_PYTHON=~/miniconda3/envs/ai_env/bin/python;
+    GDS sha256 226bf2ea... is byte-identical to iterations.yaml it09 and to a second build in the
+    same session (deterministic). Area 42231 um2, bbox (-69.50,-134.40)-(133.00,74.15) -- matches
+    REPORT section 1. All nine iterations/it0N/gen.py hashes equal their gen_sha256 in iterations.yaml.
+  drc: {passed: true, n: 0, engine: "KLayout 0.30.5 sg13g2_maximal, --no_density"}
+  lvs:
+    passed: true
+    netlist_sha: ce35f47972067f2809e49afed9cd208f47eafee462bfeddafbaff9680d339737
+    reference: >-
+      layout/netlist_ref.py derived from circuits/ldo_ihp_capless/pdk/ihp-sg13g2/netlist.spice
+      (sha256 18bd9c959a74f1fccb9bc9a9bdf8aed9b3fa1e2ae86774c214a51c8ec02a818b) + 18 declared
+      dummies; checked device-for-device against the certified netlist by this reviewer -- 17 MOS,
+      3 rhigh, 3 cap_cmim all agree, every added dummy has all four terminals on one rail.
+    second_sizing_point: {sizing: "002 hand point, git 76eddd6", drc: 0, lvs: matched, current_density: "27/27, worst 0.836x"}
+  pex:
+    mode: CC and RC
+    halo: kpex 2.5D, technology default (SG13G2 8 um sidewall); MIM stripped before extraction
+    n_c: 182
+    n_r_cc: 21
+    n_r_rc: 8418
+    note: >-
+      CC reproduces 182 C / 21 R exactly. RC reports 8418 R of which 21 are rhigh device cards and
+      8397 are Rext_ wire resistors -- and NOT ONE of the 33 device-terminal nodes or 34 capacitor
+      nodes appears in that 6105-node mesh. See F1.
+  scorecard:
+    note: >-
+      All 13 frozen benches re-run by this reviewer on this reviewer's own CC PEX netlist through
+      ldo/postlayout.py's frozen path (ldo.sim.run + ldo.metrics.promote). Every one of the 18
+      reported pre- and post-layout values reproduces to the last committed digit; 0 spec
+      violations both rows; 13/13 benches ok.
+    i_q_ua: {designer: 33.80539, reviewer: 33.80539}
+    v_out_v: {designer: 1.199499, reviewer: 1.199499}
+    v_dropout_mv: {designer: 104.671, reviewer: 104.671}
+    v_undershoot_mv: {designer: 127.581, reviewer: 127.581}
+    pm_loop_deg: {designer: 68.76149, reviewer: 68.76149}
+    psrr_1k_db: {designer: 70.10705, reviewer: 70.10705}
+    ugf_loop_khz: {designer: 771.9145, reviewer: 771.9145}
+    t_transient_us: {designer: 0.200519, reviewer: 0.200519}
+
+findings:
+
+- id: F1
+  severity: blocker
+  category: pex
+  title: "RC wire-R mesh is disconnected: series resistance was never measured"
+  where:
+    - {kind: box, layer: TopMetal1drawing, x0: -69.5, y0: 68.55, x1: 133.0, y1: 70.55}
+    - {kind: line, points: [[46.28, 55.33], [131.0, 55.33], [131.0, 0.0]]}
+    - {kind: point, x: 131.0, y: 0.0}
+    - {kind: point, x: -62.5, y: 69.55}
+  evidence: >-
+    My own kpex RC run (rev/pex_rc/..._k25d_pex_netlist.spice) has 8397 Rext_ cards over a
+    6105-node mesh whose node names are all of the form <net>.$x.y. The intersection of that node
+    set with the 33 device-terminal nodes is EMPTY, and with the 34 capacitor nodes is EMPTY. The
+    mesh is a floating island: that, not "dangling nodes inside the rhigh serpentines"
+    (REPORT.md section 5), is why 11 of 13 benches report `singular matrix`. It also means the two
+    benches that do converge reproduce the CC row exactly BECAUSE the resistors are out of circuit,
+    so REPORT.md section 5's conclusion -- "no metric this cell is measured on moves when the
+    extracted wire resistance is put in" -- is false as stated: the wire resistance was never put
+    in. Proof by simulation: with `.option rshunt=1e12` -- the one option that gives a floating
+    island a DC path -- the RC netlist runs 13/13 and returns the CC row to five digits (dropout
+    104.654 mV, phase margin 68.76212 deg, undershoot 127.580 mV, Iq 33.8056 uA), and the CC
+    netlist with the same option returns the identical numbers. R changes nothing because R is not
+    in the circuit. Without rshunt I get 6/13 converging, not the 2/13 the REPORT states, and the
+    DC benches among those six return nonsense (load regulation 2.849 mV against 0.026, line
+    regulation 8.181 mV against 0.056 -- the latter would fail the <= 2 mV spec line), which is
+    what an ill-conditioned matrix does. A `.nodeset` seeds a guess and leaves the matrix
+    singular; it is not the fix.
+  effect:
+    metric: v_dropout_mv
+    delta: 28.5
+    unit: mV
+    model: hand
+    detail: >-
+      Hand model from the drawn geometry and the PDK's own sheet resistances
+      (libs.tech/magic/ihp-sg13g2-extract.tech, TopMetal1 18 mOhm/sq typ, 21 worst): vdd pin
+      (-62.5, 69.55) to the source riser TopVia1 row at x=62.47 is 125 um of 2.0 um TopMetal1 =
+      62.5 sq = 1.13 Ohm (0.64x of the brief's 1.77 Ohm vdd budget); vout riser (x=72.35, y=55.33)
+      to the vout pin (131.0, 0.0) is 57.6 um + 56.3 um of 2.0 um TopMetal1 = 57 sq = 1.03 Ohm
+      (0.58x of the brief's 1.78 Ohm vout_pass_only budget). At brief section 4's measured
+      13.24 and 13.21 mV/Ohm that is +14.9 and +13.6 mV of dropout -- about 30 % of the remaining
+      dropout margin -- which BOTH delivered scorecards report as exactly zero.
+  fix:
+    knob: new feature
+    note: >-
+      The wire R has to reach the devices before any series-R claim can be made. Either give kpex
+      a netlist whose device pins carry the same sub-node names as the mesh, or extract in `R`
+      mode and stitch by label, or (cheapest) drop the RC claim and replace it with the hand model
+      above plus a widened strap. `pwr_w` 2.0 -> 4.0 um halves both numbers and the
+      current-density stage already has 3x headroom on TopMetal1. This is not a defect of this
+      cell: the disconnected mesh is produced by kpex 0.3.12 driven through
+      `spicexplorer_signoff.pex` in RC mode, so it will silently zero the series R of every cell
+      the lane extracts. File it upstream against the platform wrapper (and have the wrapper
+      refuse to return an RC netlist whose Rext_ node set does not intersect the device pins),
+      not against the LDO.
+  expected: "vdd + vout series R ~2.2 Ohm today; ~1.1 Ohm at pwr_w = 4.0 um; dropout +28 mV -> +14 mV"
+  verdict: open
+
+- id: F2
+  severity: blocker
+  category: knob
+  title: "documented knob ranges contain LVS-breaking values that pass every blocker"
+  where:
+    - {kind: device, name: XMP, x0: 44.88, y0: 57.83, x1: 89.94, y1: 67.73}
+    - {kind: box, layer: Via1drawing, x0: 47.88, y0: 61.2, x1: 86.94, y1: 65.5}
+  evidence: >-
+    I built every LayoutParams knob at both ends of its documented BOUNDS (gen_ldo.py:120-128) and
+    ran current density + DRC + LVS on the interesting ones. Six knobs have an illegal endpoint.
+    `xmp_nf_mult` = 3 (the documented MINIMUM): 57 fingers of 190/57 um snap to 3.33 um, the
+    extracted device is W=189.81u against the certified 190u, LVS reports "Netlists don't match" --
+    yet current density passes (0.975x) and DRC is 0. The same arithmetic breaks 6 and 7 (both
+    confirmed LVS-fail); only 4, 5 and 8 are legal inside (3,8). `col_vias` = 3 and = 4 (the
+    documented MAXIMUM) both extract `gate|vout` as one net -- a short -- with DRC 0 and current
+    density 0.836x; only 1 and 2 are legal inside (1,4). `rail_w` = 2.0 (max) and `rb_segs` = 6
+    (max) do not build at all (AssertionError). `n_dummy` = 0 (min) gives DRC 1 x M1.b.
+    `pwr_band_w` = 5.0 (min) fails the current-density stage at 1.0032x. Only `guards` and
+    `current_density` are blocking stages in layout/signoff.py -- DRC and LVS are recorded, not
+    enforced -- so an optimizer driving that script accepts a shorted or mis-sized cell.
+  effect: {metric: lvs, delta: 5, unit: "of 10 in-range values tested that fail", model: what-if}
+  fix:
+    knob: BOUNDS
+    to: "xmp_nf_mult (4,5) plus 8; col_vias (1,2); rail_w (0.5,1.6); rb_segs {1,2,5}; n_dummy (1,2); pwr_band_w (5.1,12.0)"
+    note: >-
+      And add the guard the generator already has for resistors: `_seg_len` refuses an off-grid
+      serpentine segment, but nothing refuses an off-grid pass-device finger width. Assert
+      `W_XMP/(m*xmp_nf_mult)` lands on 0.01 um. Make DRC and LVS blocking stages in
+      layout/signoff.py, or the current-density blocker is the only gate an optimizer respects.
+  expected: "3 of 6 in-range xmp_nf_mult values and 2 of 4 col_vias values currently produce a cell that is not the certified circuit"
+  verdict: open
+
+- id: F3
+  severity: blocker
+  category: objective
+  title: "undershoot <= 150 mV passes only via an error-amp-path parasitic cancellation"
+  where:
+    - {kind: box, layer: Metal1drawing, x0: 46.94, y0: 60.33, x1: 86.785, y1: 60.83}
+    - {kind: line, points: [[47.73, 21.23], [47.73, 60.58]]}
+    - {kind: line, points: [[47.44, 21.23], [98.19, 21.23]]}
+    - {kind: line, points: [[-64.69, 15.63], [42.16, 15.63]]}
+  evidence: >-
+    What-ifs on MY CC PEX subckt through the frozen benches (all 13, tt/27): all parasitics
+    S7 = 127.581 mV; no parasitics at all (the drawn devices only) 115.065 mV; **only the `gate`
+    net's 14 extracted C cards, everything else zeroed: S7 = 204.495 mV, which VIOLATES the
+    <= 150 mV spec line**; everything except `gate`: 109.237 mV. The increments do not add
+    (115.1 + 89.4 - 5.8 = 198.7 against a measured 127.6), which is the step mechanism brief
+    section 2 warns is "a change of mechanism, not a degradation of one". I then attributed the
+    -77 mV of recovery by measurement, adding one net at a time back to the gate-only case
+    (tran_load_step, frozen path): + `ea_o1` alone -> 124.682 mV (-79.8), + `ea_out` alone
+    -> 129.124 (-75.4), + `fb` alone -> 128.590 (-75.9), + all three -> 121.882. EACH of the three
+    error-amp-path nets alone recovers essentially the whole 80 mV, and the three together recover
+    barely more than any one of them -- so the credit is not a per-net linear coefficient at all,
+    it is one saturating mechanism: extra capacitance anywhere on the ea_o1 -> ea_out -> gate path
+    slows the loop's response to the load step. REPORT.md section 6 nevertheless attributes the
+    +16.9 mV parasitic part to a linear sum in which "`ea_o1` (64.9 fF, -0.181 mV/fF) gives
+    ~-12 mV back". Brief section 3 note 4 says in terms that the -0.18 mV/fF credit is for
+    DELIBERATE capacitance to a rail and "must not be banked from incidental routing", and brief
+    section 2 puts `fb` under a budget, not a credit. The 22 mV of S7 margin in the delivered
+    scorecard is that forbidden credit, and because the mechanism saturates it will not scale the
+    way the report's per-fF coefficients say it will.
+  effect: {metric: v_undershoot_mv, delta: 89.4, unit: mV, model: what-if}
+  fix:
+    knob: new feature
+    note: >-
+      Measured scaling of the `gate` net over three PEX runs: 36.10 fF at xmp_nf_mult = 2,
+      47.49 fF at 4, 70.83 fF at 8 -- i.e. 5.8 fF per unit of xmp_nf_mult from the 38.75 um
+      Metal1 + GatPoly gate bar, on a 24 fF fixed remainder. The current-density fix (1 -> 4) cost
+      ~17 fF of `gate`, 58 % of the brief's entire 29.3 fF budget. xmp_nf_mult = 2 puts `gate`
+      back inside budget (26.5 fF to a rail) but leaves the shared column 1.46x over the Metal1
+      limit, so xmp_nf_mult is not a usable fix on its own. The fix is a NEW FEATURE: drive
+      the pass gate from a Metal2/Metal3 bus over the array so the Metal1 gate bar is stubs rather
+      than a 38.75 x 0.5 um plate, and expose GPAD (hard-coded 0.5) as a knob. Note also that
+      xmp_nf_mult = 8, which passes every gate in the lane today, puts `gate` at 70.8 fF total /
+      51.3 fF to a rail -- and 34.5 fF to a rail already gives 204 mV on its own, so 8 is not a
+      safe value even though nothing refuses it.
+  expected: "gate to-rail must come below ~30 fF for S7 to be robust without the error-amp-path credit; it is 34.5 fF today and 51.3 fF at the top of the knob range"
+  verdict: open
+
+- id: F4
+  severity: major
+  category: reproduce
+  title: "current-density table claims 4 Via1 per pass column; 2 are drawn"
+  where:
+    - {kind: box, layer: Via1drawing, x0: 47.88, y0: 64.9, x1: 86.94, y1: 65.4}
+    - {kind: box, layer: Via1drawing, x0: 47.88, y0: 61.3, x1: 86.94, y1: 61.8}
+  evidence: >-
+    gen_ldo.py:747-748 emits `n_vias=p.col_vias ** 2` = 4, but gen_ldo.py:737/741 calls
+    `via_row(..., n=p.col_vias, rows=p.col_vias)`, which lays `n` cuts over `rows` rows = 2 cuts.
+    Counted in the GDS: 77 S/D columns, exactly 2 Via1 each (155 cuts in the array band, the odd
+    one being the ntap-ring stack). The REPORT.md section 2 table therefore reads "via1 x4,
+    limit 1.60 mA, 0.165x" where the drawing is "via1 x2, limit 0.80 mA, 0.329x". The stage that
+    exists precisely because it reads the DRAWN geometry (review-002 B1) does not, on this row.
+    Same table: the source-side diffusion contacts have no budget row at all (only the drain side),
+    and the contact count is asserted as 4 where the PDK cell draws 7 per column (measured).
+  effect: {metric: current_density_headroom, delta: 2.0, unit: "x over-stated on the Via1 rows", model: what-if}
+  fix: {knob: gen_ldo.power_budgets, to: "n_vias=p.col_vias", note: "and add the vdd-side contact row; better, count the cuts out of the built Component instead of recomputing them"}
+  expected: "table verdict unchanged (worst stays 0.836x on the Metal2 comb spine) but two rows are wrong by 2x"
+  verdict: open
+
+- id: F5
+  severity: major
+  category: routing
+  title: "fb track is 107 um and crosses into the right half (PLAN 6 asked for short)"
+  where:
+    - {kind: line, points: [[-62.89, 12.83], [44.26, 12.83]]}
+    - {kind: box, layer: PolyResdrawing, x0: -66.0, y0: -49.5, x1: -31.1, y1: -5.78}
+    - {kind: device, name: XM1a, x0: 31.07, y0: 26.16, x1: 32.87, y1: 31.545}
+    - {kind: device, name: XM1b, x0: 44.21, y0: 26.16, x1: 46.01, y1: 31.545}
+  evidence: >-
+    PLAN.md section 6 constrains `fb` to "a SHORT track: the divider is placed so `fb` reaches
+    XM1's gate without crossing the cell; it is kept off the right half (vout/gate edges)
+    entirely". Measured from the GDS, the `fb` Metal1 track is (-62.89, 12.73)-(44.26, 12.93):
+    107.15 um long, 53 % of the cell width, and it ends at x = +44.26 where the cell's x midpoint
+    is +31.75. It is the second-longest signal track in the cell. The cause is the floorplan
+    conflict the plan did not resolve: the divider is at the far bottom-left for thermal reasons
+    (brief section 9) while `ea_in_pair` is the SECOND group in ROW_B_QUIET, at x = 26.7-50.4.
+  effect: {metric: pm_loop_deg, delta: -2.85, unit: deg, model: what-if}
+  fix:
+    knob: new feature
+    to: "swap the order of bias_p_group and ea_in_pair in ROW_B_QUIET"
+    note: >-
+      Putting XM1/XM2 at the left end of row B shortens `fb` by ~22 um (20 %). Hand model on the
+      measured fb-only cost: -2.85 deg x 0.8 = -2.3 deg, i.e. +0.55 deg of phase margin back.
+      `bias_p_group` has 7.16 sigma of headroom and no routing constraint, so it is the group that
+      should take the long trip. Ask for this to be A/B'd on its own before anything else moves.
+  expected: "fb 34.0 fF -> ~27 fF, phase margin 68.76 -> ~69.3 deg"
+  verdict: open
+
+- id: F6
+  severity: major
+  category: matching
+  title: "input-pair halves get unequal routing and via counts (XOR 3.69 um2)"
+  where:
+    - {kind: pair, a: {x: 31.97, y: 28.9}, b: {x: 45.11, y: 28.9}}
+    - {kind: pair, a: {x: 36.35, y: 28.9}, b: {x: 40.73, y: 28.9}}
+    - {kind: box, x0: 26.69, y0: 26.16, x1: 50.39, y1: 36.78}
+    - {kind: box, x0: 15.74, y0: 1.42, x1: 41.82, y1: 3.255}
+  evidence: >-
+    REPORT.md section 8 deviation 3 says "routing is not matched half-for-half ... Not measured".
+    Measured. Taking each half's local window (+/-2.4 um, Metal1 + Metal2 + Via1 + Metal3) and
+    XORing it against the other half translated onto it: XM1 halves XOR 3.69 um2 of 5.71 um2
+    (64.7 %), Metal2 alone 3.09 um2; XM2 halves XOR 2.54 um2 of 7.74 um2 (32.8 %) and the two
+    halves carry **4 and 3 Via1**. For comparison XM3 and XM4, the other common-centroid class,
+    XOR to **0.000 um2** with 2 Via1 each -- so the generator can produce matched half routing,
+    and does, for the 2.10 sigma class but not for the 1.85 sigma one. The device geometry itself
+    is correct: ABBA with equal centroids (XM1 at x 31.07/44.21, XM2 at 35.45/39.83, both centroids
+    37.64), all instances r0 (no mirroring), tied dummies at both ends.
+  effect: {metric: v_out_v, delta: 0.0, unit: mV, model: hand, detail: "not simulable: routing asymmetry perturbs the local etch/stress environment, which the compact models do not carry. The measured proxy is the drain-node imbalance, ea_n 17.72 fF against ea_o1 64.91 fF."}
+  fix: {knob: new feature, note: "allocate the channel columns per matching class -- reserve a mirrored column pair for the two halves of a common-centroid member before the general allocator runs -- so the halves get equal Metal2 length and equal via counts, as XM3/XM4 already do by luck of ordering."}
+  expected: "XOR -> 0 um2 and equal Via1 counts on XM1/XM2, as measured today on XM3/XM4"
+  verdict: open
+
+- id: F7
+  severity: major
+  category: routing
+  title: "obstacle map does not cover the Metal2 power comb"
+  where:
+    - {kind: line, points: [[47.73, 21.23], [47.73, 60.58]]}
+    - {kind: box, layer: Metal2drawing, x0: 44.28, y0: 52.33, x1: 90.54, y1: 58.33}
+    - {kind: box, layer: Metal2drawing, x0: 44.28, y0: 66.55, x1: 90.54, y1: 72.55}
+  evidence: >-
+    router.ObstacleMap.column_free only tests the Metal2 verticals the router itself registered in
+    `self.verticals`; the pass array's Metal2 comb (fingers and the two 6 um spines at y = 55.33
+    and 69.55) is drawn with `rect`/`h` and never registered. That is the exact hole that produced
+    the it02 -> it03 `gate|vout` short, and it is closed for `gate` only, by a hard-coded
+    `to_track_m3` (gen_ldo.py:788) -- the 0.3 um Metal3 hop at x = 47.73 from y = 21.08 to 60.73.
+    Any other net routed into that band shorts the same way, silently: `col_vias` = 3 and = 4
+    reproduce `gate|vout` today (F2), and layout/test_builder.py -- the review-002 M8 regression --
+    exercises the Metal1 map only.
+  effect: {metric: lvs, delta: 1, unit: "silent short reproduced at col_vias in {3,4}", model: what-if}
+  fix: {knob: new feature, note: "register every drawn Metal2 rectangle (comb fingers, spines, riser pads, ring risers) in ObstacleMap.verticals as claimed spans, and add the Metal2 case to layout/test_builder.py the way M8's Metal1 case was added."}
+  expected: "col_vias 3 and 4 become buildable-and-matched, or fail loudly at build time instead of silently at LVS"
+  verdict: open
+
+- id: F8
+  severity: major
+  category: routing
+  title: "divider top (lp_brk) is never joined to vout in the GDS"
+  where:
+    - {kind: point, x: -59.275, y: 14.23}
+    - {kind: point, x: 131.0, y: 0.0}
+    - {kind: pair, a: {x: -59.275, y: 14.23}, b: {x: 131.0, y: 0.0}}
+  evidence: >-
+    Brief section 4 calls the sense-tap position "the tightest budget in the brief and ... a
+    floorplan decision, not a width": tapped at the pass drain the vout metallisation is allowed
+    0.126 Ohm, tapped at the pin 1.78 Ohm, a 14x difference. REPORT.md section 7 claims the tap is
+    at the pin "by construction". It is not drawn either way: `lp_brk` is a separate pin of the
+    extracted cell (the certified netlist joins it to `vout` through the 0 V loop-break source
+    VLP, and layout/netlist_ref.py makes both nodes pins), and layout/postlayout.py re-inserts
+    `VLP lp_brk vout` onto the flat `vout` node of the subckt. With CC there is one `vout` node,
+    so the choice is invisible; with a working RC extraction it would decide between the 0.126 and
+    the 1.78 Ohm budget. The integrator, not this cell, currently picks.
+  effect: {metric: load_reg_mv, delta: 10.2, unit: mV, model: hand, detail: "9.9 mV/Ohm x the ~1.03 Ohm of vout TopMetal1 IF the tap ends up at the pass drain instead of the pin -- against a 5.0 mV spec line"}
+  fix: {knob: new feature, note: "draw the lp_brk tap: run the divider top to the vout TopMetal1 strap at the pin end and let LVS see one net, or state in the REPORT that the tap is an integration constraint and put it in the cell's interface contract."}
+  expected: "S2 load regulation is either 0.026 mV (tap at the pin) or ~10 mV (tap at the drain); today the GDS does not say which"
+  verdict: open
+
+- id: F9
+  severity: major
+  category: budget
+  title: "vss return from the bottom pin is ~32 Ohm, 1.9x the 17 Ohm budget"
+  where:
+    - {kind: box, layer: Metal1drawing, x0: -68.5, y0: -134.4, x1: -67.7, y1: 0.4}
+    - {kind: box, layer: Metal1drawing, x0: -68.9, y0: -134.4, x1: 132.4, y1: -133.6}
+    - {kind: point, x: 31.75, y: -134.0}
+    - {kind: point, x: -62.5, y: 0.0}
+  evidence: >-
+    Drawn: the bottom-edge vss rail (-68.9,-134.4)-(132.4,-133.6) reaches the cell's vss rail at
+    y = 0 through ONE 0.8 um Metal1 vertical at x = -68.1, (-68.5,-134.4)-(-67.7, 0.4), 134.8 um
+    long. At the PDK's own Metal1 sheet resistance (110 mOhm/sq typ, 135 worst) that vertical is
+    18.5 Ohm and the bottom rail from the `vss` label at (31.75,-134.0) adds 13.7 Ohm: ~32 Ohm
+    against the brief's 17 Ohm vss budget (which binds PSRR at -0.4413 dB/Ohm). Hand model:
+    -14 dB of 1 kHz PSRR. PSRR has 30 dB of margin so nothing breaks, but the net is 1.9x over a
+    measured budget and appears in neither the current-density table (it carries only 27.7 uA, so
+    it is EM-safe) nor either scorecard (CC extracts no R). The cell also carries TWO `vss` Metal1
+    labels -- (31.75,-134.0) on the bottom edge and (-62.5, 0.0) on the cell rail -- so which one
+    is the pin, and therefore what the return resistance is, is ambiguous.
+  effect: {metric: psrr_1k_db, delta: -14.0, unit: dB, model: hand}
+  fix: {knob: rail_w, to: 2.0, note: "rail_w = 2.0 is currently un-buildable (F2); with that fixed it takes the vertical to 7.4 Ohm. Cheaper: stitch the bottom rail to the cell rail up BOTH edges (the right edge is free below the vout strap), or declare a single vss pin on the cell rail and delete the bottom-edge label."}
+  expected: "vss return 32 Ohm -> ~8 Ohm, inside the 17 Ohm budget"
+  verdict: open
+
+- id: F19
+  severity: major
+  category: objective
+  title: "the -2.23 uA re-certification cost is the bias/resistor split, not the pass fingers"
+  where:
+    - {kind: box, layer: Activdrawing, x0: 66.54, y0: 1.42, x1: 102.18, y1: 2.88}
+    - {kind: device, name: XMB0_left_half, x0: 81.08, y0: 1.42, x1: 82.76, y1: 2.28}
+    - {kind: device, name: XMB0_right_half, x0: 85.96, y0: 1.42, x1: 87.64, y1: 2.28}
+    - {kind: box, layer: PolyResdrawing, x0: -66.0, y0: -49.5, x1: -31.1, y1: -5.78}
+  evidence: >-
+    REPORT.md section 2 (lines 88-95) and section 10.2 (lines 355-360) charge the whole
+    re-certification cost to the pass device: "a folded 76-finger device carries different junction
+    area and perimeter ... it moves Iq by -2.23 uA, Vout by -0.6 mV and dropout by -1.4 mV. By the
+    layout lane's own rule a generator-legalized FINGER SPLIT is a sizing change to be
+    re-certified." Section 6 column 3 lumps all three splits into one row, so the attribution is
+    never tested. I tested it with four one-group what-ifs on the CERTIFIED deck (dc_op +
+    tran_load_step, frozen path, no parasitics anywhere), each changing exactly one group.
+    XMP as m=76 at constant total W: Iq 36.29192 (+0.015 uA), S7 104.696 (-0.15 mV), Vout
+    unchanged. Bias branch XMB0/XMB1/XMS as half-width pairs: Iq 34.03716 (-2.240 uA),
+    S7 110.937 (+6.09 mV). EA pairs XM1/XM2/XM3/XM4 as half-width pairs: Iq 36.27791 (+0.001 uA),
+    Vout 1.199502 (-0.570 mV). XR1/XR2/XRB segmented 4 ways: Iq 36.07702 (-0.200 uA),
+    S7 107.728 (+2.88 mV). The one-group sums recover -2.42 uA of the measured -2.47, -0.574 mV of
+    the measured -0.573 and +8.8 mV of the measured +10.2. The pass-device finger split -- the B1
+    fix, the thing PLAN A5 argues about -- is electrically free to three digits: 91 % of the Iq
+    shift is the bias-branch halving and 8 % the resistor segmentation, and 99 % of the Vout shift
+    is the EA input/load halving. Those splits have been in the drawing since it01 and have nothing
+    to do with B1.
+  effect: {metric: i_q_ua, delta: -2.24, unit: uA, model: what-if, detail: "bias-branch halving alone; the 76-finger pass array alone is +0.015 uA"}
+  fix:
+    knob: "circuits/ldo_ihp_capless/pdk/ihp-sg13g2/netlist.spice"
+    to: "half-width cards for XMB0/XMB1/XMS and XM1..XM4, segment strings for XR1/XR2/XRB, nf on XMP"
+    note: >-
+      The ruling does not change -- re-certify -- but the reason does, and so does what an owner
+      may trade. Reverting xmp_nf_mult to 1 would buy back 0.015 uA and re-open B1, so it is not on
+      the table. The bias branch is where the microamps are, and its 2.24 uA is not the price of
+      common-centroid specifically: any matched pattern the brief's 3.15 sigma implies
+      (interdigitated included) draws unit devices, so the certified netlist mis-models this branch
+      whichever pattern is chosen. Fix the netlist, not the pattern.
+  expected: "re-certified Iq lands near 33.8 uA; the bias branch, not the pass array, is what moved"
+  verdict: open
+
+- id: F10
+  severity: minor
+  category: budget
+  title: "per-net table mis-states fb; x1 and y reported as bounds, not values"
+  where:
+    - {kind: net, name: fb}
+    - {kind: net, name: x1}
+    - {kind: net, name: 'y'}
+  evidence: >-
+    My per-net table from the same CC netlist: `fb` 33.97 fF total, of which 24.05 fF is to a rail
+    (VSUBS 21.73 + vss 1.95 + vdd 0.37) and 9.9 fF is to ea_o1 / lp_brk / ea_n / ea_tail / vref.
+    The brief's -0.111 deg/fF coefficient is a to-rail coefficient, and the measured fb-only cost
+    is -2.85 deg, which matches 24.05 fF x 0.111 = -2.67 deg and NOT the raw 34.0 x 0.111 =
+    -3.77 deg the REPORT quotes. So `fb` is 0.86x of its 27.9 fF budget, not the 1.22x reported --
+    the REPORT is conservative here, but it uses raw-total accounting for `fb` and to-rail
+    accounting for `gate` in the same table. Separately, `x1` and `y` are reported as "< 17.7"
+    because layout/signoff.py:pex keeps only the top twelve nets (`[:12]`); the values are
+    11.28 fF and 11.50 fF (0.24x and 0.19x of budget).
+  effect: {metric: pm_loop_deg, delta: 0.9, unit: deg, model: what-if, detail: "the difference between the reported and the measured fb attribution"}
+  fix: {knob: layout/signoff.py, to: "keep every net", note: "and state one accounting convention (to-rail) for the whole table, with the coupled part listed separately."}
+  expected: "fb 0.86x, gate 1.18x to-rail; x1 0.24x, y 0.19x"
+  verdict: open
+
+- id: F11
+  severity: minor
+  category: knob
+  title: "knob hygiene: dead tap_pitch, missing isl_gap, stale PLAN defaults"
+  where:
+    - {kind: net, name: LayoutParams}
+  evidence: >-
+    `tap_pitch` at 6.0 and at 18.0 produces a GDS byte-identical to the default build (sha
+    226bf2ea...); its own comment says "unused by the rings". `isl_gap` is a real knob with
+    BOUNDS but is absent from PLAN.md section 5. PLAN section 5 lists `ring_gap` 1.2, `r_segs` 4,
+    `rb_segs` 2 where the committed defaults are 1.4, 8, 5, and gives `xmp_nf_mult` the range
+    (1,8) where BOUNDS says (3,8). PLAN section 1 says `ea_in_pair` is drawn as "2 instances of
+    nf = 2 (4 fingers of 2.3825 um)"; the committed ROW_B_QUIET slots are (XM1, 0.5, 1), i.e. two
+    single-finger instances of 4.765 um. And the constants that actually set the parasitics an
+    optimizer has to trade -- GPAD 0.5 (gate-bar height), GATE 1.5, STRAP 0.5, W_M1 = W_M2 = 0.2,
+    VPAD 0.38 -- are module-level constants, not LayoutParams fields.
+  effect: {metric: search_space, delta: 1, unit: "dead dimension", model: hand}
+  fix: {knob: LayoutParams, to: "drop tap_pitch; add isl_gap, gpad, w_m1, w_m2 to PLAN section 5", note: "regenerate PLAN section 5 from LayoutParams + BOUNDS instead of typing it."}
+  expected: "PLAN section 5 and the dataclass agree, and every listed knob moves the GDS"
+  verdict: open
+
+- id: F12
+  severity: minor
+  category: matching
+  title: "bias PMOS end dummy is 10 um beside a 5.53 um XM6; XRB off-pitch"
+  where:
+    - {kind: device, name: XM6, x0: 14.93, y0: 26.16, x1: 17.23, y1: 32.31}
+    - {kind: device, name: dummy_Q2, x0: 19.81, y0: 26.16, x1: 22.11, y1: 36.78}
+    - {kind: box, layer: PolyResdrawing, x0: -29.0, y0: -49.5, x1: -21.7, y1: -20.58}
+  evidence: >-
+    `_place_row` sizes each group's dummies as `max(W)` over the group's slots, so `bias_p_group`
+    (XMBP 10, XMT 10, XM6 5.53) gets 10 um dummies at BOTH ends -- the left one matches XMBP, the
+    right one is 1.8x its neighbour XM6. Measured from the GDS: the group runs
+    d(h=10.62) XMBP(10.62) XMT(10.62) XM6(6.15) d(10.62). The other seven groups' dummies do match
+    their end neighbour. Separately, XRB is drawn as 5 rhigh segments at pitch 1.6 um immediately
+    to the right of the 18-segment divider array at pitch 2.0 um and with no dummy of its own, so
+    the divider's right-hand dummy sees XRB 1.1 um away while its left-hand dummy sees open field.
+  effect: {metric: v_out_v, delta: 0.0, unit: mV, model: hand, detail: "bias_p_group has 7.16 sigma and XRB 20.2 % of tolerance, so neither is expected to matter; it is a pattern defect, not a measured cost."}
+  fix: {knob: gen_ldo._place_row, to: "w_dum = W of the adjacent slot", note: "and give XRB the divider's res_pitch and one dummy segment, or move it one grp_gap further out."}
+  expected: "no measurable spec change; the row reads as a unit array"
+  verdict: open
+
+- id: F13
+  severity: minor
+  category: reproduce
+  title: "vref and fb labelled mid-channel, not on the left edge (PLAN A1)"
+  where:
+    - {kind: point, x: -9.315, y: 12.83}
+    - {kind: point, x: 37.7, y: 13.53}
+  evidence: >-
+    PLAN.md section 0 A1: "`vref` + `fb` on the LEFT edge" as Metal1/Metal2. Drawn: the `fb` label
+    sits at (-9.315, 12.83) and `vref` at (37.7, 13.53), both in the middle of the channel on
+    Metal1.text, and `vref` is on the RIGHT half. Brief section 9 lists both as internal today, so
+    nothing is broken -- but A1 is an approval that was not kept, and `vref` in particular will
+    become a pin when a bandgap replaces VREF, at which point its position matters.
+  effect: {metric: none, delta: 0, unit: '', model: hand}
+  fix: {knob: gen_ldo.build_full, to: "label fb and vref at the left end of their tracks", note: "or amend A1."}
+  expected: "labels on the declared sides"
+  verdict: open
+
+- id: F14
+  severity: minor
+  category: reproduce
+  title: "design.json, named as the sizing of record, has an empty sizing block"
+  where:
+    - {kind: net, name: design.json}
+  evidence: >-
+    BRIEF.md header: "sizing / scorecard: `decks/candidate/design.json`, `decks/candidate/scorecard.json`".
+    The file contains `"sizing": {}`. The sizing the layout is actually built from is
+    `circuits/ldo_ihp_capless/pdk/ihp-sg13g2/sizing.yaml` (32 variables), which is what
+    layout/netlist_ref.py:load_sizing reads. Nothing is wrong with the layout; the pointer is.
+  effect: {metric: none, delta: 0, unit: '', model: hand}
+  fix: {knob: decks/candidate/design.json, to: "write the resolved sizing", note: "or have the brief and REPORT name sizing.yaml."}
+  expected: "one named sizing of record"
+  verdict: open
+
+- id: F15
+  severity: note
+  category: pex
+  title: "swapping XCFF/XCC plates costs nothing simulated; not a design change"
+  where:
+    - {kind: box, layer: MIMdrawing, x0: -64.6, y0: -121.5, x1: -55.4, y1: -112.3}
+    - {kind: box, layer: MIMdrawing, x0: -64.6, y0: -109.5, x1: -9.4, y1: -54.3}
+  evidence: >-
+    REPORT.md section 8 deviation 2 rejects brief section 9's plate preference because "swapping the
+    plates moves the bottom-plate parasitic to the other node, i.e. it is a design change". The
+    IHP `cap_cmim` model is `.subckt cap_cmim PLUS MINUS` with `R1 PLUS 1 r=55m` and `C1 1 MINUS`
+    (libs.tech/ngspice/models/capacitors_mod.lib:51-59): the only asymmetry is a 55 mOhm series
+    resistor, tau = 5.5 fs on the 0.1 pF XCFF. Re-ordering the nodes on the certified `XCFF` and
+    `XCC` cards therefore changes no bench number and would let the layout put the Metal5 bottom
+    plate on `lp_brk` (no budget) instead of `fb` (27.9 fF), which is what the brief asked for. It
+    is a certified-netlist edit and a re-freeze, which is a real cost -- but not a re-sizing.
+  effect: {metric: pm_loop_deg, delta: 0.3, unit: deg, model: hand, detail: "the fb-side share of the XCFF bottom plate, from the fb / lp_brk split of the extracted plate capacitance"}
+  fix: {knob: "circuits/ldo_ihp_capless/pdk/ihp-sg13g2/netlist.spice", to: "XCFF fb lp_brk cap_cmim ... and XCC ea_o1 ea_out cap_cmim ...", note: "both cards, then re-freeze; the generator already reads the plate assignment off the card. Swapping XCC likewise puts the Metal5 bottom plate on ea_out instead of ea_o1, which is what brief section 9 asks for."}
+  expected: "a few fF off fb at zero simulated cost"
+  verdict: open
+
+- id: F16
+  severity: note
+  category: objective
+  title: "post-layout is tt/27 only; undershoot and Iq already bind at corners"
+  where:
+    - {kind: net, name: scorecard}
+  evidence: >-
+    REPORT.md section 10.4 records this and I confirm it: 13/13 benches at tt/27 only. Experiment
+    003 section 3 has S7 failing at ss/-40 and S5 at ff/125 BEFORE layout; this drawing moves S7 by
+    +22.7 mV and S5 by -2.47 uA. review-002 M6 measured S7 against bias current as a STEP with the
+    tt threshold near 30.7 uA and the ss/-40 threshold near 28 uA; 36.28 -> 33.81 uA spends about
+    45 % of the tt distance to that step, in the same direction as the added undershoot. A tt-only
+    post-layout row is not a check on either.
+  effect: {metric: v_undershoot_mv, delta: 0, unit: mV, model: hand, detail: "unquantified; the corner run is the measurement"}
+  fix: {knob: none, note: "re-run the 13 benches on the CC PEX netlist at ss/-40 and ff/125 before this cell is called done."}
+  expected: "S7 at ss/-40 is the number that decides this layout"
+  verdict: open
+
+- id: F17
+  severity: note
+  category: reproduce
+  title: "postlayout.py still picks the PEX netlist by sort order"
+  where:
+    - {kind: net, name: postlayout}
+  evidence: >-
+    REPORT.md section 9 records that `hits[-1]` on an `rglob` "is a sort order, not a freshness
+    check" and that it silently re-measured the first drawing. layout/postlayout.py:150 still
+    reads `hits = sorted(Path(a.pex).rglob("*_pex_netlist.spice")); ... hits[-1]`. The fix named
+    in the report was not applied; only the reproduce line changed.
+  effect: {metric: none, delta: 0, unit: '', model: hand}
+  fix: {knob: layout/postlayout.py, to: "require exactly one match, or take the newest by mtime and print it", note: "the scorecard already records pex_netlist; assert it, do not guess it."}
+  expected: "a stale extraction can no longer be scored as a fresh one"
+  verdict: open
+
+- id: F18
+  severity: note
+  category: drc
+  title: "density waiver named but not itemised"
+  where:
+    - {kind: net, name: drc}
+  evidence: >-
+    PLAN A7 / REPORT section 3 run DRC with `--no_density` and say so, which closes review-002 m1's
+    first half. What m1 also gave was the list -- 12 items, AFil.g, AFil.g2, GFil.g, M1.j-M4.j,
+    M1Fil.h-M4Fil.h, TM2.c -- and this REPORT does not carry it, so the reader cannot tell whether
+    the waived set grew with the new floorplan. I did not re-run with `--density` (see not_checked).
+  effect: {metric: none, delta: 0, unit: '', model: hand}
+  fix: {knob: REPORT.md, to: "paste the --density rule list", note: "one extra DRC run per drawing."}
+  expected: "the waived set is visible and comparable between drawings"
+  verdict: open
+
+not_checked:
+  - "DRC with the density/fill tables enabled (--density): not re-run; the 12-item list from review-002 m1 is not re-confirmed for this floorplan."
+  - "Corners and Monte Carlo post-layout: nothing outside tt/27 was simulated by this review (F16)."
+  - "Wire resistance as an extracted quantity: impossible with the RC netlist kpex produced (F1). All series-R numbers in this review are hand models from the drawn geometry and the PDK's own sheet resistances."
+  - "Top-plate MIM coupling and n-well-to-substrate junction capacitance: not in the extractor (REPORT section 5); I did not model them."
+  - "Inductance, sealring, fill, ESD, antenna: out of scope per PLAN section 7."
+  - "Mismatch Monte Carlo on the drawn cell: not run; the brief's own conclusion is that the three tight classes sit inside 3 sigma of the PDK's random mismatch."
+  - "LVS at every knob combination: 24 single-knob points were checked, not the product space."
+  - "The 55 mOhm cap_cmim asymmetry (F15) was read from the model card, not simulated."
+  - "Iteration diff images: only diff_it01_it02.png was opened. The other seven diff_it*_it*.png were not individually viewed against their notes; note that it08 and it09 carry the same gds_sha256, so diff_it08_it09.png should be empty -- not confirmed."
