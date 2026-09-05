@@ -52,7 +52,9 @@ drawing *means*. The splice (`sch_support.flatten_hierarchy`) uses only the plat
 parser: a leaf line's net tokens are identified by position from the parser's own node count for
 that device, formals are mapped to actuals through the block instance, and **leaf instance names are
 preserved** (`XM1` stays `XM1`), which is what lets the parameter assertion join the two netlists
-device by device. It refuses to run if two blocks share a leaf name or an internal net name.
+device by device. It refuses to run if two blocks share a leaf name; a block's own internal nets
+are qualified with the block instance instead, since two children auto-name an unlabelled node
+identically.
 
 | drawing | components | nets | vacuous | parameter rows |
 |---|---|---|---|---|
@@ -63,8 +65,7 @@ The net count is also the check that all **21** `rhigh` resistors kept their sub
 PDK symbol carries it on a `body=` attribute rather than a pin, and a split `vss` would show up here
 as an extra net. A block's own internal nets are qualified with the block instance when the sheets
 are spliced (`xbias_ref.n_rb_1`), because two children auto-name an unlabelled node the same
-`net1`; the count is unchanged by the renaming, and a collision that is NOT local is still a
-failure.
+`net1`; the count is unchanged by the renaming.
 
 **A third assertion: block coverage.** The blocks are named by device, so a recertification that
 renames devices (`XR1` → `XR1_1..8`) silently empties a block — `BlockAnnotationSet.load` drops what
@@ -169,12 +170,12 @@ its own. With all three, xschem netlists the whole hierarchy with no warnings an
 | figure | what it shows |
 |---|---|
 | `figs/ldo_ihp_capless.png` | the top sheet: five blocks left to right in signal order, `VREF`/`VLP` at the bottom left, `XCOUT` on `vout` |
-| `figs/blocks_bias_ref.png` | the bias reference — label-wired (P5) |
-| `figs/blocks_ea_stage1.png` | the 5T OTA, its four half-width pairs — label-wired (P5) |
+| `figs/blocks_bias_ref.png` | the bias reference — label-wired (P5), so read by net name rather than by wire |
+| `figs/blocks_ea_stage1.png` | the 5T OTA, its four half-width pairs — label-wired (P5): PMOS row over NMOS row, no rails drawn, read by net name at each terminal |
 | `figs/blocks_ea_stage2.png` | the common-source stage and the Miller cap |
 | `figs/blocks_fvf_output.png` | the output stage, PMOS band over NMOS band, rails drawn |
 | `figs/blocks_fb_divider.png` | the 8+8 divider chain and the feed-forward cap |
-| `figs/ldo_ihp_capless_flat.png` | the same circuit on one sheet — the previous drawing of record, kept as the control |
+| `figs/ldo_ihp_capless_flat.png` | the same circuit on one sheet, kept as the control. At 50 devices it is a dense band and no longer a drawing a reviewer can read — which is the argument for the hierarchy |
 
 Renders are produced headlessly and rasterized at 2400 px wide. xschem sizes its canvas to the
 geometry bounding box, which clips every label that overhangs its anchor, so the export measures the

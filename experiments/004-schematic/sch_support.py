@@ -4,7 +4,7 @@ Everything here is either (a) a small, temporary patch to the generator that the
 the generator does not yet offer, or (b) a helper the two build scripts share. No coordinate is
 hand-placed: placement and wiring stay the generator's job throughout.
 
-**The two patches.** Both are proposed upstream verbatim -- the diff and its rationale live in
+**The patches.** All are proposed upstream verbatim -- the diff and its rationale live in
 ``$SX_SCRATCH/ldo-schematic/platform-proposal/`` -- and both carry an *outdated guard*: they assert
 the upstream code is still the version they patch, so the day the fix lands here this file fails
 loudly instead of silently patching a patch.
@@ -30,7 +30,10 @@ loudly instead of silently patching a patch.
   ``ea_stage1`` (certified ``ea_n ea_n vss vss``). Both are the FIRST half of a duplicated
   diode-connected pair the recertified deck introduced (``XMB0`` -> ``XMB0A``/``XMB0B``); the flat
   sheet of the same devices is correct, so the defect is in the child path only. The gate catches it
-  (net count 35 vs 33), so children are built ``wiring="labels"`` until it is fixed upstream.
+  (net count 35 vs 33). Children are built ``hybrid`` and each is netlisted on its own; only a block
+  whose netlist shows an auto-named ``netN`` is redrawn label-only (``blocks_losing_a_pin`` and
+  ``build_sch.py::build_hierarchy``), so a block keeps the readable drawing unless it is provably
+  wrong.
 * **P3 -- a design's own cell symbol on a bench sheet.** ``mapping.symref_for`` resolves a subcircuit
   instance through a PDK table, so a bench's ``XDUT ... ldo_ihp_capless`` has no symbol and is
   dropped from the drawing. The design's own generated symbol is registered in that table.
@@ -399,8 +402,10 @@ def _logical_lines(text: str) -> list[str]:
 def flatten_hierarchy(netlist: Path, out: Path, *, note: str = "") -> dict:
     """Splice every block subcircuit of a hierarchical netlist back inline, keeping leaf names.
 
-    Returns a record of what was spliced. Raises on a leaf-name or internal-net collision between
-    blocks -- the one thing that would make the flat result ambiguous.
+    Returns a record of what was spliced. A leaf-name collision between blocks raises -- it would make
+    the parameter join ambiguous. A block's own internal nets are qualified with the block instance
+    (``xbias_ref.net1``), because two children auto-name an unlabelled node identically; the
+    collision check that remains can then only fire if that qualification missed a net.
     """
     from spicexplorer_core.spice_engine import NetlistView
 
@@ -462,7 +467,7 @@ def flatten_hierarchy(netlist: Path, out: Path, *, note: str = "") -> dict:
                 raise SystemExit(f"leaf {tok[0]} appears in both {prev} and {ref}")
             seen_refs[tok[0].upper()] = ref
             for net in tok[1:1 + n]:
-                if net.lower() in rename:
+                if net.lower() in rename or net == "0":   # formal, qualified, or ground
                     continue
                 owner = seen_nets.setdefault(net.lower(), ref)
                 if owner != ref:

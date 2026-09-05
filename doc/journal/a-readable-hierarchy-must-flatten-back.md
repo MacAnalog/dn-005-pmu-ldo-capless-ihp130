@@ -24,6 +24,9 @@ Three things make that splice safe, and all three are cheap:
   come from the original flat netlist and are already unique.
 - **Assert that uniqueness rather than assume it.** The splice refuses to run if two blocks share a
   leaf reference or an internal net name, which is the only way the flat result could be ambiguous.
+  *Update, 2026-09-05:* the second half of that is now a qualification rather than a refusal. Two
+  children auto-name an unlabelled node the same `net1`, so a net that is not a formal port (and not
+  ground) is renamed to `<block instance>.<net>` when it is spliced. The leaf-name refusal stands.
 
 **Both drawings, both gates.** The flat sheet is still built beside the hierarchy from the same
 frozen deck and put through the same two gates. Two drawings returning the same two verdicts is what
