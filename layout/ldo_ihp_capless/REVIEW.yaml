@@ -301,7 +301,10 @@ findings:
       **67.32 dB** -- 2.82 dB of the reported figure is the ideal-ground modelling choice, and
       2.78 dB of that 2.82 is the 4.84 Ohm COMMON element, not the per-device spread. S6 is
       "PSRR at 1 kHz, 1 mA >= 40 dB", so 67.3 dB is not a spec risk in any of these cases; this
-      is a budget-definition finding, not a performance one.
+      is a budget-definition finding, not a performance one. Caveat: the what-if moves VREF's
+      return onto the internal ground along with everything else, because the frozen bench keeps
+      VREF inside the DUT block -- that is also why my -0.372 dB/Ohm reproduces the brief's
+      -0.4553, i.e. it is the right model for checking the brief's own row.
   fix:
     knob: rail_w
     to: 1.4
