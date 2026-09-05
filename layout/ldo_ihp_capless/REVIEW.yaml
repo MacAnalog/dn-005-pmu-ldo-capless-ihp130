@@ -14,6 +14,22 @@ reviewer: layout-reviewer (independent re-review of review-003; did not write th
 review_round: 4
 supersedes: "review-003 (this file at commit 2a730df), FAIL, 3 blockers"
 
+at_a_glance:
+  verdict: accept
+  note: >-
+    Graded on geometry read out of the rebuilt GDS. ea_in_pair is dummy/XM1a/XM2a/XM2b/XM1b/dummy
+    at x = 0.29..22.19 -- ABBA, both centroids at x = 11.24; ea_nmos_load is ABBA with both
+    centroids at x = 27.94; bias_n_group is ABC.CBA with ALL THREE centroids at x = 85.96. All
+    seven matching classes XOR to 0.000 um2 at device bbox + 1.2 um with equal Via1 counts.
+    Dummies at both ends of every device row, each sized to its own neighbour. All five well /
+    substrate tap regions merge to ONE polygon WITH A HOLE, i.e. the rings actually close (NWell
+    islands at (-3.71,22.01), (55.17,22.01), (44.57,57.52) with 444 / 326 / 296 contacts and
+    0.98-0.99 bbox coverage; ptap rings at (-3.40,-2.90) and (43.07,50.83)). Resistors on one
+    2.0 um pitch throughout with tied dummies each end. Straps at 0.836x J_max, 0.9835x worst over
+    the 40-endpoint walk. Two blemishes, both already findings: XCOUT has no MIM dummy ring (a
+    declared, recorded PLAN deviation) and the pin labelling is not one-per-declared-edge (F13:
+    two vdd labels, vref 71 um inside the cell).
+
 reproduced:
   build: match
   build_note: >-
@@ -98,59 +114,6 @@ reproduced:
       104.671). The certified deck IS the drawn device set. F19 is closed by measurement.
 
 findings:
-
-- id: F9
-  severity: major
-  category: budget
-  title: "vss active return is 20.9 Ohm measured, not the 14.3 Ohm the report models"
-  where:
-    - {kind: box, layer: Metal1drawing, x0: -71.5, y0: -135.5, x1: -68.5, y1: 0.3}
-    - {kind: line, points: [[-70.0, 0.0], [-3.4, 0.0]]}
-    - {kind: device, name: XMSb, x0: 95.72, y0: 1.42, x1: 97.35, y1: 2.88}
-    - {kind: point, x: -70.0, y: -134.0}
-  evidence: >-
-    REPORT section 6.4 models the worst-case active device at 14.3 Ohm against the re-derived
-    brief's 16.4772 Ohm `vss_active` budget -- "89 % spent". I solved it instead of modelling it:
-    rasterize every Metal1 shape at 0.1 um, flood-fill the component that contains the `vss` pin
-    (-70.0, -134.0), and solve Laplace at the PDK's 110 mOhm/sq (validated against an analytic
-    bar to -0.1 %). Results: the common series element (pin -> riser top at y = 0) is
-    **4.84 Ohm**, which confirms the report's 4.91; but the worst active device, XMS's b half at
-    x = 96, is **20.88 Ohm**, and the far end of row A is 20.29 Ohm. That is **1.27x** of the
-    16.4772 Ohm budget, not 0.89x. The mechanism is precise and visible in the drawing: from the
-    riser top the return runs 66.6 um of BARE 0.8 um Metal1 rail (measured 9.44 Ohm; a bare
-    0.8 um rail is 0.1375 Ohm/um and 66.6 x 0.1375 = 9.16) before the row-A ptap ring even
-    starts -- the ring segments run only from x = -3.4 to x = 105.58 (y = -2.6 and y = 11.25).
-    Section 6.4 credits "170 um of 0.8 um rail in parallel with the ptap ring's two 0.6 um
-    segments" over the WHOLE run; over the segment where the ring exists the parallel credit is
-    right (my solve gives 5.92 Ohm for the 101 um from x = 0 to x = 101, against 5.56 Ohm for
-    rail-parallel-ring and 13.9 Ohm for the bare rail), but the first 66.6 um has no ring beside
-    it and is charged at the bare rate. 4.84 + 9.44 + 5.92 = 20.2, and 14.3 is what my solve
-    returns for a device at x = 0 -- the NEAR end of the row, not the far end.
-  effect:
-    metric: psrr_1k_db
-    delta: -2.0
-    unit: dB
-    model: hand
-    detail: >-
-      brief.json series_r.vss_active d_psrr_db_per_ohm = -0.45528; 20.88 - 16.48 = 4.4 Ohm over
-      budget x 0.455 = 2.0 dB. No spec breaks (PSRR is 70.09 dB against a 40 dB line and the
-      step is at 32 Ohm), so this is a quarter-margin budget overrun, in the same class as
-      `gate` -- but it is reported as inside the budget when it is not.
-  fix:
-    knob: rail_w
-    to: 1.4
-    note: >-
-      Measured, not estimated: I ran the same solve on the generator's own `rail_w = 1.4` build
-      from the bounds walk (bnd/bounds/rail_w_hi, DRC 0, LVS matched, current density 0.836x)
-      and the worst device drops to **15.13 Ohm** -- inside the 16.4772 Ohm budget at 0.92x --
-      while the common element is unchanged at 4.84 Ohm. For contrast I also solved
-      `vss_ret_w = 6.0`: it takes the common element to 2.43 Ohm and leaves the worst device at
-      18.47 Ohm, still over. That is the report's own lesson restated with numbers: the riser
-      width is not the lever, the ROW RAIL is. Cheaper alternative with the same effect: extend
-      the row-A ptap ring (or the rail) left to meet the riser, so the 66.6 um bare section
-      disappears.
-  expected: "worst-device active return 20.9 -> 15.1 Ohm at rail_w = 1.4; ~2 dB of PSRR budget back"
-  verdict: open
 
 - id: F3
   severity: major
@@ -249,10 +212,15 @@ findings:
     at 0.017 Ohm. R(pass drains -> `vout` port) = **77.6 Ohm** against 0.51 Ohm of drawn metal.
     And column-to-column R is ~16 Ohm, which is the pass device's own S/D terminal region, in
     series with each 2.5 um finger. Nothing in the drawing is 41 Ohm: the vdd riser is 48 cuts
-    per level on Via2/3/4 plus 12 TopVia1, so 41 Ohm is ~2 kOhm per cut -- a modelling default,
-    not a via. The benches agree that this is not a circuit: 9 of 13 now TIME OUT at 600 s
-    (dc_op, dropout, load and line regulation, both transients, all three loop-gain runs) where
-    before they hit a singular matrix, and the four that finish return psrr_1k **-5.549 dB**
+    per level on Via2/3/4 plus 12 TopVia1, so 41 Ohm implies ~2 kOhm per cut. That per-cut figure is INFERRED from the
+    arithmetic (41 Ohm spread over the drawn cut count); I did not read a per-via value out of
+    kpex, and I could not find one in its output. The benches agree that this is not a circuit: 9 of 13 now fail (dc_op, dropout,
+    load and line regulation, both transients, all three loop-gain runs) where before they hit a
+    singular matrix. The failure mode is named in the run log, not just a wall clock: ngspice
+    falls back from KLU to SPARSE 1.3, coerces all 33 `Rstitch_` to 1e-12 Ohm ("Value of
+    resistor r.xdut.rstitch_NN is too small"), then `Dynamic gmin stepping failed` / `True gmin
+    stepping failed` / `source stepping failed` / `Transient op started` -- the DC operating
+    point does not converge, and the transient-op fallback is what runs out the 600 s budget. and the four that finish return psrr_1k **-5.549 dB**
     against 70.09 and vn_out 288.1 uVrms against 361.8. The one net where the mesh IS credible is
     `vss`, and it is credible because that path is Metal1 end to end: R(`vss` port -> the 13
     active-device source nodes) = **4.11 Ohm** aggregate and **10.5 to 24.0 Ohm** per device,
@@ -282,6 +250,74 @@ findings:
       including this repo's `layout/postlayout.py` -- silently picks the RAW one; `PexResult.
       netlist_path` is right, the glob is not (F27).
   expected: "RC becomes a measurement when the terminal/via values are fixed; until then the hand model stands"
+  verdict: open
+
+- id: F9
+  severity: minor
+  category: budget
+  title: "the vss_active budget is defined on the wrong quantity: the 4.84 Ohm common element"
+  where:
+    - {kind: box, layer: Metal1drawing, x0: -71.5, y0: -135.5, x1: -68.5, y1: 0.3}
+    - {kind: line, points: [[-70.0, 0.0], [-3.4, 0.0]]}
+    - {kind: device, name: XMSb, x0: 95.72, y0: 1.42, x1: 97.35, y1: 2.88}
+    - {kind: point, x: -70.0, y: -134.0}
+  evidence: >-
+    Two separate things, and only the second one matters. (a) REPORT section 6.4's number is
+    wrong. It models the worst-case active device at 14.3 Ohm against the brief's 16.4772 Ohm
+    `vss_active` budget ("89 % spent"). I solved it instead: rasterize every Metal1 shape at
+    0.1 um, flood-fill the component holding the `vss` pin (-70.0, -134.0), solve Laplace at the
+    PDK's 110 mOhm/sq (validated to -0.1 % against an analytic bar). The common series element
+    (pin -> riser top at y = 0) is **4.84 Ohm**, confirming the report's 4.91; the worst active
+    device, XMS's b half at x = 96, is **20.88 Ohm** -- **1.27x** of budget, not 0.89x. The
+    mechanism is visible in the drawing: from the riser top the return runs 66.6 um of BARE
+    0.8 um Metal1 rail (9.44 Ohm solved; 0.1375 Ohm/um x 66.6 = 9.16) before the row-A ptap ring
+    even begins -- that ring spans only x = -3.4 to 105.58. Section 6.4 credits "rail in parallel
+    with the ring" over the whole 170 um; 14.3 Ohm is what my solve returns for a device at
+    x = 0, the NEAR end of the row. REPORT section 10.4's "`rail_w` 1.2 -> ~12.7 Ohm" comes from
+    the same over-crediting model; interpolating my two solved builds puts 1.2 at ~16.6 Ohm, on
+    the budget line, not under it. (b) But the per-device number is not what the metric follows.
+    I put the solved return resistances in circuit through the frozen benches (every vss-connected
+    element of the extracted cell behind the common element, each active group then behind its own
+    extra hop, XCOUT on its own strap to the pin -- the generator's own split; anything left on
+    the ideal pin shorts the bounce, so nothing is): common 4.84 Ohm alone gives psrr_1k
+    **67.277 dB**; adding the full drawn per-device spread (14.4-20.9 Ohm) on top gives
+    **67.316 dB**. The entire distributed per-device return is worth **+0.04 dB**. The budget's
+    own step point reproduces only as a LUMPED element: flat 32 Ohm -> 58.193 dB (-0.372 dB/Ohm
+    against the brief's -0.4553), flat 16.48 Ohm -> 62.330 dB. Read as a lumped element the drawn
+    cell sits at ~4.9 Ohm = **0.30x** of the 16.4772 Ohm budget. Two control runs confirm the
+    partition the generator claims at gen_ldo.py:1127-1141: active devices alone behind 32 Ohm
+    move psrr_1k by **+0.099 dB** and S7 by +0.11 mV (the report says +0.44 mV -- same verdict,
+    nothing), and XCOUT alone behind 32 Ohm leaves psrr_1k untouched and IMPROVES S7 to 114.0 mV.
+  effect:
+    metric: psrr_1k_db
+    delta: -2.82
+    unit: dB
+    model: what-if
+    detail: >-
+      The committed post-layout psrr_1k of 70.093 dB is measured with the ground return IDEAL:
+      the CC extraction carries 21 resistors and none of them is the vss path, and XCOUT is
+      re-attached by name to the subckt pin (postlayout.py REINSERT), so no drawn return
+      resistance is in the circuit at all. With the drawn return in place the row is
+      **67.32 dB** -- 2.82 dB of the reported figure is the ideal-ground modelling choice, and
+      2.78 dB of that 2.82 is the 4.84 Ohm COMMON element, not the per-device spread. S6 is
+      "PSRR at 1 kHz, 1 mA >= 40 dB", so 67.3 dB is not a spec risk in any of these cases; this
+      is a budget-definition finding, not a performance one.
+  fix:
+    knob: rail_w
+    to: 1.4
+    note: >-
+      Ordered by what it buys. (1) Correct the brief: `vss_active` should be budgeted on the
+      COMMON series element between the active devices and the pin (4.84 Ohm drawn, 0.29x of
+      16.4772), and the "worst active device" row should be dropped -- I measured it at +0.04 dB
+      and it is the row the report spends section 6.4 on. (2) Correct REPORT sections 6.4 and
+      10.4: 14.3 Ohm is the near-end device (mine: 20.88 Ohm at the far end), and `rail_w` 1.2 is
+      ~16.6 Ohm, not 12.7. (3) Only if the corrected common-element budget is ever tight,
+      `rail_w = 1.4` is the measured lever: I re-solved the generator's own bounds-walk build
+      (bnd/bounds/rail_w_hi, DRC 0, LVS matched, current density 0.836x) and the worst device
+      drops to 15.13 Ohm with the common element unchanged at 4.84 Ohm; in circuit that whole
+      change is worth +1.15 dB (67.32 -> 68.46 dB). `vss_ret_w = 6.0` takes the common element to
+      2.43 Ohm and is the better lever for the quantity that actually matters.
+  expected: "no metric moves more than ~1 dB of a 27 dB PSRR margin; the deliverable is a corrected budget row and two corrected REPORT numbers"
   verdict: open
 
 - id: F14
@@ -412,7 +448,7 @@ findings:
 - id: F25
   severity: minor
   category: pex
-  title: "no pin labels reach kpex, so the stitcher's tie point is arbitrary"
+  title: "kpex emits no [Pin] markers although the labels ARE drawn"
   where:
     - {kind: point, x: -65.5, y: 69.55}
     - {kind: point, x: 133.64, y: 0.0}
@@ -422,7 +458,11 @@ findings:
     markers** (`zcat ldo_ihp_capless_k25d_pex_report.rdb.gz | grep -c '\[Pin'` = 0), even though
     the schematic kpex is given declares six ports
     (`.subckt ldo_ihp_capless vdd vout vss vref lp_brk fb`) and the GDS carries 17 text labels
-    (14 on Metal1 8/25, one on Metal3 30/25, two on TopMetal1 126/25). So the stitcher has device
+    (14 on Metal1 8/25, one on Metal3 30/25, two on TopMetal1 126/25). The labels do reach kpex -- its raw netlist
+    header is `.SUBCKT ldo_ihp_capless vss fb lp_brk ea_o1 ea_out nbias x1 y gate ea_n vdd
+    ea_tail vref pbias vout`, 15 ports derived from those labels -- so the premise "the
+    generator draws no pin labels" is not the mechanism. Whatever produces a `[Pin]` rdb marker,
+    a text label on the routing layer is not enough for it. The stitcher therefore has device
     terminals to anchor but no PORT anchor, and it has to tie each flat net to the mesh at a node
     it picks: for `vdd` that is `vdd.P0.25`, for `vout` `vout.P0.25`, for `vss` `vss.P0.24` --
     polygon 0 of a layer, not the pin. Consequence, and it is the whole reason a series-R budget
@@ -433,12 +473,14 @@ findings:
   effect: {metric: null, delta: null, unit: null, model: hand, detail: "every port-referred series-R number from the extractor is referred to an arbitrary node until the pins are labelled"}
   fix:
     knob: "gen_ldo.py pin labelling"
-    to: "text + pin-datatype shape per port on the pin's own layer"
+    to: "unknown until the platform says what kpex needs -- pin-datatype shape is the hypothesis"
     note: >-
-      Draw each of the six ports as a label AND a pin-datatype polygon on the layer the pin lives
-      on (vdd/vout on TopMetal1 126/2 + 126/25 at the strap ends, vss on Metal1 8/2 + 8/25 at the
-      riser foot, vref/fb/lp_brk likewise), so kpex's LVS pass emits `[Pin]` nodes and the
-      stitcher ties the flat net AT THE PIN. This is also what F13 asks for from the other side:
+      Do NOT redraw anything yet: the text labels are already there and already make ports, so
+      adding a pin-datatype polygon (vdd/vout TopMetal1 126/2 + 126/25 at the strap ends, vss
+      Metal1 8/2 + 8/25 at the riser foot, vref/fb/lp_brk likewise) is a HYPOTHESIS about what
+      kpex 0.3.12 needs, not a diagnosis. Ask the platform which geometry produces a `[Pin]`
+      marker, on the 5-T OTA example where the stitch was verified, and draw whatever that turns
+      out to be; then the stitcher ties the flat net AT THE PIN. This is also what F13 asks for from the other side:
       one label per pin, on the declared edge.
   expected: "port-referred R becomes pin-referred R, and the brief's series-R rows become directly checkable"
   verdict: open
