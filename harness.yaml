@@ -1,6 +1,7 @@
 # The one file that describes this design to the harness (spicexplorer-harness).
 # Keys not listed here keep their defaults; unknown keys fail `make lint`.
 name: ldo-ihp130
+package: ldo         # the design's own Python package (decks, lane, metrics), importable from the repo root
 exp_env: LDO_EXP        # env var stamping every ledger row with the experiment id
 jobs_env: LDO_JOBS      # width of spicexplorer_harness.batch
 
@@ -13,7 +14,7 @@ goal: "A capless LDO (Vin 1.5 V, Vout 1.2 V, 0.1-10 mA, Cout on chip) that match
 spec:
   - {key: v_out_v,         label: "S1 regulated output, Vin 1.5 V, no load", op: in,   bound: [1.176, 1.224], unit: V}
   - {key: load_reg_mv,     label: "S2 load regulation, 0.1 -> 10 mA",        op: "<=", bound: 5,   unit: mV}
-  - {key: line_reg_mv,     label: "S3 line regulation, Vin 1.4 -> 1.65 V",   op: "<=", bound: 5,   unit: mV}
+  - {key: line_reg_mv,     label: "S3 line regulation, Vin 1.4 -> 1.65 V",   op: "<=", bound: 2,   unit: mV}
   - {key: v_dropout_mv,    label: "S4 dropout at 10 mA",                      op: "<=", bound: 200, unit: mV}
   - {key: i_q_ua,          label: "S5 quiescent current, no load",            op: "<=", bound: 50,  unit: uA}
   - {key: psrr_1k_db,      label: "S6 PSRR at 1 kHz, 1 mA",                   op: ">=", bound: 40,  unit: dB}
@@ -26,8 +27,8 @@ spec_notes:
   - "S8 must hold at 0.1 mA and 10 mA too (light-load PM is where capless LDOs die); the fast scorecard measures 1 mA, sign-off runs all three"
 
 # Certified artefacts, sha-locked with SHA256SUMS (`make freeze` after certification).
-frozen: []
-reference_scorecard: ""
+frozen: [decks/reference, decks/candidate]
+reference_scorecard: decks/reference/scorecard.json
 
 # Memory surfaces: entries stay under size_cap (20 KB); the one-line-per-entry index may grow past it.
 memory: {index_size_cap: 32000}

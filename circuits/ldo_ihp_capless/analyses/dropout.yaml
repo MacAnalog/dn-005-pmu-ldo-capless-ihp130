@@ -1,0 +1,18 @@
+# Vin swept 0.9 -> 1.6 V at 10 mA; dropout = Vin - Vout where the output first regulates (S4).
+schema: spicexplorer/analysis@1
+id: dropout
+template: dropout
+description: "Vin swept 0.9 -> 1.6 V at 10 mA; dropout = Vin - Vout where the output first regulates (S4)."
+params:
+  ILOAD: 10m
+  VDD_START: 0.9
+  VDD_STOP: 1.6
+  VDD_STEP: 0.002
+  # The bench does NOT read this (review-002 m5 stands: the criterion is the regulation window
+  # |Vout-VOUT_NOM| <= VREG_TOL plus the slope test). It is bound because the LDO class dropout
+  # template still carries `${VOUT_THRESH}` in its comment header and analog-db's assemble()
+  # scans the RENDERED text, comments included -- unbound, every candidate deck fails to build.
+  # Deleting it (2026-09-04) made this circuit un-assemblable; the real fix is in the template.
+  VOUT_THRESH: 1.14
+flags: []
+produces: [v_dropout]

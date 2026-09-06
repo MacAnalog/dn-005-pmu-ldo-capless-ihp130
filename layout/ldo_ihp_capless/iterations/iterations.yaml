@@ -1,0 +1,946 @@
+iterations:
+- id: it01
+  note: 'floorplan rebuilt: TopMetal1 power path, CC/interdigitated rows w/ dummies, closed rings -> DRC
+    118 (M2.c1 x77)'
+  detail: 'First build of the second drawing. Current-density stage passes 27/27 segments (worst 0.836x).
+    DRC 118: M2.c1 x77 = the pass-array comb''s Via1 stack sticks out of the 0.31 um Metal2 finger''s
+    endcap; Cnt.b x14 inside ihp.cells.guard_ring''s own corner contact arrays; OffGrid/Sal.e/Rhi.d x14
+    inside the XRB rhigh cell at dy=34.625 (rb_segs=4 puts the segment length off the 0.01 um grid); M1.b
+    x8 and M2.b x1 and NW.f x2 in the top cell.'
+  gen_sha256: b85858aa28e16dc8110fd5949c8ae4aab79aa8103b749f3739b624b47c14dbb9
+  gds_sha256: 8d8d55d07b6098141a6cc0d96c79d8aa2f96537fd7967aef8c8a492d05f16c48
+  params:
+    note: LayoutParams defaults
+  area_um2: 42395
+  drc:
+    passed: false
+    n: 118
+    rules:
+      M2.c1: 77
+      Cnt.b: 14
+      M1.b: 8
+      OffGrid.EXTBlock: 6
+      NW.f: 2
+      OffGrid.pSD: 2
+      OffGrid.nSD: 2
+      OffGrid.SalBlock: 2
+      OffGrid.PolyRes: 2
+      M2.b: 1
+      Sal.e: 1
+      Rhi.d: 1
+  lvs: {}
+  pex: {}
+  scorecard: {}
+  files:
+    gen: it01/gen.py
+    png: it01/layout.png
+  drc_hits:
+    M2.c1:
+    - - 50.725
+      - 61.55
+    - - 48.685
+      - 61.55
+    - - 47.665
+      - 61.55
+    - - 51.745
+      - 61.55
+    - - 55.315
+      - 64.52
+    - - 54.295
+      - 64.52
+    - - 55.825
+      - 61.55
+    - - 54.805
+      - 61.55
+    - - 49.195
+      - 64.52
+    - - 53.785
+      - 61.55
+    - - 52.765
+      - 61.55
+    - - 69.595
+      - 64.52
+    - - 61.435
+      - 64.52
+    - - 62.455
+      - 64.52
+    - - 70.615
+      - 64.52
+    - - 68.575
+      - 64.52
+    - - 60.415
+      - 64.52
+    - - 63.475
+      - 64.52
+    - - 71.635
+      - 64.52
+    - - 57.355
+      - 64.52
+    - - 65.515
+      - 64.52
+    - - 73.675
+      - 64.52
+    - - 46.645
+      - 61.55
+    - - 69.085
+      - 61.55
+    - - 58.375
+      - 64.52
+    - - 72.145
+      - 61.55
+    - - 74.695
+      - 64.52
+    - - 68.065
+      - 61.55
+    - - 70.105
+      - 61.55
+    - - 66.535
+      - 64.52
+    - - 61.945
+      - 61.55
+    - - 82.345
+      - 61.55
+    - - 59.905
+      - 61.55
+    - - 75.715
+      - 64.52
+    - - 46.135
+      - 64.52
+    - - 78.775
+      - 64.52
+    - - 49.705
+      - 61.55
+    - - 53.275
+      - 64.52
+    - - 81.835
+      - 64.52
+    - - 81.325
+      - 61.55
+    - - 67.555
+      - 64.52
+    - - 67.045
+      - 61.55
+    - - 64.495
+      - 64.52
+    - - 72.655
+      - 64.52
+    - - 74.185
+      - 61.55
+    - - 66.025
+      - 61.55
+    - - 65.005
+      - 61.55
+    - - 76.735
+      - 64.52
+    - - 56.335
+      - 64.52
+    - - 62.965
+      - 61.55
+    Cnt.b:
+    - - 103.79
+      - 11.125
+    - - 103.79
+      - 11.058
+    - - 51.69
+      - 46.166
+    - - -1.475
+      - 22.71
+    - - 51.69
+      - 46.205
+    - - -1.475
+      - 22.636
+    - - 87.73
+      - 46.205
+    - - 87.73
+      - 46.166
+    - - 55.645
+      - 22.71
+    - - 55.645
+      - 22.673
+    - - 86.35
+      - 65.575
+    - - 86.35
+      - 65.561
+    - - 42.265
+      - 50.52
+    - - 42.265
+      - 50.506
+    M1.b:
+    - - 27.93
+      - 32.329
+    - - 72.73
+      - 36.584
+    - - 72.14
+      - 36.74
+    - - 27.34
+      - 32.485
+    - - 49.83
+      - 32.329
+    - - 49.24
+      - 32.485
+    - - 85.87
+      - 36.584
+    - - 85.28
+      - 36.74
+    OffGrid.EXTBlock:
+    - - -0.2
+      - 34.626
+    - - -0.18
+      - 34.626
+    - - -0.18
+      - 35.236
+    - - 0.68
+      - 35.236
+    - - 0.68
+      - 34.626
+    - - 0.7
+      - 34.626
+    NW.f:
+    - - 42.34
+      - 56.89
+    - - 88.88
+      - 68.27
+    OffGrid.pSD:
+    - - 0.0
+      - 35.846
+    - - 0.86
+      - 35.846
+    OffGrid.nSD:
+    - - 0.0
+      - 35.846
+    - - 0.86
+      - 35.846
+    OffGrid.SalBlock:
+    - - 0.0
+      - 34.626
+    - - 0.9
+      - 34.626
+    OffGrid.PolyRes:
+    - - 0.0
+      - 34.626
+    - - 0.5
+      - 34.626
+    M2.b:
+    - - 44.26
+      - 66.35
+    Sal.e:
+    - - 0.25
+      - 34.626
+    Rhi.d:
+    - - 0.43
+      - 34.825
+- id: it02
+  note: 'M2.c1 x77: comb Via1 stack overhung the 0.31 um Metal2 finger -> endcap enclosure; own guard
+    ring; dummy blanket'
+  detail: 'Round 2. Five fixes from round 1: (1) the pass-array comb''s Metal1 stub and Metal2 finger
+    now enclose the col_vias via column by 0.10 um (M2.c1 x77 -> 0); (2) ihp.cells.guard_ring replaced
+    by Builder.ring, because the PDK cell''s corner contact arrays violate Cnt.b at every corner (measured
+    standalone at 7 width/spacing combinations) (Cnt.b x14 -> 0); (3) each dummy device is one Metal1
+    blanket rather than per-column ties, which left a 0.09 um notch against its own gate bar (M1.b x8
+    -> 0); (4) the n-well fill comes from the ring itself instead of a wider hand rect that the outer
+    p-substrate ring then sat on (NW.f x2 -> 0); (5) rb_segs 4 -> 5 so XRB''s segment length is 27.7 um
+    and not 34.625 um, which put the rhigh cell''s own geometry off-grid (OffGrid/Sal.e/Rhi.d x14 -> 0).
+    A sixth, Act.b x6, appeared once the rings were mine: the two row-B n-well islands were 0.20 um apart
+    and merged into one well; isl_gap now holds NW.b 0.62 + both rings.'
+  gen_sha256: 3aed26220aafdc8e4f52b7ac46df71db960748512bbbc76b43f225f1cb3be48b
+  gds_sha256: e0da25ae2222555affe303d5631e4d7fa8a2318f9f1bec03867bb1b9b99fd1d7
+  params:
+    area_um2: 42231
+    current_density_worst_over: 0.836
+  area_um2: 42231
+  drc:
+    passed: true
+    n: 0
+    rules: {}
+  lvs:
+    passed: false
+    matched: false
+    unmatched: {}
+    netlist_sha: ce35f47972067f2809e49afed9cd208f47eafee462bfeddafbaff9680d339737
+  pex: {}
+  scorecard: {}
+  files:
+    gen: it02/gen.py
+    png: it02/layout.png
+    diff_from_it01: diff_it01_it02.png
+  drc_hits: {}
+- id: it03
+  note: gate merged into vout at the comb spine; XR2 split 212/85/42 by a stub walking the port row ->
+    Metal3 escape + claimed pads
+  detail: 'Round 3. DRC was 0 and LVS was not: the extracted netlist showed net ''gate|vout'' and XR2
+    as three resistors. Four causes, four fixes. (1) XMP''s gate left its island on a Metal2 column at
+    the array''s left edge, which is exactly where the vout Metal2 comb spine runs - two overlapping Metal2
+    shapes merge, so DRC is silent; the gate now hops the spine and both guard rings on Metal3 (Builder.to_track_m3).
+    (2) The rhigh end pads of the divider comb were not in the Metal1 obstacle map, so a to_track stub
+    walked along the port row and tapped XR2 twice; every segment end is now claimed and only the four
+    terminal pads are retagged to their net. (3) The vdd/vss rails were likewise unclaimed. (4) The MIM
+    plate pads started at Metal2, so when alloc shifted the column the Metal1 stub never reached the plate
+    and XCFF''s bottom plate extracted as an unnamed net; the pads now start at Metal1.'
+  gen_sha256: 8b27de6ad08bfc4c85365a4c3e177c4d0c7ba3e2db51fde1138c09c1b06f0721
+  gds_sha256: 047a2870ed8e8cc1abacba2c633825da0f47d050a2f00a56c1a7238ff3852eab
+  params:
+    area_um2: 42231
+    current_density_worst_over: 0.836
+  area_um2: 42231
+  drc:
+    passed: false
+    n: 129
+    rules:
+      V1.b: 128
+      V1.a: 1
+  lvs:
+    passed: false
+    matched: false
+    unmatched: {}
+    netlist_sha: ce35f47972067f2809e49afed9cd208f47eafee462bfeddafbaff9680d339737
+  pex: {}
+  scorecard: {}
+  files:
+    gen: it03/gen.py
+    png: it03/layout.png
+    diff_from_it02: diff_it02_it03.png
+  drc_hits:
+    V1.b:
+    - - 129.28
+      - -38.02
+    - - 129.305
+      - -37.995
+    - - 129.09
+      - -37.59
+    - - 129.52
+      - -37.59
+    - - 129.305
+      - -38.235
+    - - 128.875
+      - -38.235
+    - - 129.52
+      - -37.78
+    - - 129.305
+      - -37.805
+    - - 129.735
+      - -38.235
+    - - 129.735
+      - -38.425
+    - - 129.735
+      - -37.805
+    - - 129.71
+      - -38.02
+    - - 129.52
+      - -37.59
+    - - 129.71
+      - -37.59
+    - - 129.735
+      - -37.995
+    - - 129.28
+      - -37.59
+    - - 129.52
+      - -38.02
+    - - 129.09
+      - -37.59
+    - - 129.09
+      - -37.78
+    - - 129.52
+      - -38.02
+    - - 129.305
+      - -38.235
+    - - 129.495
+      - -37.805
+    - - 129.09
+      - -38.02
+    - - 129.305
+      - -38.425
+    - - 128.875
+      - -37.805
+    - - 129.065
+      - -37.805
+    - - 129.09
+      - -38.21
+    - - 129.065
+      - -38.235
+    - - 129.09
+      - -38.02
+    - - 129.495
+      - -38.235
+    - - 129.52
+      - -38.21
+    - - 129.305
+      - -37.805
+    - - -0.32
+      - -38.02
+    - - -0.535
+      - -37.805
+    - - -0.725
+      - -38.235
+    - - 0.135
+      - -38.235
+    - - -0.105
+      - -38.235
+    - - -0.08
+      - -37.59
+    - - -0.105
+      - -37.805
+    - - -0.535
+      - -38.235
+    - - -0.08
+      - -38.21
+    - - -0.51
+      - -38.02
+    - - 0.135
+      - -37.995
+    - - -0.51
+      - -38.02
+    - - -0.51
+      - -37.59
+    - - 0.135
+      - -37.805
+    - - -0.295
+      - -38.235
+    - - -0.295
+      - -38.235
+    - - -0.51
+      - -38.21
+    - - -0.295
+      - -38.425
+    V1.a:
+    - - -66.495
+      - -81.995
+- id: it04
+  note: 'V1.b x128: MIM pad + to_track both stacked Via1 at one point; vout split at the climb landing;
+    XR2 links -> Metal3'
+  detail: 'Round 4. DRC 129 and LVS still split. (1) V1.b x128 / V1.a: the MIM plate pads now reach Metal1,
+    so to_track''s own Metal1->Metal2 stack landed on top of the plate pad''s 3x3 Via1 array - two overlapping
+    arrays merge into shapes of the wrong size and spacing. to_track(term_stack=False) leaves the pad''s
+    own stack alone, and the XCOUT vss ties no longer add one. (2) The vout channel track and the vout
+    TopMetal1 strap extracted as two nets (vout and vout): Builder.climb landed on the track at an x the
+    track was never drawn out to, because climb did not register the landing in track_pts. (3) XR2''s
+    series links ran on Metal2 at the port row, which is exactly where the fb / lp_brk Metal2 columns
+    leave the comb; they are on Metal3 now, and XR1''s Metal1 links are claimed in the obstacle map.'
+  gen_sha256: 39f255f82bd84b04f76922e6614c81dc700a232139fe85562161d560a2d202f9
+  gds_sha256: 98325021d0998744a3e91bb9628261315570960371d9e5c1829b933e2b32f987
+  params:
+    area_um2: 42231
+    current_density_worst_over: 0.836
+  area_um2: 42231
+  drc:
+    passed: false
+    n: 3
+    rules:
+      M2.b: 2
+      V1.a: 1
+  lvs:
+    passed: false
+    matched: false
+    unmatched: {}
+    netlist_sha: ce35f47972067f2809e49afed9cd208f47eafee462bfeddafbaff9680d339737
+  pex: {}
+  scorecard: {}
+  files:
+    gen: it04/gen.py
+    png: it04/layout.png
+    diff_from_it03: diff_it03_it04.png
+  drc_hits:
+    M2.b:
+    - - -53.1
+      - -6.557
+    - - -53.1
+      - -49.617
+    V1.a:
+    - - -66.495
+      - -81.995
+- id: it05
+  note: 'CFF/CC plates swapped vs the certified card: cap_cmim is polarised, nodes[0] is the top plate
+    -> read the assignment from the netlist'
+  detail: 'Round 5. DRC 3, LVS mismatch on exactly two devices. (1) The LVS cross-reference named CFF
+    and CC (and nets fb/lp_brk/ea_o1/ea_out): cap_cmim is a POLARISED device class, so the certified card
+    fixes which node is the top plate - nodes[0] is PLUS/top, nodes[1] the Metal5 bottom. Round 4 followed
+    brief section 9 (sensitive terminal on top, since kpex does not extract the top plate) and inverted
+    both. The generator now reads the assignment off the certified card; the brief''s preference is a
+    re-sizing question because the bottom-plate parasitic would move to the other node. (2) M2.b x2: the
+    Metal1->Metal3 hop pads were 0.6 um, which alloc''s 0.6 um column pitch does not clear; they are VPAD
+    now and registered as obstacles. (3) V1.a x1: a shifted column 0.6 um from a MIM plate pad merged
+    its Via1 with the pad''s 3x3 array; to_track now pushes such a column at least 0.95 um clear.'
+  gen_sha256: 5b6d91cd704a9f3b66c468a0296436520b32176ca7360286a2cdbf65b81cd0fe
+  gds_sha256: e3422e88911cd0759b1c7f220aeb88e7eb14b41cc16f1988a6b48d8f574d50ea
+  params:
+    area_um2: 42231
+    current_density_worst_over: 0.836
+  area_um2: 42231
+  drc:
+    passed: false
+    n: 6
+    rules:
+      M1.b: 2
+      M2.b: 2
+      V1.a: 1
+      V1.b: 1
+  lvs:
+    passed: true
+    matched: true
+    unmatched: {}
+    netlist_sha: ce35f47972067f2809e49afed9cd208f47eafee462bfeddafbaff9680d339737
+  pex: {}
+  scorecard: {}
+  files:
+    gen: it05/gen.py
+    png: it05/layout.png
+    diff_from_it04: diff_it04_it05.png
+  drc_hits:
+    M1.b:
+    - - -66.45
+      - -82.232
+    - - -66.45
+      - -81.8
+    M2.b:
+    - - -66.45
+      - -81.774
+    - - -66.45
+      - -82.269
+    V1.a:
+    - - -52.745
+      - -116.995
+    V1.b:
+    - - -52.745
+      - -116.995
+- id: it06
+  note: 'LVS matched; last 6 DRC are one cause: a shifted column 0.95 um from a 1.3 um MIM pad -> push
+    it 1.4 um clear'
+  detail: 'Round 6. LVS matched at the record sizing for the first time in this drawing. The remaining
+    M1.b x2 / M2.b x2 / V1.a / V1.b are all the same geometry: the minimum shift introduced in round 5
+    (0.95 um) is smaller than the MIM plate pad''s own half width (0.65) plus a via pad (0.19) plus the
+    metal space (0.21), so the pad and the shifted stack still faced each other at 0.11 um. 1.4 um clears
+    Metal1, Metal2 and the 3x3 Via1 array with margin.'
+  gen_sha256: 6f901dd1bc8975ed5151b8a2e1aa13b7c7fc17c86c46d7ed0a537142d48be35a
+  gds_sha256: 2a7ffd70a353d5b876c769eb7975f95f35bc3f400c919a51e4499a201b9de394
+  params:
+    area_um2: 42231
+    current_density_worst_over: 0.836
+  area_um2: 42231
+  drc:
+    passed: false
+    n: 6
+    rules:
+      M2.b: 3
+      V1.b: 2
+      M2.e: 1
+  lvs:
+    passed: true
+    matched: true
+    unmatched: {}
+    netlist_sha: ce35f47972067f2809e49afed9cd208f47eafee462bfeddafbaff9680d339737
+  pex: {}
+  scorecard: {}
+  files:
+    gen: it06/gen.py
+    png: it06/layout.png
+    diff_from_it05: diff_it05_it06.png
+  drc_hits:
+    M2.b:
+    - - -66.45
+      - -116.71
+    - - -66.45
+      - -82.55
+    - - -52.3
+      - -116.71
+    V1.b:
+    - - -52.295
+      - -116.995
+    - - -66.325
+      - -116.995
+    M2.e:
+    - - -66.5
+      - -81.015
+- id: it07
+  note: MIM plate pads now claimed in the obstacle map and routed from a 2 um Metal1 escape arm, not from
+    the pad itself
+  detail: 'Round 7. The last six violations kept moving between M1.b / M2.b / V1.a / V1.b / M2.e around
+    the XCC and XCFF plate pads: a routing pad allocated on the 0.6 um column pitch next to a 1.3 um plate
+    pad with a 3x3 Via1 array always lands too close somewhere. Replaced the minimum-shift patch with
+    structure: mim() claims each plate pad (0.85 um halo) in the Metal1 obstacle map, so alloc refuses
+    those columns outright, and hands the caller a Metal1 arm 2 um clear of the plate to route from. to_track
+    lost its term_stack special case.'
+  gen_sha256: 108626d300e26623028849012b6cad5c3bd16877f0847910a364619609cc5b01
+  gds_sha256: 720111fd57e026665264d4c3f0ca0b43fbdf0f030ef8b4dc95f3addaf2acdbaa
+  params:
+    area_um2: 42231
+    current_density_worst_over: 0.836
+  area_um2: 42231
+  drc:
+    passed: true
+    n: 0
+    rules: {}
+  lvs:
+    passed: false
+    matched: false
+    unmatched: {}
+    netlist_sha: ce35f47972067f2809e49afed9cd208f47eafee462bfeddafbaff9680d339737
+  pex: {}
+  scorecard: {}
+  files:
+    gen: it07/gen.py
+    png: it07/layout.png
+    diff_from_it06: diff_it06_it07.png
+  drc_hits: {}
+- id: it08
+  note: escape arms ran outward into the left-edge vss strap and shorted ea_o1/fb/vss -> route them inward
+    under the plate
+  detail: 'Round 8. DRC hit 0 for the first time in this drawing, and LVS broke: the XCC and XCFF plate
+    escape arms added in round 7 pointed outward, where the cell''s left-edge Metal1 vss strap runs from
+    the bottom rail to the cell rail, so ea_o1, fb and vss extracted as one net. Pointing the arms inward
+    puts them under the plate''s own Metal5, where nothing on Metal1 or Metal2 can be in the way.'
+  gen_sha256: 9a5ba62884a672a599b1b13e5378ae77704a9bbdbc18cfdeb7653e068a5e152e
+  gds_sha256: 226bf2ea97e80388441802cd031db6131c9cbe8cbd777db379fd7bdb95e52269
+  params:
+    area_um2: 42231
+    current_density_worst_over: 0.836
+  area_um2: 42231
+  drc:
+    passed: true
+    n: 0
+    rules: {}
+  lvs:
+    passed: true
+    matched: true
+    unmatched: {}
+    netlist_sha: ce35f47972067f2809e49afed9cd208f47eafee462bfeddafbaff9680d339737
+  pex: {}
+  scorecard: {}
+  files:
+    gen: it08/gen.py
+    png: it08/layout.png
+    diff_from_it07: diff_it07_it08.png
+  drc_hits: {}
+- id: it09
+  note: 'layout of record: DRC 0, LVS matched at both sizing points, current density 27/27, kpex CC 182C/21R,
+    13/13 benches PASS'
+  detail: 'Round 9, the layout of record. Nothing changed from round 8 except xmp_nf_mult''s documented
+    range (1,8) -> (3,8): a build at nf_mult=1 (which the current-density stage rejects anyway, 1.46x
+    over on the shared column) extracts gate shorted to vout, so the range now only covers what the blocker
+    allows. Verdicts: current density 27/27 segments, worst 0.836x; DRC 0 with the density tables off;
+    LVS matched against lower(certified netlist)+dummies at the record sizing AND at the 002 hand sizing;
+    kpex CC 182 C / 21 R; RC 182 C / 8418 R; the 13 frozen benches on the CC netlist give 0 spec violations.'
+  gen_sha256: aff30273581db1c2c299755c7ac467576e2d31c3622f65d616ba010e2fcb37e1
+  gds_sha256: 226bf2ea97e80388441802cd031db6131c9cbe8cbd777db379fd7bdb95e52269
+  params:
+    area_um2: 42231
+    current_density_worst_over: 0.836
+  area_um2: 42231
+  drc:
+    passed: true
+    n: 0
+    rules: {}
+  lvs:
+    passed: true
+    matched: true
+    unmatched: {}
+    netlist_sha: ce35f47972067f2809e49afed9cd208f47eafee462bfeddafbaff9680d339737
+  pex:
+    ok: true
+    mode: CC
+    n_c: 182
+    n_r: 21
+  scorecard: {}
+  files:
+    gen: it09/gen.py
+    png: it09/layout.png
+    diff_from_it08: diff_it08_it09.png
+  drc_hits: {}
+- id: it10
+  note: 'certified deck re-issued on the drawn device set (F19): Iq 36.28->33.81 uA, S7 104.8->115.1 mV'
+  detail: 'Commit 1 of the fix round: `decks/candidate` re-certified so the certified netlist and the
+    LVS reference are the same text (review-003 F19, adopted). The drawn device set moves into `circuits/.../netlist.spice`:
+    XMB0/XMB1/XMS/XM1..XM4 as named half-width A/B cards, XR1/XR2 as eight-segment strings and XRB as
+    five, XMP as m=76 unit fingers of 2.5 um. The generator''s slot tables now name those cards, so a
+    matched member is a certified device rather than a split `--combine_devices` happens to tolerate,
+    and `xmp_nf_mult` / `r_segs` / `rb_segs` leave `LayoutParams` for `sizing.yaml`. Attribution measured
+    on the certified deck: 91 % of the -2.47 uA Iq shift is the bias-branch halving, 8 % the resistor
+    segmentation, and the pass finger split is +0.015 uA, i.e. free. The GDS changes with it (sha 226bf2ea
+    -> ff85adc0) at the same 42 231 um2. This round had no snapshot when it was committed; it is recorded
+    here so the trail has no hole between the reviewed drawing and the fix round.'
+  gen_sha256: 62411818d1a30da0a838b281bc32c9b3ee679b43f19e76fce9ec62c1fd05cddf
+  gds_sha256: ff85adc0da06ed2edbbb0d7d97f84e152e6a41cbeb48732100b3b6529509181a
+  params:
+    area_um2: 42231
+    current_density_worst_over: 0.836
+  area_um2: 42231
+  drc:
+    passed: true
+    n: 0
+    rules: {}
+  lvs:
+    passed: true
+    matched: true
+    unmatched: {}
+    netlist_sha: null
+  pex: {}
+  scorecard: {}
+  files:
+    gen: it10/gen.py
+    png: it10/layout.png
+    diff_from_it09: diff_it09_it10.png
+  drc_hits: {}
+- id: it11
+  note: 'Metal2 comb registered per-layer + gate track on Metal3 + ea_in_pair leftmost: DRC 0, LVS matched,
+    PM 68.76->69.30'
+  detail: 'Fix round for layout review-003 (blockers F1-F3, majors F4-F9, minors F10-F14).
+
+
+    Router: ObstacleMap is layer-aware. Every vertical carries its layer and claim_box() records an
+
+    arbitrary drawn rectangle, so the pass array''s Metal2 comb (fingers + two 6 um spines, drawn by the
+
+    power path as plain rects) is finally an obstacle. That closes the gate|vout short class the
+
+    reviewer reproduced at col_vias 3 and 4, and it removes the hard-coded to_track_m3: gate''s track
+    is
+
+    now Metal3 (TRACK_LAYER), so the comb is simply not on its layer. Same-net columns now keep the
+
+    via-pad pitch too - two ea_n columns 0.38 um apart merge legally on Metal2 but put their Via1 cuts
+
+    0.19 um apart (V1.b).
+
+
+    Geometry: the pass device''s gate stand-off is derived from the drain via pad (at col_vias 4 the
+
+    drain Metal1 reached 0.08 um into the gate bar); the n-well ring''s Metal2 riser reaches the source
+
+    spine at any ring_gap (at 3.0 the pass bulk extracted as an unnamed node); the right cell edge is
+
+    placed by TopMetal1 spacing to the XCOUT block, so pwr_w 1.64-8 and vss_ret_w 0.8-6 are all legal.
+
+
+    Floorplan: ea_in_pair is the first group of row B (fb 107 -> 79.6 um) and bias_p_group takes the
+
+    long trip. Common-centroid members reserve a MIRRORED COLUMN PAIR before the general allocator runs
+
+    - the XOR of the two halves'' own routing is 0.000-0.011 um2 with equal via counts, against 64.7 %
+
+    and 32.8 %. Dummies are sized to the slot they stand beside, not to the widest slot in the group.
+
+    XRB is on res_pitch with a tied dummy at each end. vss return: bottom rail plus TWO edge risers at
+
+    vss_ret_w = 3.0 (hand model 32 -> ~3 ohm) and ONE vss label. lp_brk escapes to the right edge beside
+
+    vout, so the divider senses at the output pin. pwr_w 2.0 -> 4.0 (hand model: vdd 1.20 -> 0.60 ohm,
+
+    vout 1.11 -> 0.56 ohm, dropout adder 30.5 -> 15.2 mV).
+
+
+    Sign-off: DRC and LVS now BLOCK; a new bounds stage walks both ends of every documented range
+
+    (40/40 build + DRC 0 + LVS matched + current density pass); the per-net C table keeps every net;
+
+    kpex runs with the run dir as its cwd so its stray <cell>_extracted.cir lands inside it.
+
+
+    Measured: area 42 231 -> 44 266 um2 (+4.8 %). CC per-net to-rail C: gate 34.45, fb 21.20, ea_o1
+
+    43.92, ea_out 16.75 fF. Post-layout 18/18 PASS, S7 127.6 mV, PM 69.30 (was 68.76). Gate-only what-if
+
+    S7 201.7 mV (was 204.5) - still over 150 and NOT closed by routing: gpad 0.5 -> 0.34, i.e. 32 % less
+
+    gate-bar area, buys 0.30 fF of 34.45, so the term is the pass array''s own gate structure, which the
+
+    certified finger count sets. RC still emits an 8548-card R mesh with ZERO nodes in common with the
+
+    33 device pins (kpex 0.3.12), so 5 of 13 benches abort and the R is electrically absent.
+
+    '
+  gen_sha256: 7d274c6a75c404541616f478e17988251e1f086c62dc08ae36da76b20f3e02ee
+  gds_sha256: a66d15b58033051c9100a5f067b3b0c10de5527a29df42812070d983a5f40467
+  params:
+    area_um2: 44266
+    current_density_worst_over: 0.836
+  area_um2: 44266
+  drc:
+    passed: true
+    n: 0
+    rules: {}
+  lvs:
+    passed: true
+    matched: true
+    unmatched: {}
+    netlist_sha: f573b653cd022e639fbe1c97c7c3cb08db32c5c08b8edf920c1e34067951fcfd
+  pex:
+    ok: true
+    mode: CC
+    n_c: 186
+    n_r: 21
+  scorecard: {}
+  files:
+    gen: it11/gen.py
+    png: it11/layout.png
+    diff_from_it10: diff_it10_it11.png
+  drc_hits: {}
+- id: it12
+  note: 'vss cliff is shared impedance, not width: XCOUT gets its own strap to the pin, right riser deleted
+    -> return 4.9 ohm, 40/40 endpoints clean'
+  detail: 'Second round of the fix, after the brief author re-derived every budget on the re-certified
+
+    schematic row (BRIEF.md @ 223373e). Two brief changes drive it.
+
+
+    F9''s MECHANISM changed. The re-derived brief §4a splits the vss injection: with only the ACTIVE
+
+    devices behind 32 ohm S7 moves +0.44 mV (nothing), and with only XCOUT''s bottom plate behind it S7
+
+    IMPROVES to 103.2 mV (ESR-zero damping). The 11 ohm cliff needs BOTH halves behind one R - Cout''s
+
+    load-step displacement current develops a ground bounce the FVF sources and the EA read as a
+
+    reference step. So the fix is a CONNECTION, not a width: the vss pin is now the foot of the single
+
+    left-edge riser, the active devices reach it down that riser alone, and XCOUT''s four bottom plates
+
+    reach the same pin along the bottom rail on their own vss_ret_w-wide straps. The right-edge riser
+
+    of the previous round is DELETED - it would have put the active current back onto the cap''s return
+
+    rail, which is the shared impedance the cliff is made of. Hand model: common series element 4.9
+
+    ohm, worst-device total including the cell rail in parallel with the ptap ring 14.3 ohm, against
+
+    the brief''s 16 ohm active-only budget (S6, -0.4553 dB/ohm).
+
+
+    F3''s TARGET changed: gate to-rail 29.3 -> 12 fF, with a measured step between 12 and 13 fF, and
+
+    gate->vout re-bracketed at 40 fF (26x cheaper per fF). The drawn cell is 34.45 fF to-rail and 8.91
+
+    fF to vout. Two new measurements settle what layout can do about it. (1) dev_gap 3.2 -> 6.0
+
+    lengthens the Metal3 gate track 50.77 -> 59.17 um and moves gate to-rail 34.45 -> 34.95 fF, i.e.
+
+    0.060 fF/um, so the WHOLE track is worth 3.0 fF and a vout shield under it can convert at most that
+
+    into the 26x-cheaper column - 13 % of the 22.5 fF shortfall. (2) A sizing sweep at
+
+    x_dut_xmp_nf_mult = 2 gives gate 33.70 total / 26.63 fF to-rail, i.e. 3.9 fF of to-rail per unit
+
+    finger multiple, so the extrapolated floor at nf_mult -> 0 is ~18.8 fF - still above 12 fF, and
+
+    nf_mult = 2 is already 1.46x over the Metal1 current-density limit on the shared S/D column. 12 fF
+
+    is therefore not reachable by routing OR by any legal sizing; it is a spec/topology ruling for the
+
+    owner and is filed as one.
+
+
+    Verdicts unchanged by the F9 change, as expected - the CC extraction carries no R, so a return-path
+
+    topology fix cannot show in it: DRC 0, LVS matched, current density 30/30 worst 0.836x, kpex CC
+
+    186 C / 21 R, post-layout 18/18 PASS with S7 127.558 mV and PM 69.301 deg, area 44 266 um2.
+
+    The pwr_w = 4.0 hand model re-scored against the brief''s new pooled rule: 10.34 x 0.598 + 8.64 x
+
+    0.556 = 10.98 mV of the 23.83 mV dropout pool (46 %), where pwr_w = 2.0 spends 21.98 mV (92 %).
+
+
+    Two further generator fixes found by re-walking the ranges after this round''s changes, both
+
+    verified byte-identical at the record sizing: XRB''s five segment end pads are now CLAIMED in the
+
+    obstacle map (the divider''s already were), and the XCOUT array starts at `x_pass_r` instead of a
+
+    fixed x = 1.0 um. At res_pitch = 3.0 the XRB block slid right to x = -2..16 and XCOUT''s
+
+    bottom-plate drop - 3.0 um wide since the Kelvin return, 0.6 um before it - ran straight down
+
+    through it, so the five-segment string extracted as vss-27.7-$23, vss-27.7-nbias, vss-55.4-vdd.
+
+    `x_pass_r` had been computed and never used.
+
+    '
+  gen_sha256: a539510636e7610fd5061b93b94fee58fd35f2e01261cc50c22aadc41f4299aa
+  gds_sha256: c8d92a2f9e9bc0aa8883bf9090f25cb623b9192717803119a4caa28096260a9b
+  params:
+    area_um2: 44266
+    current_density_worst_over: 0.836
+  area_um2: 44266
+  drc:
+    passed: true
+    n: 0
+    rules: {}
+  lvs:
+    passed: true
+    matched: true
+    unmatched: {}
+    netlist_sha: f573b653cd022e639fbe1c97c7c3cb08db32c5c08b8edf920c1e34067951fcfd
+  pex:
+    ok: true
+    mode: CC
+    n_c: 186
+    n_r: 21
+  scorecard: {}
+  files:
+    gen: it12/gen.py
+    png: it12/layout.png
+    diff_from_it11: diff_it11_it12.png
+  drc_hits: {}
+- id: it13
+  note: 'port labels were not pins: 0.2 um pin-purpose square under all 17 -> kpex anchors 15/15 ports
+    on [Pin], CC netlist byte-identical'
+  detail: 'review-004 round. The only geometry change is PLAN A14: a 0.2 um square on the layer''s PIN
+
+    purpose (Metal1 8/2, Metal3 30/2, TopMetal1 126/2) centred on each of the 17 port labels, because
+
+    kpex emits a [Pin] node only when the text sits inside a pin-purpose polygon (platform probe
+
+    @7d55218). Before: 0 [Pin] markers, the RC stitch anchored every port on a proxy node ~100 um from
+
+    the drawn port, so every port-referred series-R number was referred to the wrong place. After:
+
+    15 of 15 named ports anchor on ''pin'', 18 proxies left (the anonymous $NN divider nets).
+
+    Electrically inert, and that is measured rather than argued: DRC 0, LVS matched, current density
+
+    30/30 worst 0.836x, and the CC extracted netlist is byte-identical to it12''s (418/418 lines,
+
+    0 differing). So scorecard_post.json, the per-net budget table and experiments/007''s corner grid
+
+    all stand on the same numbers.
+
+    RC on this drawing: mesh_connected=True, 220/243 device pins, 0 open nets, 19 stub nets,
+
+    n_R=8583 (platform @d708816/@b61f6c7/@9df117b fixed the island). The stitched netlist still does
+
+    not regulate through the frozen benches (v_out 1.4999 V, i_q 12.66 uA); the record row stays CC
+
+    and scorecard_post_rc.json carries the RC row verbatim.
+
+    Also this round, no geometry: F27 select_pex_netlist (the benches measure the file the extractor
+
+    named), F26 mesh_connected/mesh/raw_netlist in the record + a gate on an open mesh, F24 signoff.json
+
+    merges instead of replacing, F22 router.py/netlist_ref.py copied beside gen.py, F9 rail_solve.py
+
+    (common element 4.74 Ohm, worst device 20.56 Ohm, in-circuit -2.76 dB of a 27 dB PSRR margin).
+
+    modules copied beside gen.py: router.py d93b46ae8a273de3, netlist_ref.py 75df5e6b08d871b4'
+  gen_sha256: 59c4659e1c5271273d36e2327a98e8bde055581dd4b84f5421d68b53b5ecae1f
+  gds_sha256: e638b89e8666319b6b84c6c3a56d85a6801cfb1762e6ef402d54a0a51c2e0ed9
+  params:
+    area_um2: 44266
+    current_density_worst_over: 0.836
+  area_um2: 44266
+  drc:
+    passed: true
+    n: 0
+    rules: {}
+  lvs:
+    passed: true
+    matched: true
+    unmatched: {}
+    netlist_sha: f573b653cd022e639fbe1c97c7c3cb08db32c5c08b8edf920c1e34067951fcfd
+  pex:
+    ok: true
+    mode: CC
+    n_c: 186
+    n_r: 21
+  scorecard: {}
+  files:
+    gen: it13/gen.py
+    png: it13/layout.png
+    diff_from_it12: diff_it12_it13.png
+  drc_hits: {}

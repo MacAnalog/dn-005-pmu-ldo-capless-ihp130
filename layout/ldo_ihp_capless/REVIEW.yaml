@@ -1,0 +1,832 @@
+schema: layout-review/1
+cell: ldo_ihp_capless
+gds: build/ldo_ihp_capless.gds
+gds_sha256: c8d92a2f9e9bc0aa8883bf9090f25cb623b9192717803119a4caa28096260a9b
+generator:
+  path: layout/gen_ldo.py
+  sha256: a539510636e7610fd5061b93b94fee58fd35f2e01261cc50c22aadc41f4299aa
+  params: LayoutParams() defaults; sizing from circuits/ldo_ihp_capless/pdk/ihp-sg13g2/sizing.yaml
+verdict: PASS with majors
+units: um
+axis: {}
+frame: {x0: -73.5, y0: -135.5, x1: 137.64, y1: 74.15}
+reviewer: layout-reviewer (independent re-review of review-003; did not write this generator)
+review_round: 4
+supersedes: "review-003 (this file at commit 2a730df), FAIL, 3 blockers"
+
+at_a_glance:
+  verdict: accept
+  note: >-
+    Graded on geometry read out of the rebuilt GDS. ea_in_pair is dummy/XM1a/XM2a/XM2b/XM1b/dummy
+    at x = 0.29..22.19 -- ABBA, both centroids at x = 11.24; ea_nmos_load is ABBA with both
+    centroids at x = 27.94; bias_n_group is ABC.CBA with ALL THREE centroids at x = 85.96. All
+    seven matching classes XOR to 0.000 um2 at device bbox + 1.2 um with equal Via1 counts.
+    Dummies at both ends of every device row, each sized to its own neighbour. All five well /
+    substrate tap regions merge to ONE polygon WITH A HOLE, i.e. the rings actually close (NWell
+    islands at (-3.71,22.01), (55.17,22.01), (44.57,57.52) with 444 / 326 / 296 contacts and
+    0.98-0.99 bbox coverage; ptap rings at (-3.40,-2.90) and (43.07,50.83)). Resistors on one
+    2.0 um pitch throughout with tied dummies each end. Straps at 0.836x J_max, 0.9835x worst over
+    the 40-endpoint walk. Two blemishes, both already findings: XCOUT has no MIM dummy ring (a
+    declared, recorded PLAN deviation) and the pin labelling is not one-per-declared-edge (F13:
+    two vdd labels, vref 71 um inside the cell).
+
+reproduced:
+  build: match
+  build_note: >-
+    Rebuilt from the committed layout/gen_ldo.py through layout/signoff.py with
+    $LDO_GF_PYTHON=~/miniconda3/envs/ai_env/bin/python. GDS sha256 c8d92a2f... equals
+    iterations.yaml it12 exactly, and equals the sha of the generator's own sha256 record
+    (gen a539510...). Area 44266 um2, bbox (-73.50,-135.50)-(137.64,74.15) -- matches REPORT
+    section 1. iterations/it11/gen.py also rebuilds byte-identical to its recorded
+    a66d15b5..., and the it11 -> it12 XOR is 858.26 um2 on layer 8/0 (Metal1) and ZERO on
+    every other layer -- the disclosed 858.3 um2 Metal1-only change, confirmed.
+  drc: {passed: true, n: 0, engine: "KLayout 0.30.5 sg13g2_maximal, --no_density"}
+  lvs:
+    passed: true
+    netlist_sha: f573b653cd022e639fbe1c97c7c3cb08db32c5c08b8edf920c1e34067951fcfd
+    reference: >-
+      layout/netlist_ref.py derived from the RE-CERTIFIED
+      circuits/ldo_ihp_capless/pdk/ihp-sg13g2/netlist.spice (sha256
+      f5c4efb02afe023e931d02ceda9b9916712409b28c9125f165dcafb396a42080, commit bf3a4f8) plus the
+      declared dummies. I read that netlist card by card: XR1/XR2 are 8 segments each, XRB 5,
+      XMB0/XMB1/XMS and XM1..XM4 are half-width A/B pairs, XMP is
+      w={x_dut_xmp_w/x_dut_xmp_nf_mult} m={x_dut_xmp_m*x_dut_xmp_nf_mult} = 2.5 um x 76 -- the
+      drawn device set, exactly. This is the F19 fix and it is in the file, not just in prose.
+    second_sizing_point:
+      sizing: "002 hand point, git 76eddd6 (13 knobs differ; it carries no x_dut_xmp_nf_mult, so
+        the generator defaults it to 4)"
+      build: ok
+      area_um2: 41055
+      drc: 0
+      lvs: matched
+      current_density: "30/30, worst 0.836x"
+  bounds:
+    passed: true
+    n: 40
+    note: >-
+      I re-ran the new `bounds` stage myself at --jobs 2: all 20 documented ranges, both ends,
+      40/40 build + DRC 0 + LVS matched + current density pass. Worst current density over the
+      whole walk is 0.9835x (pwr_band_w lo). This is the F2 fix and it reproduces.
+  pex:
+    mode: CC and RC
+    halo: kpex 2.5D, technology default (SG13G2 8 um sidewall); MIM stripped before extraction
+    n_c: 186
+    n_r_cc: 21
+    n_r_rc: 8566
+    note: >-
+      CC reproduces 186 C / 21 R exactly, and every number in REPORT section 7's per-net table
+      reproduces to the digit (gate 44.50 / 34.45 to-rail, gate->vout 8.911, fb 31.90 / 21.20,
+      lp_brk 37.93 / 24.26, vout 109.17 / 96.73, vdd 163.26, ea_o1 64.11 / 43.92, x1 11.38 / 6.91,
+      y 11.62 / 8.34, and Cext_127 fb<->lp_brk 4.2346 fF). The committed
+      asbuilt/core_pex.sp is byte-identical to my own extraction on all 186 Cext_ cards.
+      RC on the platform this round was built against: 8566 R (8545 Rext_ + 21 rhigh) against the
+      report's 8569 / 8548 (F23), and the mesh electrically absent -- 6215 nodes named <net>.$i.j,
+      intersection with the device-terminal nodes EMPTY and with the 34 Cext_ nodes EMPTY,
+      confirmed independently. I then re-extracted on the FIXED platform
+      (spicexplorer-platform @b61f6c7, run_pex(..., stitch_mesh=True)): see reproduced.pex_stitched.
+  pex_stitched:
+    platform: "spicexplorer-platform @b61f6c7 (feat/harness-spec-v2), run_pex(stitch_mesh=True)"
+    mode: RC
+    ok: true
+    mesh_connected: true
+    mesh: {n_mesh_nodes: 6215, n_device_pins: 243, n_pins_on_mesh: 220, n_nets_with_mesh: 33,
+           n_open_nets: 0, n_stub_nets: 19}
+    stub_nets: "the 18 divider internal nets ($19..$41) and lp_brk -- kpex 0.3.12 registers no terminal region for rhigh"
+    benches: "4 of 13 ran; 9 TIMED OUT at 600 s (dc_op, dropout, load/line_regulation, both transients, all three ac_loopgain). The four that ran return nonsense: psrr_1k -5.549 dB against 70.09, psrr_1m -5.464 against 14.32, vn_out 288.1 uVrms against 361.8."
+    note: >-
+      The stitch does what it claims -- the mesh is joined, 220 of 243 device pins land on it and
+      no net is open -- and it changes the failure mode from `singular matrix` to
+      non-convergence. It does NOT make this cell's RC row measurable, and the extracted values
+      say why (F25).
+  scorecard:
+    passed: true
+    note: >-
+      All 18 post-layout metrics reproduce the committed scorecard_post.json to the last digit
+      through the frozen path (layout/postlayout.py -> ldo.sim.run + ldo.metrics.promote):
+      v_out 1.199499, i_q 33.80539, dropout 104.671, psrr_1k 70.0932, undershoot 127.560,
+      pm 69.3010 / 69.2706 / 69.1863, loopgain 50.2243, ugf 777.266, gm 7.72094, ms_peak 10.3160,
+      psrr_1m 14.3178, t_transient 0.190095, vn_out 361.801, v_line_pp 55.725, load_reg 0.026,
+      line_reg 0.056. 0 violations, 13/13 benches ok.
+    f19_closure: >-
+      The F19 test: my CC extraction with all 186 Cext_ cards deleted, through the frozen path,
+      reproduces decks/candidate/scorecard.json (i_q 33.80539 vs 33.80539, v_out 1.199499 vs
+      1.199499, undershoot 115.065 vs 115.057, pm 72.5064 vs 72.5064, dropout 104.671 vs
+      104.671). The certified deck IS the drawn device set. F19 is closed by measurement.
+
+findings:
+
+- id: F3
+  severity: major
+  category: objective
+  title: "gate budget is a gate-only artifact: in the assembled cell the net has ~45 fF of headroom"
+  where:
+    - {kind: device, name: XMP pass array, x0: 47.57, y0: 61.77, x1: 87.25, y1: 64.89}
+    - {kind: box, layer: Metal3drawing, x0: 46.94, y0: 3.01, x1: 98.09, y1: 60.77}
+    - {kind: net, name: gate}
+  evidence: >-
+    Everything the report measures reproduces. `gate` extracts to 44.50 fF total / **34.45 fF
+    to-rail** / 8.911 fF to `vout`; gate-only S7 is **201.744 mV** against my run of the frozen
+    tran_load_step (report: 201.72); the finger-multiple lever is linear over a 4x span --
+    I built and extracted at x_dut_xmp_nf_mult = 2, 4 and 8 and got to-rail **26.63 / 34.45 /
+    50.03 fF**, i.e. 3.91 and 3.895 fF per unit with an intercept of **18.81 fF** (report:
+    3.9/unit, ~18.8 fF floor); and nf_mult = 2 fails current density at **1.4626x** (report:
+    1.46x), so it is genuinely unavailable. What the report does NOT measure, and what decides
+    the ruling, is the net's headroom IN THE ASSEMBLED CELL. I swept a lumped `gate`->`vss`
+    capacitor on top of the full 186-card extraction through the frozen tran_load_step:
+    +0 fF S7 = 127.560 mV, +5 = 129.673, +10 = 132.100, +20 = 137.404, +40 = 147.293,
+    +80 = 167.900. That is a smooth **0.44 mV/fF with no step anywhere**, crossing the 150 mV
+    line at about **+45 fF** -- so the drawn 34.45 fF sits at roughly 43 % of the capacitance
+    this net can actually carry. The brief's "12 fF budget with a step between 12 and 13 fF" is
+    measured with every other parasitic zeroed; the assembled cell does not have that step.
+  effect:
+    metric: v_undershoot_mv
+    delta: 22.4
+    unit: mV
+    model: what-if
+    detail: >-
+      127.560 mV drawn against the 150 mV line; the marginal sensitivity of S7 to `gate`
+      to-rail capacitance measured in situ is 0.44 mV/fF, giving ~45 fF (130 % of the drawn
+      value) before the spec line, at tt / 27 C.
+  fix:
+    knob: new feature
+    note: >-
+      Not a layout fix and not a topology fix -- a measurement. Before an owner is asked to
+      change the pass device, change the output stage, add a certified capacitor on `ea_o1` or
+      widen the S7 line (PLAN section 6b ruling 1), run the full-PEX corner and Monte-Carlo
+      sweep (F16). The whole question is whether the 22.4 mV of measured margin survives ss/-40
+      and mismatch; a gate-only budget cannot answer it in either direction. If the corner run
+      shows the margin holds, ruling 1 dissolves; if it does not, the corner run also says by
+      how much, which is what a topology decision needs.
+  expected: "either the ruling closes or it acquires a number; today it has neither"
+  verdict: open
+
+- id: F16
+  severity: major
+  category: objective
+  title: "still tt/27 only, and both owner rulings now depend on the corner + MC run"
+  where:
+    - {kind: net, name: (whole cell)}
+  evidence: >-
+    Unchanged from review-003 and now load-bearing. Every row in both scorecards is tt / 27 C
+    (PLAN section 7 excludes corners explicitly, REPORT section 10.6 records it). Three things
+    the re-derived brief added make this the decisive gap rather than a caveat. (1) F3's margin
+    is a cancellation whose corner behaviour nobody has measured. (2) `brief.json` prices
+    `ea_nmos_load` at 1.0 mV of tolerated dVT against a PDK 1-sigma of 1.6468 mV (0.607 sigma),
+    and its own `out_of_box_dvt_mv` is 2.0 mV -- I checked the sigma arithmetic myself,
+    sqrt(2) x A_VT / sqrt(W.L) with A_VT = 2.0 mV.um from sg13g2_moslv_mismatch.lib and
+    W.L = 2.95 x 1.0 um on the WHOLE device (not per half), = 1.6468 mV, which is right. So
+    P(dVT > 2.0 mV on the dangerous XM3 side) = Phi(-1.215) = **11 %** of dies, one-sided, from
+    random mismatch of one class alone, before any parasitic. `bias_p_group`: out of box at
+    1.5 mV, 1 sigma 1.118 mV, = **9 %** one-sided. (3) The re-certification moved Iq to
+    33.81 uA, toward the S7-vs-bias-current step review-002 M6 measured near 30.7 uA at tt.
+    None of the three has been simulated anywhere but the typical corner.
+  effect: {metric: v_undershoot_mv, delta: null, unit: mV, model: hand, detail: "unquantified by construction -- that is the finding"}
+  fix:
+    knob: new feature
+    note: >-
+      The post-layout corner sweep the campaign already has decks for, on the extracted subckt,
+      plus a mismatch Monte Carlo on the drawn device set. It is the last measurement this cell
+      needs and it is the input both open rulings are missing.
+  expected: "the corner + MC row; without it neither ruling can be taken"
+  verdict: open
+
+- id: F1
+  severity: major
+  category: pex
+  title: "with the mesh stitched, the extracted vdd/vout series R is 70-140x the drawn metal"
+  where:
+    - {kind: box, layer: TopMetal1drawing, x0: -73.5, y0: 67.55, x1: 137.64, y1: 71.55}
+    - {kind: box, layer: TopMetal1drawing, x0: 61.69, y0: 52.33, x1: 73.13, y1: 58.33}
+    - {kind: device, name: XMP pass array, x0: 47.57, y0: 61.77, x1: 87.25, y1: 64.89}
+    - {kind: point, x: -65.5, y: 69.55}
+    - {kind: point, x: 133.64, y: 0.0}
+  evidence: >-
+    Re-extracted on the fixed platform (@b61f6c7, `stitch_mesh=True`): ok, `mesh_connected=True`,
+    6215 mesh nodes, **220 of 243 device pins on the mesh, 0 open nets**, 19 stub nets (the 18
+    divider internal nets and `lp_brk` -- the rhigh terminal-region limit). The topology defect
+    review-003 F1 named is fixed. What the mesh now says, solved as a nodal network from the
+    extractor's own resistor values, is that its VALUES are not usable on this cell.
+    R(`vdd` port -> each of the 39 pass source columns) = **49.14 to 49.19 Ohm**, essentially
+    identical for every column, i.e. a **~41 Ohm COMMON series element** in front of the whole
+    array, on a path whose drawn TopMetal1 I solve at **0.59 Ohm** and whose Metal2 comb I solve
+    at 0.017 Ohm. R(pass drains -> `vout` port) = **77.6 Ohm** against 0.51 Ohm of drawn metal.
+    And column-to-column R is ~16 Ohm, which is the pass device's own S/D terminal region, in
+    series with each 2.5 um finger. Nothing in the drawing is 41 Ohm: the vdd riser is 48 cuts
+    per level on Via2/3/4 plus 12 TopVia1, so 41 Ohm implies ~2 kOhm per cut. That per-cut figure is INFERRED from the
+    arithmetic (41 Ohm spread over the drawn cut count); I did not read a per-via value out of
+    kpex, and I could not find one in its output. The benches agree that this is not a circuit: 9 of 13 now fail (dc_op, dropout,
+    load and line regulation, both transients, all three loop-gain runs) where before they hit a
+    singular matrix. The failure mode is named in the run log, not just a wall clock: ngspice
+    falls back from KLU to SPARSE 1.3, coerces all 33 `Rstitch_` to 1e-12 Ohm ("Value of
+    resistor r.xdut.rstitch_NN is too small"), then `Dynamic gmin stepping failed` / `True gmin
+    stepping failed` / `source stepping failed` / `Transient op started` -- the DC operating
+    point does not converge, and the transient-op fallback is what runs out the 600 s budget. and the four that finish return psrr_1k **-5.549 dB**
+    against 70.09 and vn_out 288.1 uVrms against 361.8. The one net where the mesh IS credible is
+    `vss`, and it is credible because that path is Metal1 end to end: R(`vss` port -> the 13
+    active-device source nodes) = **4.11 Ohm** aggregate and **10.5 to 24.0 Ohm** per device,
+    against my independent Laplace solve of the drawn Metal1 at 4.84 Ohm and 12.5 to 20.9 Ohm.
+    Two methods, one built from the extractor's numbers and one from the drawn polygons, agree
+    to ~15 % -- and both put the worst device over the brief's budget (F9).
+  effect:
+    metric: v_dropout_mv
+    delta: 10.8
+    unit: mV
+    model: hand
+    detail: >-
+      The series-R number of record stays the hand model, now solved rather than estimated:
+      10.34 x 0.5895 + 8.64 x 0.5446 = 10.80 mV of the brief's 23.83 mV dropout pool (45 %),
+      against the report's 10.98 mV / 46 %. The extracted mesh cannot replace it yet.
+  fix:
+    knob: new feature
+    note: >-
+      Upstream, not this cell. Three things, in order of value. (1) The residual kpex defect is
+      the terminal/via resistance, not the topology: ~41 Ohm of common element and ~16 Ohm per
+      finger on a metal path of 0.6 Ohm. Report it with these numbers -- it is a different defect
+      from the island the stitch just fixed, and it is what stops the RC row being usable.
+      (2) `spicexplorer_signoff.pex` should carry a sanity gate beside `mesh_connected`: if the
+      port-to-pin resistance of a supply net exceeds the drawn metal's sheet-resistance bound by
+      orders of magnitude, say so rather than return the netlist. (3) The stitched file is
+      `*_pex_netlist_stitched.spice` while every consumer that globs `*_pex_netlist.spice` --
+      including this repo's `layout/postlayout.py` -- silently picks the RAW one; `PexResult.
+      netlist_path` is right, the glob is not (F27).
+  expected: "RC becomes a measurement when the terminal/via values are fixed; until then the hand model stands"
+  verdict: open
+
+- id: F9
+  severity: minor
+  category: budget
+  title: "the vss_active budget is defined on the wrong quantity: the 4.84 Ohm common element"
+  where:
+    - {kind: box, layer: Metal1drawing, x0: -71.5, y0: -135.5, x1: -68.5, y1: 0.3}
+    - {kind: line, points: [[-70.0, 0.0], [-3.4, 0.0]]}
+    - {kind: device, name: XMSb, x0: 95.72, y0: 1.42, x1: 97.35, y1: 2.88}
+    - {kind: point, x: -70.0, y: -134.0}
+  evidence: >-
+    Two separate things, and only the second one matters. (a) REPORT section 6.4's number is
+    wrong. It models the worst-case active device at 14.3 Ohm against the brief's 16.4772 Ohm
+    `vss_active` budget ("89 % spent"). I solved it instead: rasterize every Metal1 shape at
+    0.1 um, flood-fill the component holding the `vss` pin (-70.0, -134.0), solve Laplace at the
+    PDK's 110 mOhm/sq (validated to -0.1 % against an analytic bar). The common series element
+    (pin -> riser top at y = 0) is **4.84 Ohm**, confirming the report's 4.91; the worst active
+    device, XMS's b half at x = 96, is **20.88 Ohm** -- **1.27x** of budget, not 0.89x. The
+    mechanism is visible in the drawing: from the riser top the return runs 66.6 um of BARE
+    0.8 um Metal1 rail (9.44 Ohm solved; 0.1375 Ohm/um x 66.6 = 9.16) before the row-A ptap ring
+    even begins -- that ring spans only x = -3.4 to 105.58. Section 6.4 credits "rail in parallel
+    with the ring" over the whole 170 um; 14.3 Ohm is what my solve returns for a device at
+    x = 0, the NEAR end of the row. REPORT section 10.4's "`rail_w` 1.2 -> ~12.7 Ohm" comes from
+    the same over-crediting model; interpolating my two solved builds puts 1.2 at ~16.6 Ohm, on
+    the budget line, not under it. (b) But the per-device number is not what the metric follows.
+    I put the solved return resistances in circuit through the frozen benches (every vss-connected
+    element of the extracted cell behind the common element, each active group then behind its own
+    extra hop, XCOUT on its own strap to the pin -- the generator's own split; anything left on
+    the ideal pin shorts the bounce, so nothing is): common 4.84 Ohm alone gives psrr_1k
+    **67.277 dB**; adding the full drawn per-device spread (14.4-20.9 Ohm) on top gives
+    **67.316 dB**. The entire distributed per-device return is worth **+0.04 dB**. The budget's
+    own step point reproduces only as a LUMPED element: flat 32 Ohm -> 58.193 dB (-0.372 dB/Ohm
+    against the brief's -0.4553), flat 16.48 Ohm -> 62.330 dB. Read as a lumped element the drawn
+    cell sits at ~4.9 Ohm = **0.30x** of the 16.4772 Ohm budget. Two control runs confirm the
+    partition the generator claims at gen_ldo.py:1127-1141: active devices alone behind 32 Ohm
+    move psrr_1k by **+0.099 dB** and S7 by +0.11 mV (the report says +0.44 mV -- same verdict,
+    nothing), and XCOUT alone behind 32 Ohm leaves psrr_1k untouched and IMPROVES S7 to 114.0 mV.
+  effect:
+    metric: psrr_1k_db
+    delta: -2.82
+    unit: dB
+    model: what-if
+    detail: >-
+      The committed post-layout psrr_1k of 70.093 dB is measured with the ground return IDEAL:
+      the CC extraction carries 21 resistors and none of them is the vss path, and XCOUT is
+      re-attached by name to the subckt pin (postlayout.py REINSERT), so no drawn return
+      resistance is in the circuit at all. With the drawn return in place the row is
+      **67.32 dB** -- 2.82 dB of the reported figure is the ideal-ground modelling choice, and
+      2.78 dB of that 2.82 is the 4.84 Ohm COMMON element, not the per-device spread. S6 is
+      "PSRR at 1 kHz, 1 mA >= 40 dB", so 67.3 dB is not a spec risk in any of these cases; this
+      is a budget-definition finding, not a performance one. Caveat: the what-if moves VREF's
+      return onto the internal ground along with everything else, because the frozen bench keeps
+      VREF inside the DUT block -- that is also why my -0.372 dB/Ohm reproduces the brief's
+      -0.4553, i.e. it is the right model for checking the brief's own row.
+  fix:
+    knob: rail_w
+    to: 1.4
+    note: >-
+      Ordered by what it buys. (1) Correct the brief: `vss_active` should be budgeted on the
+      COMMON series element between the active devices and the pin (4.84 Ohm drawn, 0.29x of
+      16.4772), and the "worst active device" row should be dropped -- I measured it at +0.04 dB
+      and it is the row the report spends section 6.4 on. (2) Correct REPORT sections 6.4 and
+      10.4: 14.3 Ohm is the near-end device (mine: 20.88 Ohm at the far end), and `rail_w` 1.2 is
+      ~16.6 Ohm, not 12.7. (3) Only if the corrected common-element budget is ever tight,
+      `rail_w = 1.4` is the measured lever: I re-solved the generator's own bounds-walk build
+      (bnd/bounds/rail_w_hi, DRC 0, LVS matched, current density 0.836x) and the worst device
+      drops to 15.13 Ohm with the common element unchanged at 4.84 Ohm; in circuit that whole
+      change is worth +1.15 dB (67.32 -> 68.46 dB). `vss_ret_w = 6.0` takes the common element to
+      2.43 Ohm and is the better lever for the quantity that actually matters.
+  expected: "no metric moves more than ~1 dB of a 27 dB PSRR margin; the deliverable is a corrected budget row and two corrected REPORT numbers"
+  verdict: open
+
+- id: F14
+  severity: minor
+  category: reproduce
+  title: "decks/candidate/design.json still records an empty sizing block after re-certification"
+  where:
+    - {kind: net, name: (no geometry -- decks/candidate/design.json)}
+  evidence: >-
+    review-003 F14 flagged that `decks/candidate/design.json`, the file named as the sizing of
+    record, carries `"sizing": {}`. The deck set was re-issued wholesale at bf3a4f8 (all 13
+    .spice files, SHA256SUMS, decks.sha256 and scorecard.json changed) and the file still reads
+    `{"circuit": "ldo_ihp_capless", "pdk": "ihp-sg13g2", "corner": "tt", "sizing": {},
+    "note": "capless double-mirror FVF LDO, design of record (003 optimizer winner, rounded)"}`.
+    The actual sizing lives in sizing.yaml and in each deck's .param block; the file that claims
+    to record it is empty, and it is now empty across a certification boundary where a new knob
+    (x_dut_xmp_nf_mult) was introduced.
+  effect: {metric: null, delta: null, unit: null, model: hand, detail: "no electrical effect; a provenance defect on the artifact a re-certification is supposed to pin"}
+  fix: {knob: "decks/candidate/design.json", to: "the 33 resolved knobs", note: "write the resolved sizing at freeze time, or delete the key rather than carry it empty."}
+  expected: "the certified deck set names its own sizing point"
+  verdict: open
+
+- id: F13
+  severity: minor
+  category: reproduce
+  title: "vref is still labelled mid-channel, and vdd now carries two labels"
+  where:
+    - {kind: point, x: 8.81, y: 13.53}
+    - {kind: point, x: -62.6, y: 12.83}
+    - {kind: point, x: -65.5, y: 43.83}
+    - {kind: point, x: -65.5, y: 69.55}
+  evidence: >-
+    PLAN A1 is unchanged: "`vref` + `fb` Metal1/Metal2 on the **left** edge". Read out of the
+    GDS: `fb` moved and is now at (-62.600, 12.830), on the left edge -- fixed. `vref` is at
+    (8.810, 13.530), 71 um inside the cell, on the same track row as before. Separately, and
+    this is new, `vdd` now carries **two** labels: Metal1 (8/25) at (-65.500, 43.830) and
+    TopMetal1 (126/25) at (-65.500, 69.550). That is the same ambiguity review-003 F9 raised
+    for `vss` -- which label is the pin decides what the series resistance to it is -- and it is
+    now resolved for `vss` (exactly one label, at (-70.000, -134.000)) and reintroduced for
+    `vdd`. The TopMetal1 one is clearly the intended pin per A1; the Metal1 one is 26 um lower
+    and on a different layer.
+  effect: {metric: null, delta: null, unit: null, model: hand, detail: "interface clarity; F9's own lesson is that the pin location is what a series-R budget is measured to"}
+  fix: {knob: "gen_ldo label placement", to: "vref on the left cell edge; one vdd label", note: "or amend PLAN A1 to say vref is an internal probe, not an edge pin."}
+  expected: "one label per pin, on the edge the plan declares"
+  verdict: open
+
+- id: F20
+  severity: minor
+  category: matching
+  title: "REPORT section 8 prints bias_n_group's tolerance as 6 mV where the brief says 5.0"
+  where:
+    - {kind: box, layer: Activdrawing, x0: 66.54, y0: 1.42, x1: 102.18, y1: 2.88}
+  evidence: >-
+    REPORT section 8's table has columns `tolerated | 1 sigma | headroom (sigma)` and the
+    `bias_n_group` row reads `6 mV dVT (step) | 2.43 mV | 2.06`. 6 / 2.43 = 2.47, not 2.06.
+    `brief.json` matching[] gives that class `tolerated.dvt_mv = 5.0`, `sigma.dvt_mv = 2.4318`
+    and `headroom_sigma = 2.056`; BRIEF.md line 49 says "5 mV, 2.06 sigma, step at 6 mV". So the
+    printed value is the STEP, not the tolerance, in a column headed "tolerated" -- and it is
+    the only row where the two differ enough to notice, because the same cell is annotated
+    "(step)" on `ea_nmos_load` where the printed 1.0 mV IS the tolerance (its step is at 2 mV).
+    Every other row's arithmetic closes: 1.0/1.6468 = 0.607, 1.2/1.118 = 1.073,
+    2.9477/1.6197 = 1.820, 0.989/0.575 = 1.72, 20.78/1.6648 = 12.48, 40.59/1.6623 = 24.42.
+  effect: {metric: null, delta: null, unit: null, model: hand, detail: "no electrical effect; the one row a reader would use to check the table is the one that does not close"}
+  fix: {knob: "REPORT section 8 generator", to: "print tolerated and step in separate columns", note: "the numbers are all in brief.json; the table should be generated from it, as the Iterations table is generated from iterations.yaml."}
+  expected: "every row's headroom = tolerated / 1 sigma"
+  verdict: open
+
+- id: F21
+  severity: minor
+  category: reproduce
+  title: "README's M8 row now describes the opposite of what the code does"
+  where:
+    - {kind: net, name: (no geometry -- README.md line 69)}
+  evidence: >-
+    The M8 row says the Metal2-on-Metal2 class "has a fix but ... **no case that fails without
+    it**", that "the power combs are **routed around** on Metal3 (`to_track_m3`) rather than
+    claimed", that `layout/test_builder.py` has "five cases", and it points at "REPORT.md
+    section 10.5" for a `xmp_nf_mult = 1` short. All four are now false. `router.claim_box`
+    records the comb and `to_track_m3` is gone; `test_builder.py` has nine cases; and I ran the
+    negative test the row says does not exist -- copy `router.py`, make `claim_box` a no-op
+    (the pre-F7 behaviour), run the suite: **4 failures**, including
+    `test_without_the_claim_the_allocator_walks_into_the_comb: alloc returned 44.1, inside the
+    comb`, exit code 1. REPORT section 10 has no item 5 about `xmp_nf_mult = 1`, and
+    `xmp_nf_mult` is no longer a layout knob at all (it moved to sizing.yaml with min 2).
+  effect: {metric: null, delta: null, unit: null, model: what-if, detail: "the row understates the repo; a reader checking whether M8's lesson was applied is told it was not"}
+  fix: {knob: "README.md M8 row", to: "the case exists and fails without the claim (4 failures)", note: "and drop the dangling REPORT section 10.5 reference."}
+  expected: "the closed-findings table matches the code"
+  verdict: open
+
+- id: F22
+  severity: minor
+  category: reproduce
+  title: "iteration snapshots are not self-contained: gen.py alone does not rebuild"
+  where:
+    - {kind: net, name: (no geometry -- layout/ldo_ihp_capless/iterations/it*/gen.py)}
+  evidence: >-
+    `iterations/it11/gen.py` is a full copy of the generator, but line 60-61 are
+    `import netlist_ref as NR` and `from router import ObstacleMap`, resolved from the caller's
+    sys.path. Running it as the trail implies (`python iterations/it11/gen.py -o ...`) fails
+    with `ModuleNotFoundError: No module named 'netlist_ref'`; it only builds with today's
+    `layout/` on PYTHONPATH, i.e. against today's `netlist_ref.py` and today's `router.py`, not
+    the ones that produced it. In this round it happens to be harmless -- with the current
+    modules it11 rebuilds byte-identical to its recorded a66d15b5..., which is how I verified
+    the trail -- but a snapshot whose reproduction depends on files outside the snapshot is not
+    a snapshot. `router.py` in particular changed in exactly the rounds the trail records.
+  effect: {metric: null, delta: null, unit: null, model: hand, detail: "the audit trail's reproducibility is conditional on files the trail does not carry"}
+  fix: {knob: "layout/signoff.py _snapshot", to: "copy netlist_ref.py and router.py beside gen.py", note: "and record the sha of each, so a snapshot rebuilds from itself."}
+  expected: "python it<N>/gen.py -o x.gds reproduces gds_sha256 with nothing else on the path"
+  verdict: open
+
+- id: F18
+  severity: minor
+  category: drc
+  title: "waiver list is itemised now, but --density is still not run"
+  where:
+    - {kind: net, name: (whole cell)}
+  evidence: >-
+    Half fixed. REPORT section 3 now names all twelve waived rules (AFil.g, AFil.g2, GFil.g,
+    M1.j-M4.j, M1Fil.h-M4Fil.h, TM2.c), which is what review-003 F18 asked for. But the run is
+    still `--no_density`, so whether the waived set grew with a floorplan that is 4.8 % larger
+    and has two new wide straps is unverified; the report says so itself (section 10.8). My own
+    DRC run was also `--no_density` -- I did not close this either.
+  effect: {metric: null, delta: null, unit: null, model: hand, detail: "DRC 0 is conditional on a rule set neither of us ran"}
+  fix: {knob: "layout/signoff.py --density", to: "run once and diff the rule list against the twelve", note: "PLAN A7 keeps fill out of scope, which is fine; the point is to know the count."}
+  expected: "the waived set is measured, not assumed"
+  verdict: open
+
+- id: F25
+  severity: minor
+  category: pex
+  title: "kpex emits no [Pin] markers although the labels ARE drawn"
+  where:
+    - {kind: point, x: -65.5, y: 69.55}
+    - {kind: point, x: 133.64, y: 0.0}
+    - {kind: point, x: -70.0, y: -134.0}
+  evidence: >-
+    The cell's own kpex report database has **594 `[Device Terminal]` markers and zero `[Pin]`
+    markers** (`zcat ldo_ihp_capless_k25d_pex_report.rdb.gz | grep -c '\[Pin'` = 0), even though
+    the schematic kpex is given declares six ports
+    (`.subckt ldo_ihp_capless vdd vout vss vref lp_brk fb`) and the GDS carries 17 text labels
+    (14 on Metal1 8/25, one on Metal3 30/25, two on TopMetal1 126/25). The labels do reach kpex -- its raw netlist
+    header is `.SUBCKT ldo_ihp_capless vss fb lp_brk ea_o1 ea_out nbias x1 y gate ea_n vdd
+    ea_tail vref pbias vout`, 15 ports derived from those labels -- so the premise "the
+    generator draws no pin labels" is not the mechanism. Whatever produces a `[Pin]` rdb marker,
+    a text label on the routing layer is not enough for it. The stitcher therefore has device
+    terminals to anchor but no PORT anchor, and it has to tie each flat net to the mesh at a node
+    it picks: for `vdd` that is `vdd.P0.25`, for `vout` `vout.P0.25`, for `vss` `vss.P0.24` --
+    polygon 0 of a layer, not the pin. Consequence, and it is the whole reason a series-R budget
+    exists: a resistance measured from the subckt port is a resistance from an arbitrary point in
+    the net, not from the pad the brief's `vdd` / `vout` / `vss_active` budgets are defined to.
+    The `vss` numbers happen to come out right because that net's tie landed on the bottom rail
+    near the pin; nothing guarantees that for the next build.
+  effect: {metric: null, delta: null, unit: null, model: hand, detail: "every port-referred series-R number from the extractor is referred to an arbitrary node until the pins are labelled"}
+  fix:
+    knob: "gen_ldo.py pin labelling"
+    to: "unknown until the platform says what kpex needs -- pin-datatype shape is the hypothesis"
+    note: >-
+      Do NOT redraw anything yet: the text labels are already there and already make ports, so
+      adding a pin-datatype polygon (vdd/vout TopMetal1 126/2 + 126/25 at the strap ends, vss
+      Metal1 8/2 + 8/25 at the riser foot, vref/fb/lp_brk likewise) is a HYPOTHESIS about what
+      kpex 0.3.12 needs, not a diagnosis. Ask the platform which geometry produces a `[Pin]`
+      marker, on the 5-T OTA example where the stitch was verified, and draw whatever that turns
+      out to be; then the stitcher ties the flat net AT THE PIN. This is also what F13 asks for from the other side:
+      one label per pin, on the declared edge.
+  expected: "port-referred R becomes pin-referred R, and the brief's series-R rows become directly checkable"
+  verdict: open
+
+- id: F26
+  severity: minor
+  category: pex
+  title: "signoff record drops mesh_connected / mesh, the fields that say whether RC is real"
+  where:
+    - {kind: net, name: (no geometry -- layout/signoff.py pex(), ~line 275)}
+  evidence: >-
+    `pex()` returns `{ok, available, mode, netlist, n_c, n_r, per_net_c_ff, reason, log_tail}`.
+    `PexResult` now also carries `mesh_connected` and `mesh`
+    (`n_mesh_nodes`, `n_device_pins`, `n_pins_on_mesh`, `n_nets_with_mesh`, `open_nets`,
+    `stub_nets`), and those are exactly the fields that distinguish "RC ran" from "RC measured
+    something". On this cell they are the difference between a green `ok=True` and the real
+    state: 220/243 pins on the mesh, 0 open nets, **19 stub nets** -- the 18 divider nets and
+    `lp_brk` have a mesh but nothing measured through it, so any `fb`/`lp_brk` series-R statement
+    from an RC run is empty. The stage prints `PEX: ok=True n_C=186 n_R=8566` and the JSON keeps
+    no more than that. The docstring above the call is also now stale: it explains a cwd dance to
+    contain `<cell>_extracted.cir`, which the platform fixed at 97cc0be by running the runsets
+    from the run dir.
+  effect: {metric: null, delta: null, unit: null, model: hand, detail: "no electrical effect; the sign-off record cannot distinguish a measured RC row from an empty one"}
+  fix:
+    knob: "layout/signoff.py pex()"
+    to: "add mesh_connected and mesh to the returned dict"
+    note: >-
+      And gate on it the way DRC and LVS are gated now: an RC run with `mesh_connected` false, or
+      with a stub net that carries a series-R budget, is not a series-R measurement and should say
+      so rather than be reported as an extraction. The stale cwd paragraph can go at the same time.
+  expected: "the round's JSON says how much of the mesh was actually connected"
+  verdict: open
+
+- id: F27
+  severity: minor
+  category: pex
+  title: "the stitched netlist is not the one postlayout.py picks up"
+  where:
+    - {kind: net, name: (no geometry -- layout/postlayout.py main)}
+  evidence: >-
+    The platform writes two files: `..._k25d_pex_netlist.spice` (raw, mesh island) and
+    `..._k25d_pex_netlist_stitched.spice` (the joined one), and `PexResult.netlist_path` points
+    at the stitched one. `postlayout.py` selects by `sorted(Path(a.pex).rglob("*_pex_netlist.
+    spice"))` and requires exactly one match -- and `..._stitched.spice` does NOT match that
+    glob, so the selection finds exactly one file, reports no ambiguity, and measures the RAW
+    netlist. I hit this: I had to symlink the stitched file under the expected name to run the
+    benches on it at all. This is review-003 F17 in a new form -- the check is for ambiguity, not
+    for identity -- and it is worse than the old `hits[-1]` because it fails silently and
+    confidently.
+  effect: {metric: null, delta: null, unit: null, model: what-if, detail: "an RC scorecard produced through this path would be the unstitched netlist, i.e. exactly the artifact F1 says measures nothing"}
+  fix:
+    knob: "layout/postlayout.py"
+    to: "take the netlist path from the PEX stage's record, not from a glob"
+    note: >-
+      `signoff.json` already carries `pex.netlist`; read it. If a glob has to stay, prefer
+      `*_stitched.spice` when one exists and say which file was used in the printed line (it
+      prints the path today, which is how I caught it).
+  expected: "the file the extractor named is the file the benches measure"
+  verdict: open
+
+- id: F15
+  severity: note
+  category: pex
+  title: "MIM plate swap still not done (agreed, deferred)"
+  where:
+    - {kind: box, layer: MIMdrawing, x0: -64.6, y0: -121.5, x1: -55.4, y1: -112.3}
+    - {kind: box, layer: MIMdrawing, x0: -64.6, y0: -109.5, x1: -9.4, y1: -54.3}
+  evidence: >-
+    REPORT section 8.2 deviation 2 and section 10.9 accept the finding and defer it: swapping
+    `XCFF`/`XCC` plate order is a certified-netlist edit plus a re-freeze, worth about +0.3 deg
+    by my hand model. I agree with the disposition. The re-certification at bf3a4f8 would have
+    been the cheap moment to do it -- the netlist was being re-issued and re-frozen anyway --
+    and it was not taken. If there is a next re-freeze, it costs nothing to include.
+  effect: {metric: pm_loop_deg, delta: 0.3, unit: deg, model: hand}
+  fix: {knob: "circuits/ldo_ihp_capless/pdk/ihp-sg13g2/netlist.spice", to: "XCFF fb lp_brk ... and XCC ea_o1 ea_out ...", note: "next time the deck is re-frozen."}
+  expected: "a few fF off fb at zero simulated cost"
+  verdict: open
+
+- id: F23
+  severity: note
+  category: pex
+  title: "RC-mode bench counts in REPORT section 5 do not reproduce"
+  where:
+    - {kind: net, name: (no geometry -- REPORT.md section 5)}
+  evidence: >-
+    REPORT section 5 states "RC: 8/13 ran, 7 violations" and "the transient benches that do run
+    reproduce the CC row exactly (undershoot 127.558 mV, recovery 0.1901 us, line step
+    55.73 mV)". Running my own RC netlist through the same frozen path I get **4/13 ran, 4
+    violations**, with `tran_load_step` and `tran_line_step` both aborting -- the two benches
+    the report says reproduced -- and the DC rows that do run returning nonsense (i_q 40.67 uA
+    against 33.81, load_reg 3.218 mV against 0.026, line_reg 8.502 mV against 0.056, which
+    would fail its 2 mV line). My R count also differs (8545 Rext_ / 8566 total against 8548 /
+    8569). None of this changes the conclusion -- the mesh is disconnected, proved by the node
+    sets, and both of us agree the RC row measures no resistance -- but the specific counts are
+    run-to-run artefacts of an ill-conditioned matrix and should not be quoted as measurements.
+  effect: {metric: null, delta: null, unit: null, model: what-if, detail: "the numbers in section 5's RC row are not reproducible; the finding they support is"}
+  fix: {knob: "REPORT section 5", to: "state the node-set test and drop the bench counts", note: "the node-set intersection is deterministic and is the whole proof."}
+  expected: "one deterministic statement instead of two run-dependent ones"
+  verdict: open
+
+- id: F24
+  severity: note
+  category: knob
+  title: "signoff.json is overwritten by a partial re-run, so it never records a whole sign-off"
+  where:
+    - {kind: net, name: (no geometry -- layout/signoff.py main)}
+  evidence: >-
+    `main()` builds `rec` from the stages of THIS invocation and writes it whole, so the
+    documented two-step flow (`--stages ...,pex` then `--stages pex --pex-mode RC`, which is what
+    the PEX policy asks for) leaves `signoff.json` containing only `{"pex": {...RC...}}`. I hit
+    this on my own run: after the RC pass my file had lost the build, current-density, DRC and
+    LVS verdicts I had just produced. The verdicts survive in the console log, which is not the
+    artifact.
+  effect: {metric: null, delta: null, unit: null, model: hand, detail: "no electrical effect; the sign-off record is not additive"}
+  fix: {knob: "layout/signoff.py", to: "merge into an existing signoff.json rather than replace it", note: "or write signoff_<stages>.json per invocation."}
+  expected: "one file that carries every stage of the round"
+  verdict: open
+
+- id: F19
+  severity: note
+  category: objective
+  title: "FIXED: the certified deck is the drawn device set (verified by re-measurement)"
+  where:
+    - {kind: box, layer: Activdrawing, x0: 66.54, y0: 1.42, x1: 102.18, y1: 2.88}
+    - {kind: device, name: XMP pass array, x0: 47.57, y0: 61.77, x1: 87.25, y1: 64.89}
+  evidence: >-
+    The ruling was adopted (PLAN section 0.1, commit bf3a4f8). I verified it two ways. In the
+    file: the certified netlist now carries `XMB0A/XMB0B`, `XMB1A/XMB1B`, `XMSA/XMSB`,
+    `XM1A/XM1B`..`XM4A/XM4B` as half-width cards, `XR1_1..XR1_8`, `XR2_1..XR2_8`, `XRB_1..XRB_5`
+    as segment strings, and `XMP ... w={x_dut_xmp_w/x_dut_xmp_nf_mult} m={x_dut_xmp_m*
+    x_dut_xmp_nf_mult}` with `x_dut_xmp_nf_mult` promoted to a sizing variable. By measurement:
+    my extraction with all 186 `Cext_` cards deleted returns i_q 33.80539, v_out 1.199499,
+    undershoot 115.065, pm 72.5064, dropout 104.671 -- `decks/candidate/scorecard.json` to the
+    resolution of every bench. The pre column of `scorecard_post.json` is that same certified
+    row. Closed.
+  effect: {metric: i_q_ua, delta: 0.0, unit: uA, model: what-if, detail: "certified 33.80539 vs drawn-devices-no-parasitics 33.80539"}
+  fix: {knob: null, note: "nothing owed."}
+  expected: "closed"
+  verdict: fixed
+
+- id: F2
+  severity: note
+  category: knob
+  title: "FIXED: 40/40 documented endpoints clean, and off-grid sizing is refused"
+  where:
+    - {kind: net, name: (no geometry -- LayoutParams.BOUNDS)}
+  evidence: >-
+    I re-ran the new `bounds` stage: 20 knobs x 2 ends, **40/40 built, DRC 0, LVS matched,
+    current density pass**, worst 0.9835x. DRC and LVS are now gates in `signoff.py` (a
+    non-matching build writes no scorecard), which was the substance of the finding.
+    `tap_pitch` is deleted, `isl_gap` and `gpad` and `vss_ret_w` are knobs, and an assert
+    forces `set(BOUNDS) == LayoutParams fields`. The `xmp_nf_mult` half of the finding moved to
+    sizing.yaml and is handled there: building at the off-grid `x_dut_xmp_nf_mult = 3` now
+    raises `XMP: unit finger 3.33333 um is not a multiple of 0.01 um; the drawn finger would
+    round and LVS would see a different device` instead of silently drawing a 189.81 um device.
+    One residue, not a finding on its own: nothing WALKS the sizing space, so
+    `x_dut_xmp_nf_mult = 8` (legal, in range, DRC 0, LVS matched, current density 0.836x in my
+    own build) puts `gate` to-rail at 50.03 fF -- see F3 for why that is now a smaller worry
+    than it looked.
+  effect: {metric: null, delta: null, unit: null, model: what-if}
+  fix: {knob: null, note: "nothing owed by the layout knobs."}
+  expected: "closed"
+  verdict: fixed
+
+- id: F7
+  severity: note
+  category: knob
+  title: "FIXED: the obstacle map is layer-aware and the regression fails without it"
+  where:
+    - {kind: box, layer: Metal2drawing, x0: 42.18, y0: 64.33, x1: 90.54, y1: 72.55}
+    - {kind: box, layer: Metal2drawing, x0: 44.28, y0: 52.33, x1: 90.54, y1: 61.93}
+  evidence: >-
+    `ObstacleMap.claim_box` records any drawn rectangle on a named layer and `column_free`
+    compares per layer, so the pass array's two Metal2 combs are obstacles to Metal2 columns and
+    invisible to Metal3 ones -- which let the hard-coded `to_track_m3` hop go. I ran the
+    "fails without it" test rather than reading it: a copy of `router.py` with `claim_box`
+    turned into a no-op fails 4 of the 9 cases, including
+    `test_without_the_claim_the_allocator_walks_into_the_comb` (`alloc returned 44.1, inside the
+    comb`) and `test_a_metal2_column_may_not_run_through_the_power_comb`, exit code 1. And the
+    class the hole produced is gone: `col_vias` = 3 and 4, which extracted `gate|vout` in the
+    reviewed drawing, both LVS-match in the bounds walk.
+  effect: {metric: null, delta: null, unit: null, model: what-if}
+  fix: {knob: null, note: "nothing owed."}
+  expected: "closed"
+  verdict: fixed
+
+- id: F6
+  severity: note
+  category: matching
+  title: "FIXED: all seven common-centroid pairs XOR 0.000 um2 with equal via counts"
+  where:
+    - {kind: box, layer: Activdrawing, x0: 0.29, y0: 26.16, x1: 23.99, y1: 36.78}
+    - {kind: box, layer: Activdrawing, x0: 15.74, y0: 1.42, x1: 41.82, y1: 3.255}
+  evidence: >-
+    My own test, re-run on this drawing: translate one half's window onto the other and XOR
+    Metal1 + Metal2 + Via1 + Metal3. At the device bbox + 1.2 um all seven pairs read
+    **0.000 um2** with equal Via1 counts (XM1a/b 3v3, XM2a/b 3v3, XM3a/b 1v1, XM4a/b 1v1,
+    XMSa/b 1v1, XMB1a/b 2v2, XMB0a/b 1v1) -- slightly better than the report's own
+    0.000-0.011. At my wider +2.4 um window the two row-A groups stay at 0.000 while
+    `ea_in_pair` reads 42.2 % and 12.3 % with 4v5 and 5v6 Via1; since the +1.2 window is exactly
+    zero, every one of those differences lies in the 1.2-2.4 um annulus, i.e. in the
+    neighbourhood and not in the pair's own routing, which is what the report says. Worth
+    noting that `ea_in_pair` was moved to the row end (F5), so its two halves now have
+    genuinely different outer neighbourhoods; at 1.82 sigma that is a second-order etch/LOD
+    term, and the class that matters, `ea_nmos_load` at 0.61 sigma, is symmetric at both windows.
+  effect: {metric: null, delta: null, unit: null, model: what-if}
+  fix: {knob: null, note: "nothing owed."}
+  expected: "closed"
+  verdict: fixed
+
+- id: F4
+  severity: note
+  category: budget
+  title: "FIXED: the current-density table now describes the drawn vias and contacts"
+  where:
+    - {kind: device, name: XMP pass array, x0: 47.57, y0: 61.77, x1: 87.25, y1: 64.89}
+  evidence: >-
+    `power_path.json` now declares `n_vias = 2` on the pass S/D column Via1 and `n_vias = 7` on
+    the diffusion contacts, and 30 segments instead of 27. Counted out of my rebuilt GDS: the
+    source side has 40 Via1 columns carrying 79 cuts and the drain side 39 columns carrying 77
+    -- 2 per column everywhere except the single leftmost end column on each side (x = 45.18
+    and x = 47.13), which serves one finger and carries half the current. The contact histogram
+    over the array is dominated by 73 columns of 7. Both declared numbers are the drawn ones,
+    and the table now also carries the `vdd`/`vss` rails and the two `vss` return paths.
+    Current density 30/30, worst 0.836x, reproduced.
+  effect: {metric: null, delta: null, unit: null, model: what-if}
+  fix: {knob: null, note: "nothing owed."}
+  expected: "closed"
+  verdict: fixed
+
+- id: F5
+  severity: note
+  category: pex
+  title: "FIXED: fb track 107.15 -> 79.57 um, and the measured phase margin moved with it"
+  where:
+    - {kind: point, x: -62.6, y: 12.83}
+    - {kind: box, layer: Activdrawing, x0: 0.29, y0: 26.16, x1: 23.99, y1: 36.78}
+  evidence: >-
+    `ea_in_pair` is now the leftmost group of row B (device boxes at x = 4.67, 9.05, 13.43,
+    17.81 in my rebuild) and `bias_p_group` sits to its right, which shortens the `fb` run.
+    Measured in my own extraction: `fb` 33.97 -> **31.90 fF total / 21.20 fF to-rail**, against
+    a 27.1 fF to-rail budget = **0.78x, inside**. Phase margin 68.76 -> **69.301 deg** in the
+    reproduced post-layout row.
+  effect: {metric: pm_loop_deg, delta: 0.54, unit: deg, model: what-if}
+  fix: {knob: null, note: "nothing owed."}
+  expected: "closed"
+  verdict: fixed
+
+- id: F8
+  severity: note
+  category: reproduce
+  title: "FIXED: lp_brk is escaped and labelled at the output-pin edge"
+  where:
+    - {kind: point, x: 134.64, y: 14.23}
+    - {kind: point, x: 133.64, y: 0.0}
+  evidence: >-
+    The finding was that the GDS did not say where the divider senses, leaving a 14x series-R
+    difference to a bench splice. It says so now: the `lp_brk` label is at (134.640, 14.230),
+    beside the `vout` pin at (133.640, 0.000) on the right cell edge, and PLAN A12 records it as
+    an interface contract. The brief settles the choice with a measurement rather than a
+    preference (sensing at the pass drain gives S2 = 10.22 mV against a 5 mV line). The cost is
+    stated and I reproduce it: `lp_brk` 18.2 -> 37.93 fF total / 24.26 fF to-rail, on a net with
+    no capacitance budget.
+  effect: {metric: null, delta: null, unit: null, model: what-if}
+  fix: {knob: null, note: "nothing owed."}
+  expected: "closed"
+  verdict: fixed
+
+- id: F10
+  severity: note
+  category: pex
+  title: "FIXED: one accounting convention, every net listed"
+  where:
+    - {kind: net, name: (REPORT section 7)}
+  evidence: >-
+    The per-net table now states its convention (budgets are to-rail, so the used/allowed column
+    is read against to-rail), lists every net rather than the top twelve, and prints `x1` and
+    `y` as values (11.38 / 6.91 and 11.62 / 8.34) rather than as a bound. `fb` is 0.78x, which
+    is the number my own to-rail parse gives. Every entry reproduces to the digit.
+  effect: {metric: null, delta: null, unit: null, model: what-if}
+  fix: {knob: null, note: "nothing owed."}
+  expected: "closed"
+  verdict: fixed
+
+- id: F11
+  severity: note
+  category: knob
+  title: "FIXED: dead knob deleted, hidden knob promoted, the two lists cannot drift"
+  where:
+    - {kind: net, name: (no geometry -- LayoutParams / BOUNDS)}
+  evidence: >-
+    `tap_pitch` is gone, `isl_gap` and the two new knobs `gpad` and `vss_ret_w` are in both
+    `LayoutParams` and `BOUNDS`, and `gen_ldo.py` asserts the two sets are equal at import, so a
+    knob is in both or in neither. 20 knobs, and I walked all 40 endpoints.
+  effect: {metric: null, delta: null, unit: null, model: what-if}
+  fix: {knob: null, note: "nothing owed."}
+  expected: "closed"
+  verdict: fixed
+
+- id: F12
+  severity: note
+  category: matching
+  title: "FIXED: dummies sized to their own neighbour, XRB on the divider pitch with dummies"
+  where:
+    - {kind: box, layer: Activdrawing, x0: 28.57, y0: 26.16, x1: 50.39, y1: 36.78}
+    - {kind: box, layer: PolyResdrawing, x0: -66.0, y0: -49.5, x1: -16.1, y1: -5.78}
+  evidence: >-
+    Read out of my rebuild. `bias_p_group` runs d(10.62) XMBP(10.62) XMT(10.62) XM6(6.15)
+    d(6.15) -- the right-hand dummy now matches XM6 instead of being 1.8x it. The resistor block
+    is one pitch throughout: the divider is 18 segments at 2.0 um from x = -66 to -32 (16
+    members + a tied dummy each end) and XRB is 7 segments at the SAME 2.0 um pitch from -29 to
+    -17 (5 members + a dummy each end), where it used to be 5 segments at 1.6 um with no dummies.
+  effect: {metric: null, delta: null, unit: null, model: what-if}
+  fix: {knob: null, note: "nothing owed."}
+  expected: "closed"
+  verdict: fixed
+
+- id: F17
+  severity: note
+  category: reproduce
+  title: "FIXED: the PEX netlist is chosen by uniqueness, and the committed as-built is fresh"
+  where:
+    - {kind: net, name: (no geometry -- layout/postlayout.py)}
+  evidence: >-
+    `hits[-1]` on an rglob is replaced by "exactly one match, or list them with their mtimes and
+    stop". The freshness half is what I checked by measurement: the committed
+    `layout/ldo_ihp_capless/asbuilt/core_pex.sp` is byte-identical to my own extraction on all
+    186 `Cext_` cards, so the artifact in the repo is this drawing's, not a stale one in a new
+    coat. `postlayout.py` also grew the `--keep-c` / `--drop-c` / `--no-c` what-if flags and
+    refuses to overwrite the record when a what-if is asked for, which is how F3 and F19 above
+    are now reproducible by anyone.
+  effect: {metric: null, delta: null, unit: null, model: what-if}
+  fix: {knob: null, note: "nothing owed."}
+  expected: "closed"
+  verdict: fixed
+
+not_checked:
+  - "Corners and Monte Carlo post-layout: still nothing outside tt / 27 C, by either of us (F16). This is the largest open item in the cell, not a footnote."
+  - "DRC with the density/fill tables (--density): not run by the designer and not by me (F18)."
+  - "Wire resistance as an extracted quantity: impossible with the RC netlist kpex produces (F1). Every series-R number here is a Laplace solve on the drawn metal at the PDK's own sheet resistances -- an independent model, not an extraction."
+  - "The vss solve is Metal1-only. I checked for Metal2 shunts on that net and found none that matter (five 0.38 um columns with one Via1 each and four 1.3 um MIM-return pads), and substrate conduction is modelled by nobody."
+  - "MIM top-plate coupling and n-well-to-substrate junction capacitance: in neither the extractor nor the model cards."
+  - "The sizing space is not walked. I probed x_dut_xmp_nf_mult at 2, 3 and 8 only."
+  - "Mismatch Monte Carlo on the drawn cell: not run. I checked the brief's sigma arithmetic (it is right, and computed on the whole device) but did not simulate the distribution."
+  - "Iteration diff images: I verified it11 -> it12 by rebuilding it11 and XORing (858.26 um2, Metal1 only, matching the disclosure). The other ten diff_it*_it*.png were not opened."
+  - "Inductance, sealring, fill, ESD, antenna: out of scope per PLAN section 7."

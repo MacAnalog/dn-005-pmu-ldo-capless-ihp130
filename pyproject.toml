@@ -7,13 +7,20 @@ dependencies = [
     "numpy>=1.26",
     "matplotlib>=3.8",
     "spicexplorer-harness",     # ledger, lints, context pack, spec-as-data (harness.yaml)
-    "spicexplorer-core",        # NGSpice_Wrapper: the platform's ngspice lane (lab/sim.py)
+    "spicexplorer-core",        # NGSpice_Wrapper: the platform's ngspice lane (ldo/sim.py)
     "spicexplorer",             # backends.analog_db loaders (sizing, datasheet metrics, corners)
-    "spicexplorer-analog-db",   # the LDO class benches + the reference circuit (lab/dut.py)
+    "spicexplorer-analog-db",   # the LDO class benches + the reference circuit (ldo/dut.py)
     # transitive platform members, named directly so uv applies the path sources below to them
     "spicexplorer-waveview",
     "spicexplorer-circuitgraph",
     "spicexplorer-netlist2xschem",
+    # sizing / layout / signoff lanes (experiments 003-005)
+    "spicexplorer-gmid",        # gm/ID lookup tables + sizing (experiments/003-sizing)
+    "spicexplorer-layout",      # generator contract, GdsBuilder, render (layout/gen_ldo.py)
+    "spicexplorer-signoff",     # DRC/LVS/PEX runners + post-layout splice
+    "pyyaml>=6",
+    "nbconvert>=7", "ipykernel>=6", "notebook>=7",
+    "cairosvg>=2",              # schematic PNG render (netlist2xschem [render])
 ]
 
 [tool.uv]
@@ -30,6 +37,9 @@ spicexplorer-waveview = { path = "../../spicexplorer-platform/packages/spicexplo
 spicexplorer-circuitgraph = { path = "../../spicexplorer-platform/packages/spicexplorer-circuitgraph", editable = true }
 spicexplorer-netlist2xschem = { path = "../../spicexplorer-platform/packages/spicexplorer-netlist2xschem", editable = true }
 spicexplorer-analog-db = { path = "../../spicexplorer-platform/examples/analog-db", editable = true }
+spicexplorer-gmid = { path = "../../spicexplorer-platform/packages/spicexplorer-gmid", editable = true }
+spicexplorer-layout = { path = "../../spicexplorer-platform/packages/spicexplorer-layout", editable = true }
+spicexplorer-signoff = { path = "../../spicexplorer-platform/packages/spicexplorer-signoff", editable = true }
 
 [tool.ruff]
 line-length = 100

@@ -1,0 +1,5 @@
+{
+ "_source": "layout/ldo_ihp_capless/brief.json @ 223373e, matching[].sigma.dvt_mv — the PAIR sigma of the class, sqrt(sa^2+sb^2) with each member's own W*L*m and the PDK's A_VT (sg13g2_moslv_mismatch.lib)",
+ "ea_nmos_load": 1.6468,
+ "bias_p_group": 1.118
+}

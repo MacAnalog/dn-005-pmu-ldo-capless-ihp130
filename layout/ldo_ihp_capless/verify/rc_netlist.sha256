@@ -1,0 +1,21 @@
+# Digest of the extracted RC netlist behind the SIGNED post-layout row of record
+# (`verify_postlayout_rc`).  The netlist itself is a ~5 000-card extractor output and is not
+# committed (rule: never commit rawfiles); this file is the `raw` its provenance block hashes,
+# the pattern `spicexplorer_harness.hashes.recompute` documents for an untracked rawfile.
+#
+# Produced by the verifier's OWN run: layout/gen_ldo.py -> layout/signoff.py
+#   --stages guards,build,cd,drc,lvs,pex --pex-mode RC   (kpex 2.5D, stitch_mesh on)
+# on the GDS this verifier rebuilt, DRC 0 / LVS matched.  The extractor stamps its own run date
+# into the file, so a re-extraction gives a DIFFERENT digest for the SAME layout -- what is
+# reproducible is the mesh census and the scorecard, both recorded here.
+#
+# mesh: 3096 nodes, 3101 zero-ohm edges contracted,
+#       3101 cards collapsed, n_zero_r_cards = 0,
+#       220/243 device pins on the mesh, open nets 0,
+#       15/15 named ports anchored on a kpex [Pin] node.
+# cards: 5461 Rext + 21 rhigh primitives = 5482 R, 186 C; zero-valued Rext cards: 0
+#       (so postlayout.floor_zero_r() floored nothing -- it is a no-op on this netlist).
+#
+9c6c6d53482259b06d2a08c9da72c24159f12559cac244a608b2a6ec8c5727ec  ldo_ihp_capless_k25d_pex_netlist_stitched.spice
+4c6ce39ec96074bb71e76963aabec5709f92a827f167394faf9db5154c45f60f  ldo_ihp_capless_k25d_pex_netlist.spice
+c00859c0210fc6fe7898a77346fb1a0db99cda6a13e362ee929f1e4d4101570e  extracted_subckt.spice (the prepared block the 13 benches ran on)

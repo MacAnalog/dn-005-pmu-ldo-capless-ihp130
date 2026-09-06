@@ -1,0 +1,66 @@
+# Datasheet for the capless candidate — the challenge's own operating point (doc/target-spec.md).
+# default_conditions feed assemble()'s fallbacks (VDD <- supply, VOUT_NOM <- vout, TEMP <- temp);
+# the per-analysis params in analyses/*.yaml bind everything else at the spec's conditions.
+# UNITS: load_reg / line_reg are a plain delta-Vout in VOLTS (analog-db LDO class convention).
+schema: spicexplorer/datasheet@1
+cace_format: "5.2"
+default_conditions:
+  supply: {unit: V, typical: 1.5}
+  vout:   {unit: V, typical: 1.2}
+  vref:   {unit: V, typical: 0.6}      # ideal internal reference (sizing var vref_val); divider 1:1
+  cout:   {unit: pF, typical: 1.0}     # the BENCH's external COUT: a 1 pF pad/wiring parasitic only.
+                                       # The real output capacitor is INSIDE the DUT (c_out_int, MIM),
+                                       # so it is laid out, extracted and counted once; C1 (<= 100 pF)
+                                       # = c_out_int + this 1 pF.
+  iload:  {unit: mA, typical: 1.0}
+  corner: {typical: tt}
+  temp:   {unit: degC, typical: 27}
+metrics:
+  v_out:
+    display: "Regulated output voltage"
+    unit: V
+    analysis: dc_op
+    extract: {meas: vout_dc}
+    spec: {min: 1.176, typ: 1.2, max: 1.224, unit: V}
+  i_q:
+    display: "Quiescent current"
+    unit: A
+    analysis: dc_op
+    extract: {meas: i_supply}
+    spec: {max: 50e-6, unit: A}
+  load_reg:
+    display: "Load regulation (delta-Vout, 0.1 -> 10 mA)"
+    unit: V
+    analysis: load_regulation
+    extract: {meas: load_reg}
+    spec: {max: 5e-3, unit: V}
+  line_reg:
+    display: "Line regulation (delta-Vout, Vin 1.4 -> 1.65 V)"
+    unit: V
+    analysis: line_regulation
+    extract: {meas: line_reg}
+    spec: {max: 2e-3, unit: V}
+  v_dropout:
+    display: "Dropout voltage at 10 mA"
+    unit: V
+    analysis: dropout
+    extract: {meas: v_dropout}
+    spec: {max: 0.2, unit: V}
+  psrr_vdd_db:
+    display: "PSRR (Vdd -> Vout) at 1 kHz, 1 mA"
+    unit: dB
+    analysis: psrr
+    extract: {meas: psrr_vdd_db}
+    spec: {min: 40, unit: dB}
+  v_undershoot:
+    display: "Load-step undershoot, 0.1 -> 10 mA in 100 ns"
+    unit: V
+    analysis: tran_load_step
+    extract: {meas: v_undershoot}
+    spec: {max: 0.15, unit: V}
+  pm_loop_deg:
+    display: "Loop phase margin at 1 mA (voltage injection at Vlp)"
+    unit: deg
+    analysis: ac_loopgain
+    extract: {meas: pm_loop}
+    spec: {min: 60, unit: deg}

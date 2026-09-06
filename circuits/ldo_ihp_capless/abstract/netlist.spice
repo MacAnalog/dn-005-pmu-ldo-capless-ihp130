@@ -1,0 +1,49 @@
+* ldo_ihp_capless — abstract (PDK-free) netlist. Generic tokens nmos/pmos; sizes are the
+* sizing.yaml symbols. Passives are PDK devices too (resistor/capacitor tokens -> rhigh/cap_cmim,
+* geometry knobs) so the LVS reference and the post-layout deck simulate the same models as this one. Lowered by hand to pdk/ihp-sg13g2/netlist.spice (this repo has no
+* `analog-db generate` step for a local circuit — see doc/journal/analog-db-has-no-overlay-root.md).
+* Ports: vdd vout vss.
+*
+*   VREF   ideal reference (a real bandgap is out of scope, same convention as the reference)
+*   XR1/XR2 feedback divider (high-ohmic poly, w = r_w, l = r_fb_l each: 1:1 -> vout = 2*vref), sensed
+*            through the 0 V loop-break marker VLP (ac_loopgain bench)
+*   XCFF   feed-forward MIM across XR1: a lead zero at 1/(2*pi*R1*Cff) that cancels the divider-node pole
+*            the resistors' own substrate capacitance makes (~16 fF per rhigh terminal at 340u)
+*   XRB/XMB0 resistor-referenced bias: I_ref = (VDD - Vgs) / R(r_bias_l); XMB1/XMBP mirror it to a PMOS diode
+*   XMT/XM1/XM2/XM3/XM4  error-amp stage 1: PMOS-input 5T OTA (XM1: fb -> diode side, XM2: vref -> output side)
+*   XM5/XM6  error-amp stage 2: NMOS common source under a PMOS current source (ea_out = FVF control voltage)
+*   XCC    Miller MIM capacitor across stage 2 (dominant pole at ea_o1), c_comp_w square
+*   XMC    flipped-voltage-follower control device (source = vout, gate = ea_out): the fast local loop
+*   XMA/XMB + XMCP/XMD  NMOS then PMOS 1:1 current mirrors that fold XMC's current up to the pass gate
+*            as a PULL-UP (double-mirror FVF): the pass gate can reach vdd - Vsd,sat, so the pass device
+*            turns fully off at hot/fast corners, which the plain FVF (gate <= vout) cannot do, and the
+*            gate pull-down XMS keeps the plain FVF's pull-down slew (the transient path of 002)
+*   XMS    constant gate-node sink (I_B)
+*   XMP    pass device
+*   XCOUT  on-chip output capacitor: c_out_m parallel MIM units of c_out_w square (the only Cout the challenge allows)
+VREF vref vss dc {vref_val}
+VLP lp_brk vout dc 0
+XR1 lp_brk fb vss resistor w=r_w l=r_fb_l
+XCFF lp_brk fb capacitor w=c_ff_w l=c_ff_w
+XR2 fb vss vss resistor w=r_w l=r_fb_l
+XRB vdd nbias vss resistor w=r_w l=r_bias_l
+XMB0 nbias nbias vss vss nmos l=x_dut_xmb0_l w=x_dut_xmb0_w
+XMB1 pbias nbias vss vss nmos l=x_dut_xmb0_l w=x_dut_xmb1_w
+XMBP pbias pbias vdd vdd pmos l=x_dut_xmbp_l w=x_dut_xmbp_w
+XMT ea_tail pbias vdd vdd pmos l=x_dut_xmbp_l w=x_dut_xmt_w
+XM1 ea_n fb ea_tail vdd pmos l=x_dut_xm1_l w=x_dut_xm1_w
+XM2 ea_o1 vref ea_tail vdd pmos l=x_dut_xm1_l w=x_dut_xm1_w
+XM3 ea_n ea_n vss vss nmos l=x_dut_xm3_l w=x_dut_xm3_w
+XM4 ea_o1 ea_n vss vss nmos l=x_dut_xm3_l w=x_dut_xm3_w
+XM5 ea_out ea_o1 vss vss nmos l=x_dut_xm5_l w=x_dut_xm5_w
+XM6 ea_out pbias vdd vdd pmos l=x_dut_xmbp_l w=x_dut_xm6_w
+XCC ea_out ea_o1 capacitor w=c_comp_w l=c_comp_w
+XMC x1 ea_out vout vdd pmos l=x_dut_xmc_l w=x_dut_xmc_w
+XMA x1 x1 vss vss nmos l=x_dut_xma_l w=x_dut_xma_w
+XMB y x1 vss vss nmos l=x_dut_xma_l w=x_dut_xma_w
+XMCP y y vdd vdd pmos l=x_dut_xmcp_l w=x_dut_xmcp_w
+XMD gate y vdd vdd pmos l=x_dut_xmcp_l w=x_dut_xmcp_w
+XMS gate nbias vss vss nmos l=x_dut_xms_l w=x_dut_xms_w
+XMP vout gate vdd vdd pmos l=x_dut_xmp_l w=x_dut_xmp_w m=x_dut_xmp_m
+XCOUT vout vss capacitor w=c_out_w l=c_out_w m=c_out_m
+.end
