@@ -47,7 +47,7 @@ literature instead. Full certified scorecard: `experiments/001-reference/README.
 
 Report-only from the same certification: DC loop gain 91.9 dB, UGF 569 kHz,
 gain margin 41.6 dB, Ms 4.34 dB, Zout peaking 5.88 dB, recovery
-0.87 µs, output noise 5.04 mVrms (10 Hz–10 MHz), line-step 3.45 mVpp.
+0.87 µs, output noise 25.4 µVrms (10 Hz–10 MHz), line-step 3.45 mVpp.
 
 Every bound cites its origin in the last column (handles are `pdf/INDEX.md` rows; two of them
 are abstract-only and are used for bracketing, never as the sole source of a bound). Derived,
