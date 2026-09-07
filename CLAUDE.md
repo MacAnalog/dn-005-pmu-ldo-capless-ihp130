@@ -41,6 +41,23 @@ checkout) does the generic work, driven by `harness.yaml`; `Makefile` wraps it.
 - `make freeze` — write `SHA256SUMS` into the frozen dirs after certifying a reference.
 - `make baseline` — simulate the frozen reference decks and print the scorecard.
 
+## Simulation lanes and reuse (contract for every agent in this repo)
+
+- **Open-source PDK (IHP SG13G2, sky130, gf180 …) → the open lane.** ngspice (with OSDI/openvaf models) through this repo's lane
+  module (`design/sim.py` or its equivalent here), KLayout / magic / netgen / kpex for layout and sign-off, xschem for schematics — natively
+  on the workstation; `make doctor` proves the lane. An open-PDK bench is never routed through the commercial tools.
+- **Commercial PDK under NDA → the bridge lane only.** Those simulations run on the EDA server through the lab's
+  remote-simulator bridge (the bridge submodule of the lab's `analog-skill-directory` and its two simulator skills): decks are built here, uploaded by basename with *relative* `include`s,
+  simulated there, and only results come back. Kit bytes never reach the workstation or the model (`pdk_guard`
+  blocks it); every server-side artifact is design-named, never tool-named (`naming_guard`).
+- **SpiceXplorer first.** Before writing a script, use what exists and compose it: the platform packages
+  (`spicexplorer_core` — `spice_engine.run_deck`, measurements; `spicexplorer_harness` — ledger, pack, lint,
+  spec; `spicexplorer-optimize`; `spicexplorer_gmid`; `spicexplorer_layout` + `spicexplorer_signoff`;
+  `spicexplorer_waveview`; `spicexplorer_circuitgraph`; `spicexplorer_netlist2xschem`), the orchestration
+  workflows and MCP tools (`spicexplorer_orchestration.workflows`: layout, sizing, campaign, sign-off,
+  literature), and the reusable agents and skills in the lab's `analog-skill-directory` (this repo's `.sx/skills` once its template migration lands). A missing function is added to the platform or the
+  library by PR (gap-as-signal), never reimplemented privately in this repo.
+
 ## Rules (mechanically enforced where possible; the rest is contract)
 
 1. **Reference first.** A number that has not passed the frozen definitions is a claim.
