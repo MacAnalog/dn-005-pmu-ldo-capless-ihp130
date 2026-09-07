@@ -41,6 +41,31 @@ checkout) does the generic work, driven by `harness.yaml`; `Makefile` wraps it.
 - `make freeze` — write `SHA256SUMS` into the frozen dirs after certifying a reference.
 - `make baseline` — simulate the frozen reference decks and print the scorecard.
 
+## Simulation lanes and reuse (contract for every agent in this repo)
+
+- **Open-source PDK (IHP SG13G2, sky130, gf180 …) → the open lane.** ngspice (with OSDI/openvaf models) through this repo's lane
+  module (`design/sim.py` or its equivalent here), KLayout / magic / netgen / kpex for layout and sign-off, xschem for schematics — natively
+  on the workstation; `make doctor` proves the lane. An open-PDK bench is never routed through the commercial tools.
+- **Commercial PDK under NDA → the bridge lane only.** Those simulations run on the EDA server through the lab's
+  remote-simulator bridge (the bridge submodule of the lab's `analog-skill-directory` and its two simulator skills): decks are built here, uploaded by basename with *relative* `include`s,
+  simulated there, and only results come back. Kit bytes never reach the workstation or the model (`pdk_guard`
+  blocks it); every server-side artifact is design-named, never tool-named (`naming_guard`).
+- **SpiceXplorer first.** Before writing a script, use what exists and compose it: the platform packages
+  (`spicexplorer_core` — `spice_engine.run_deck`, measurements; `spicexplorer_harness` — ledger, pack, lint,
+  spec; `spicexplorer-optimize`; `spicexplorer_gmid`; `spicexplorer_layout` + `spicexplorer_signoff`;
+  `spicexplorer_waveview`; `spicexplorer_circuitgraph`; `spicexplorer_netlist2xschem`), the orchestration
+  workflows and MCP tools (`spicexplorer_orchestration.workflows`: layout, sizing, campaign, sign-off,
+  literature), and the reusable agents and skills in the lab's `analog-skill-directory` (this repo's `.sx/skills` once its template migration lands). A missing function is added to the platform or the
+  library by PR (gap-as-signal), never reimplemented privately in this repo.
+- **Visual evidence and reports.** Every design cell and every testbench has a **human-readable xschem
+  sheet** (the `schematic-of-record` and `testbench-schematic` skills): generated from the certified netlist with `spicexplorer-netlist2xschem`, proven equal
+  to it, PNG render committed — never a hand drawing offered as a schematic. When a cell must live in the
+  commercial schematic editor it is **ported from that sheet** through the bridge's `xvport` lane and
+  re-proven identical with `circuitgraph`. Findings are **tables or plots regenerated from simulated
+  data** with the spec boxes drawn (the `findings-as-plots` skill); a simulation report is one `experiments/NNN-*/` directory —
+  `run.py` simulates into git-ignored `out/*.json`, figures land in committed `figs/`, `mk_readme.py`
+  rewrites its README from `out/` — or this repo's documented equivalent, so no number is typed into prose.
+
 ## Rules (mechanically enforced where possible; the rest is contract)
 
 1. **Reference first.** A number that has not passed the frozen definitions is a claim.
