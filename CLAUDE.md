@@ -39,6 +39,7 @@ checkout) does the generic work, driven by `harness.yaml`; `Makefile` wraps it.
 - `make runs ARGS="--fails | --best i_q_ua | --exp 001 | --kind bench"` — query the run ledger
   (`runs/ledger.ndjson`; every `ldo.metrics.evaluate()` appends a row).
 - `make freeze` — write `SHA256SUMS` into the frozen dirs after certifying a reference.
+- `make sign DIR=decks/reference AUTHOR=<designer> VERIFIED_BY=<you>` — the SECOND actor re-measures a frozen dir and signs it only if it reproduces bit for bit (clears the `scorecard-recompute` "unverifiable" lint in the checkout where it runs; rule 7).
 - `make baseline` — simulate the frozen reference decks and print the scorecard.
 
 ## Simulation lanes and reuse (contract for every agent in this repo)

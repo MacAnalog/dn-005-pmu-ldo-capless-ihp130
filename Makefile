@@ -28,6 +28,9 @@ runs:  ## query the run ledger (ARGS="--fails" | "--best i_q_ua" | "--exp 001" |
 freeze:  ## write SHA256SUMS into the frozen dirs after a deliberate certification
 	@$(HARNESS) freeze
 
+sign:  ## verifier re-measures a frozen dir and signs it if it reproduces (DIR=decks/reference AUTHOR=<designer> VERIFIED_BY=<you>)
+	@$(PY) -m ldo.sign $(DIR) --author "$(AUTHOR)" --verified-by "$(VERIFIED_BY)"
+
 doctor:  ## is the simulation lane alive?
 	@$(PY) -m ldo.sim
 
