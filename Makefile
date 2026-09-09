@@ -10,6 +10,21 @@ ARGS ?=
 help:  ## list every target
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-8s %s\n", $$1, $$2}'
 
+init:  ## set up this checkout: .sx/platform -> $$SX_ROOT/spicexplorer-platform, the .sx/skills library + agent/skill links, uv sync
+	@test -n "$(SX_ROOT)" || { echo "SX_ROOT is not set: export SX_ROOT=<your spicexplorer-workspace checkout> (the lab puts it in ~/.sx_env)"; exit 2; }
+	@test -f "$(SX_ROOT)/spicexplorer-platform/packages/spicexplorer-harness/pyproject.toml" || { echo "SX_ROOT=$(SX_ROOT) holds no spicexplorer-platform/ checkout"; exit 2; }
+	@mkdir -p .sx && ln -sfn "$(SX_ROOT)/spicexplorer-platform" .sx/platform
+	@git submodule update --init --recursive .sx/skills
+	@.sx/skills/bin/sx-link . --set design
+	@uv sync
+	@echo "init OK: .sx/platform -> $$(readlink .sx/platform); $$(ls .claude/agents | wc -l) agents + $$(ls .claude/skills | wc -l) skills linked from .sx/skills; next: make doctor"
+
+skills-update:  ## move .sx/skills (the shared agent/skill library) to its main, re-link, and stage the pin — then commit it
+	@git -C .sx/skills fetch -q origin main && git -C .sx/skills checkout -q origin/main
+	@.sx/skills/bin/sx-link . --set design
+	@git add .sx/skills .claude
+	@echo "skills @ $$(git -C .sx/skills rev-parse --short HEAD): $$(ls .claude/agents | wc -l) agents + $$(ls .claude/skills | wc -l) skills linked; staged — commit the pin: git commit -m 'skills: bump .sx/skills to $$(git -C .sx/skills rev-parse --short HEAD)'"
+
 lint:  ## repo invariants (harness.yaml + scripts/lint.py extras); failures carry their remediation
 	@$(PY) scripts/lint.py
 
@@ -53,4 +68,4 @@ fig-layout:  ## redraw experiments/005-layout/figs/ldo_ihp_capless_labelled*.png
 clean:  ## delete this checkout's simulation work dir + experiment output (never the ledger)
 	@d=$$($(PY) -c "from ldo import config; print(config.WORK)"); echo "rm -rf $$d"; rm -rf "$$d"; rm -rf experiments/*/out/
 
-.PHONY: help lint check baseline pack runs freeze doctor fig-layout clean
+.PHONY: help init skills-update lint check baseline pack runs freeze doctor fig-layout clean

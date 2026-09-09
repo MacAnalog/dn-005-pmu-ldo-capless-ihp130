@@ -5,3 +5,4 @@ experiments/*/out/
 .venv/
 .ruff_cache/
 xschemrc
+.sx/platform
