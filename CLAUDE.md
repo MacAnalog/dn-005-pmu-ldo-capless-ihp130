@@ -58,7 +58,7 @@ checkout) does the generic work, driven by `harness.yaml`; `Makefile` wraps it.
   spec; `spicexplorer-optimize`; `spicexplorer_gmid`; `spicexplorer_layout` + `spicexplorer_signoff`;
   `spicexplorer_waveview`; `spicexplorer_circuitgraph`; `spicexplorer_netlist2xschem`), the orchestration
   workflows and MCP tools (`spicexplorer_orchestration.workflows`: layout, sizing, campaign, sign-off,
-  literature), and the reusable agents and skills in the lab's `analog-skill-directory` (this repo's `.sx/skills` once its template migration lands). A missing function is added to the platform or the
+  literature), and the reusable agents and skills in the lab's `analog-skill-directory` (this repo's `.sx/skills` submodule; `make skills-update` moves it to the library's main). A missing function is added to the platform or the
   library by PR (gap-as-signal), never reimplemented privately in this repo.
 - **Visual evidence and reports.** Every design cell and every testbench has a **human-readable xschem
   sheet** (the `schematic-of-record` and `testbench-schematic` skills): generated from the certified netlist with `spicexplorer-netlist2xschem`, proven equal
