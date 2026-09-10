@@ -17,6 +17,64 @@ Versions are `MAJOR.MINOR`, written `#.##`:
 `make template-status` prints the recorded version and the latest release. Releases are git
 tags, `v<version>`.
 
+## v2.03 — say what the relocation does to the ledger
+
+Minor. 2.02 moved a frozen directory and repointed its scorecard. The **ledger** records the same
+paths, and it is deliberately not rewritten — *"never hand-edit the ledger: an edited row is not
+evidence of a run"*. A row naming the old path is a true record of where the file was when that run
+happened.
+
+The consequence is a `scorecard-recompute` failure for those rows **in the checkout that holds
+them**. `runs/` is git-ignored and per checkout, so a fresh clone never sees it, and it clears at
+the next certification. That is now said in the migration's own output rather than discovered
+afterwards — a lint going red for a reason nobody can act on is the failure mode the harness
+already avoids for fresh clones.
+
+## v2.02 — a frozen directory CAN move; it just has to take its pointers with it
+
+Minor. This corrects an over-strong rule in 2.00/2.01, which refused to move any frozen directory
+on the strength of one design's breakage.
+
+**What was actually true.** A scorecard's `provenance` block records `script` and `raw` as
+repo-relative paths, each beside a sha of that file's **contents**. Move the directory and a path
+pointing inside it stops resolving — `scorecard-recompute` reports *"raw `<path>` is missing"*.
+
+**What was not true: that this makes the move impossible.** Rewriting the pointer keeps every hash
+valid, because no byte of the rawfile, the scorer, or any number changes. The move is a relocation
+record, not a re-measurement. And it does not apply at all to a scorecard with no `provenance`
+block — one design in the fleet has six frozen dirs and no provenance paths, and would never have
+been affected.
+
+**So `move_reference` now relocates.** It reads each scorecard, moves the directory, repoints only
+the provenance keys that pointed inside it, and updates `harness.yaml`. Run `make freeze`
+afterwards: `SHA256SUMS` covers `scorecard.json`.
+
+**Two things are still never inferred**, and both are arguments or refusals rather than guesses:
+
+- **Which frozen dir is the design of record** — `--design-of-record <dir>`. `reference_scorecard`
+  cannot answer it: that key means *the scorecard `make check` reproduces*, which a design may
+  legitimately point at a prior-art yardstick it is trying to beat.
+- **Whether a dir is a result at all.** A yardstick, a control and a withdrawn row are frozen too,
+  and they stay in `decks/`. `signoff/` is for this design's own results.
+
+**The lesson:** one design's failure is evidence about that design. Generalising it into a rule for
+every design cost two repos the structure they were entitled to.
+
+## v2.01 — three defects the first real migrations found
+
+Minor: propagatable into any design already on 2.00. All three were found by running the migration
+against live designs, and every one of them failed silently or confusingly rather than loudly.
+
+| defect | what happened | fix |
+|---|---|---|
+| `frozen:` read with a single-line regex | a design whose list wraps over two lines was told **"nothing is frozen yet"** — with six frozen directories — and advised to certify into a fresh path | `re.S`, and the comment says why a false negative here is worse than no check |
+| `artifact_home` used a module-level `subprocess` | the check crashed (`NameError`) on any design whose own `lint.py` does not import it | imports it locally, so it never depends on a design's import block |
+| a missing `scripts/template_update.py` | raw `ModuleNotFoundError` traceback mid-run | a refusal that says whether the repo is template-derived and how to restore the file |
+
+**The lesson worth keeping:** two of these produced confident wrong output rather than an error. A
+migration that reports is only useful if what it reports is true, so test it against the messiest
+real repo you have, not against the template.
+
 ## v2.00 — every artefact has a home (MAJOR: directories move)
 
 **Why this is a MAJOR.** A three-way merge can change a file's contents; it cannot move a file.
