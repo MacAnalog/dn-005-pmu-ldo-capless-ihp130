@@ -193,7 +193,7 @@ drawing.
 | **M3** | the schematic of record netlists `cap_cmim` with no `w`/`l` and `VREF vref vss 3`, and the equivalence check passes anyway | green at the recertified cell | closing the finding is the verifier's call (rule 7) and that re-measure is pending |
 | **M7** | the LVS golden netlist was written by the generator from its own device table | closed 2026-09-04 | listed for the record of how it closed |
 | **M8** | half the Metal1-short fix (`stub_clear`) was an unexercised regression | closed 2026-09-04 | listed for the record of how it closed |
-| **m5-r** | deleting `VOUT_THRESH: 1.14` from the candidate's `analyses/dropout.yaml` left the whole candidate circuit un-assemblable, and nothing noticed for a review round | open | the dead placeholder still sits in the analog-db class template |
+| **m5-r** | deleting `VOUT_THRESH: 1.14` from the candidate's `analyses/dropout.yaml` makes the `dropout` bench fail to assemble — 1 of 13, which sinks every scorecard — and nothing noticed for a review round | open | re-measured 2026-09-10: the dead placeholder is still in the analog-db class template at the pinned commit, so the binding is still load-bearing |
 | **m3** | no interdigitation, common centroid, dummies or guard rings on the matched pairs; no mismatch or Monte Carlo run anywhere in this branch | layout part closed 2026-09-04 | routing is not matched half-for-half and no mismatch Monte Carlo exists |
 | **m11** | S8 constrains phase margin only; light-load gain margin is **5.75 dB** and the sensitivity peak **14.09 dB** at 0.1 mA | open | neither is in the box or the reported columns |
 | **m4** | `zout_peak_db` is the rise of output impedance from DC, not peaking; it reads 100.2 dB on a 72°-phase-margin loop (the reference reads 5.88 dB on the identical definition) | open, deferred | report-only and not used for S8, but printed in every scorecard, where it reads as an alarm; renaming it changes a bench definition, which would re-freeze the decks, so it is deferred deliberately |
@@ -260,11 +260,26 @@ where an off-grid value now raises instead of silently drawing a different devic
 
 ### m5-r — the deleted placeholder that broke every candidate deck
 
-The bench really does ignore the parameter (m5 stands), but the class template still carries
-`${VOUT_THRESH}` in its comment header and analog-db's `assemble()` scans the rendered text,
-comments included. The binding is restored with the reason written beside it; `deck_rebuild` now
-guards **every** frozen dir, which is what would have caught it. The real fix — dropping the dead
-placeholder from the class template — is an analog-db change.
+**Re-measured 2026-09-10.** The bench really does ignore the parameter (m5 stands), and the binding
+is still load-bearing anyway. `assemble()` renders the class template with
+`Template.safe_substitute` and then scans the **rendered** text — comment lines included — for
+unresolved `${…}`; `ldo.dut.Design.deck()` strips comments only afterwards. Delete the binding and
+rebuild all 13 candidate benches and **12 still build**: only `dropout` raises
+`AssembleError: … unresolved placeholders ['VOUT_THRESH']`. A 13-bench scorecard needs all 13, which
+is what "un-assemblable" meant. The binding is restored with the reason written beside it, and
+`deck_rebuild` now guards **every** frozen dir, which is what would have caught the deletion.
+
+**What it is waiting on, precisely.** The real fix — dropping the dead placeholder from the class
+template — is an analog-db change, and it has **not merged**: `${VOUT_THRESH}` is still in
+`_shared/classes/ldo/testbench-templates/dropout.spice` on analog-db `origin/main` (`3b9535f7`) and
+at the commit the shared root is pinned to (`2da526c5`). The retirement exists only on an unmerged
+working branch. So m5-r closes when that change is on `main` **and** the shared root has re-pinned
+past it — not when the branch exists.
+
+When it lands, nothing here breaks: `safe_substitute` ignores mapping keys the template does not
+use, so the binding turns inert rather than into an error, and it can be deleted at leisure.
+`scripts/lint.py::dropout_threshold_binding` is what will say so — it fails in **both** directions,
+a template that needs the binding without one and a binding that outlives its placeholder.
 `doc/journal/one-guarded-frozen-dir-guards-one-frozen-dir.md`.
 
 ### m3 — matching drawn, mismatch measured at two edges, distribution still unsimulated
