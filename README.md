@@ -128,8 +128,9 @@ parasitic budget in the layout brief tightens ~23 % as a result.
 
 ### The headline, and the corners where it does not hold
 
-Every number in this section is [007](experiments/007-post-layout-corners/README.md) §1–§3, at the
-re-certified 33.81 µA sizing point.
+Every **measured corner** number in this section is
+[007](experiments/007-post-layout-corners/README.md) §1–§3, at the re-certified 33.81 µA sizing
+point; anything carried over from the 36.28 µA point is labelled as such where it appears.
 
 - **Met at tt / 27 °C, before and after layout.** The reference's regulation and PSRR class at
   **4.5 % of its quiescent current**, with the output capacitor on chip (21 pF) and phase margin
@@ -152,9 +153,11 @@ re-certified 33.81 µA sizing point.
   — 24.32 µA at ss / −40 °C to 58.37 µA at ff / 125 °C, **2.4×** on a 33.81 µA nominal.
 - **S7 does not fail where 003 said it does.** The drawn cell's parasitics *rescue* the cold
   corners — ≈44 fF of undesigned capacitance on the error-amp output node `ea_o1` takes tt / −40 °C
-  from 288.7 mV (schematic) to 106.9 mV (extracted) — and spend margin at 125 °C, where the
-  extraction's +34.45 fF on `gate` puts four of five corners out of the box. The post-layout S7
-  constraint is **temperature**, not the `gate` parasitic budget
+  from 288.7 mV (schematic) to 106.9 mV (extracted) — and spend margin at 125 °C, where S7 leaves
+  the box in four of five corners post-layout against the one (ss / 125 °C) that already did on the
+  schematic: the extraction's +34.45 fF on `gate` is worth ~10 mV and the pre-layout margin there is
+  only 10.9–14.3 mV. The post-layout S7 constraint is **temperature**, not the `gate` parasitic
+  budget
   ([007 §2–§3](experiments/007-post-layout-corners/README.md)).
 - **S8 never binds** anywhere on the grid: worst post-layout phase margin 67.61° at ff / 125 °C,
   7.6° above the line.
