@@ -1,5 +1,6 @@
 # 003 — sizing: gm/ID start, optimizer run, design of record, corners
 
+**Phase:** `sizing`
 **Paper(s):** none (topology from 002)
 **Hypothesis:** starting from the gm/ID-derived hand point of 002 (the double-mirror fold, all of S1–S8 at tt except S5), `spicexplorer-optimize` (Nevergrad NGOpt, the S1–S8 box with margin as constraints, S8 also at 0.1/10 mA, Iq as the objective) finds a point ≤ 35 µA that still meets the whole box at tt/27 °C, and that point holds S1–S8 over the five MOS corners × −40/27/125 °C with at most S8 falling below 60° at ss/−40 °C. Falsified if the optimizer cannot cut Iq by ≥ 20 % without a constraint violation, or if the corner table shows a hard-box violation at tt-adjacent corners.
 **Control:** the hand point itself (trial 0, seeded through `seed_from_init`) scored by the same project; and the reference row quoted from `decks/reference/scorecard.json`. Every candidate row is the full 13-bench `ldo.metrics.evaluate` scorecard, not the optimizer's own reading.

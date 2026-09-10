@@ -1,5 +1,6 @@
 # 005 — layout: generator → GDS → DRC / LVS / PEX → post-layout scorecard
 
+**Phase:** `layout`
 **Paper(s):** none
 **Hypothesis:** the design of record (003) can be drawn by a *parameterized generator* — `layout/gen_ldo.py`, whose sizing comes from `sizing.yaml` and whose floorplan constants are an optimizer-ready search space — and the resulting cell will be DRC-clean, LVS-identical to the certified netlist, extractable, and will still pass the whole S1–S8 box on its **own frozen benches** run against the extracted netlist. Falsified if any sign-off stage cannot be made to pass, or if a spec falls out of the box post-layout.
 **Control:** the pre-layout scorecard of the same sizing point, re-simulated in the same run (not quoted from 003), so every pre→post shift is attributable to the extraction alone; and, for the generator bug in §2, the same generator at the 002 hand sizing, which passed LVS before and after the fix.

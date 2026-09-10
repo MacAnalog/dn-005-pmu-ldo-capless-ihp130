@@ -63,5 +63,5 @@ re-measures it). Full certified scorecard: `experiments/001-reference/README.md`
   conditions.
 - **Quotable yardsticks: S2, S3, S5, S6 and S8 only.** S4 and S7 depend on the pass device family
   and the output capacitor, so their bounds are set from the literature instead.
-- **Every bound cites its origin** in the last column of the box. Handles are `pdf/INDEX.md` rows;
+- **Every bound cites its origin** in the last column of the box. Handles are `references/INDEX.md` rows;
   two of them are abstract-only and are used for bracketing, never as the sole source of a bound.
