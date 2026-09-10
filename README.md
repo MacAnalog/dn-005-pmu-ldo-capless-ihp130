@@ -95,12 +95,25 @@ certification.
 | sized, tt / 27 °C (design of record) | 1.199 | 0.026 | 0.056 | 104.7 | **33.81** | 70.01 | 115.1 | 72.51 | **PASS** |
 | post-layout, RC extraction (record), tt / 27 °C | 1.199 | 0.027 | 0.056 | **134.7** | **33.77** | 70.06 | 129.5 | 69.33 | **PASS** |
 | post-layout, CC extraction (ideal-metal comparison), tt / 27 °C | 1.199 | 0.026 | 0.056 | 104.7 | **33.81** | 70.09 | 127.6 | 69.30 | **PASS** |
-| worst corner (5 MOS × −40/27/125 °C) | 1.198 | 0.056 | 0.248 | 135.0 | **61.9** @ ff/125 | 59.66 | **310.8** @ ss/−40 | 70.35 | 12/15 PASS |
+| worst corner, schematic (5 MOS × −40/27/125 °C) | 1.197 | 0.054 | 0.266 | 131.8 | **58.37** @ ff/125 | 59.02 | **301.8** @ sf/−40 | 70.37 | 8/15 PASS |
+| worst corner, post-layout CC (same grid) | 1.197 | 0.054 | 0.266 | 131.8 | **58.37** @ ff/125 | 59.02 | **171.1** @ ss/125 | 67.61 | 10/15 PASS |
 
-The corner row plotted, with each spec bound drawn:
-[`experiments/003-sizing/figs/corners.png`](experiments/003-sizing/figs/corners.png) — S5, S7 and
-S8 against temperature, one curve per MOS corner, at the design of record
-(`experiments/003-sizing/figs.py::corner_figs`, from `out/corners.json`). The drawn cell:
+Both corner rows are [007](experiments/007-post-layout-corners/README.md) §1, measured at **this**
+sizing point (Iq 33.81 µA). Each column is that column's worst over the 15-cell grid, so neither row
+describes a single corner. Both are **CC** rows: the RC corner grid was never run, and adding tt/27's
++30.0 mV CC→RC dropout gap to the worst S4 (131.8 mV) is an arithmetic addition, not a measurement
+([007 §5](experiments/007-post-layout-corners/README.md)). The row this table carried until
+2026-09-10 — **61.9 µA @ ff/125, 310.8 mV @ ss/−40, 12/15 PASS** — is
+[003 §3](experiments/003-sizing/README.md) at the **superseded 36.28 µA sizing**; it stays 003's
+record and is not a description of the cell this repo holds.
+
+The corner grid at the current sizing point, plotted:
+[`experiments/007-post-layout-corners/figs/corners_s5_s7.png`](experiments/007-post-layout-corners/figs/corners_s5_s7.png)
+— S5 and S7 across the grid, schematic and extracted.
+[`experiments/003-sizing/figs/corners.png`](experiments/003-sizing/figs/corners.png) draws the same
+three specs (S5, S7, S8) against temperature at the **36.28 µA** point
+(`experiments/003-sizing/figs.py::corner_figs`, from that experiment's `out/corners.json`); it is
+003's record, not a plot of the cell of record. The drawn cell:
 [`experiments/005-layout/figs/ldo_ihp_capless_labelled.png`](experiments/005-layout/figs/ldo_ihp_capless_labelled.png)
 (`make fig-layout`, from the rebuilt GDS + `layout/ldo_ihp_capless/labels.yaml`).
 
@@ -113,26 +126,51 @@ schematic of record simply did not describe the devices the generator has drawn 
 round ([`layout/ldo_ihp_capless/PLAN.md` §0.1](layout/ldo_ihp_capless/PLAN.md)). Every S7-derived
 parasitic budget in the layout brief tightens ~23 % as a result.
 
-### The headline, and the corner where it does not hold
+### The headline, and the corners where it does not hold
+
+Every number in this section is [007](experiments/007-post-layout-corners/README.md) §1–§3, at the
+re-certified 33.81 µA sizing point.
 
 - **Met at tt / 27 °C, before and after layout.** The reference's regulation and PSRR class at
   **4.5 % of its quiescent current**, with the output capacitor on chip (21 pF) and phase margin
   26° better.
-- **Sign-off over corners is not met.** Two spec lines leave the box, and both come from the same
-  resistor-referenced bias, whose current spreads 2.4× over the corner grid — the resistor corner
-  alone reproduces both failures.
+- **Sign-off over corners is not met, and the two failing lines are no longer one story.** At
+  36.28 µA ([003 §3](experiments/003-sizing/README.md)) S5 and S7 were the same resistor-bias
+  mechanism pulled in opposite directions. At the sizing point the repo now holds, S5 still is that
+  — and S7 is not:
 
-| corner | spec that binds | measured | bound |
-|---|---|---|---|
-| ff / 125 °C | S5 quiescent current | 61.9 µA | ≤ 50 µA |
-| ss / −40 °C | S7 load-step undershoot | 310.8 mV | ≤ 150 mV |
+| lane | corners that fail | spec that binds | measured | bound |
+|---|---|---|---|---|
+| schematic **and** post-layout | ff / 125 °C | S5 quiescent current | 58.37 µA, identical to five digits in both | ≤ 50 µA |
+| schematic | 6 of 15: tt, ss, sf, fs / −40 °C and ss / 27 °C, ss / 125 °C | S7 load-step undershoot | 152.8–301.8 mV | ≤ 150 mV |
+| post-layout (CC) | 4 of 15: tt, ss, sf, fs / 125 °C | S7 load-step undershoot | 152.1–171.1 mV | ≤ 150 mV |
 
-- **The two failures pull one knob in opposite directions.** A supply-independent bias is the
-  named next increment, and it does **not** relax both ends at once: pinned at the design's own
-  36.3 µA it still fails S7 at ff/125 °C, and the window that clears both corners is
-  **Iq ≈ 41–50 µA**.
-- **The corner-robust headline is therefore 41–50 µA, not 36.28 µA**
-  ([003 §3](experiments/003-sizing/README.md), [design-reference §4](doc/design-reference.md)).
+- **S5 is a schematic-level failure of the bias**, not a layout one: pre and post read the same
+  58.37 µA, so nothing in the layout lane can move it
+  ([007 §2](experiments/007-post-layout-corners/README.md)). The mechanism is the
+  resistor-referenced bias, and 007's own `i_q_ua` column carries the spread at this sizing point
+  — 24.32 µA at ss / −40 °C to 58.37 µA at ff / 125 °C, **2.4×** on a 33.81 µA nominal.
+- **S7 does not fail where 003 said it does.** The drawn cell's parasitics *rescue* the cold
+  corners — ≈44 fF of undesigned capacitance on the error-amp output node `ea_o1` takes tt / −40 °C
+  from 288.7 mV (schematic) to 106.9 mV (extracted) — and spend margin at 125 °C, where the
+  extraction's +34.45 fF on `gate` puts four of five corners out of the box. The post-layout S7
+  constraint is **temperature**, not the `gate` parasitic budget
+  ([007 §2–§3](experiments/007-post-layout-corners/README.md)).
+- **S8 never binds** anywhere on the grid: worst post-layout phase margin 67.61° at ff / 125 °C,
+  7.6° above the line.
+
+**What is still quoted from the old sizing point.** 007 re-ran the corner grid at 33.81 µA, so the
+corner verdict above is current. These were derived at **36.28 µA** and have not been re-derived:
+
+- the `r_bias_l` threshold sweep and the **Iq ≈ 41–50 µA** window that clears both ends — the exit
+  path's price ([003 §3](experiments/003-sizing/README.md),
+  [review-002 §3.4 + M6](doc/reviews/review-002-capless-ldo.md),
+  [design-reference §4](doc/design-reference.md)). It is a figure for a bias increment, not a
+  measurement of the cell of record;
+- `experiments/003-sizing/figs/corners.png`, that grid's figure.
+
+Never run at either sizing point: the **RC** corner grid, and any joint corners × mismatch sweep
+([007 §5](experiments/007-post-layout-corners/README.md)).
 
 ## Open findings — independent review `doc/reviews/review-002-capless-ldo.md`
 

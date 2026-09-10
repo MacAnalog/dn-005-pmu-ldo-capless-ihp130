@@ -91,6 +91,11 @@ right order of magnitude given the FVF is pull-down-slew-limited on the falling 
 3. **Quiescent current ≤ 50 µA is measured at no load** (`dc_op`, `i_supply`) — a bleeder or a
    minimum-load device counts against it.
 4. **The bias binds at both ends, and S7 against bias current is a THRESHOLD, not a ramp.**
+   *Every number in this item — the 25.6/61.9 µA spread, the `r_bias_l` sweep, the 41–50 µA window
+   — was measured at the **36.28 µA** sizing point and has not been re-derived on the re-certified
+   33.81 µA cell. The corner grid itself was re-run there (`experiments/007-post-layout-corners/`),
+   and it no longer supports the "one mechanism, both ends" reading for S7 post-layout; the
+   constraint the bias still owns at this sizing point is S5 at ff/125 °C.*
    The resistor-referenced bias makes every branch current scale with `rhigh`'s sheet resistance:
    Iq runs 25.6 µA at ss/−40 °C to 61.9 µA at ff/125 °C, a 2.4× spread on a 36.3 µA nominal. The
    resistor corner alone reproduces **both** failures; neither the transistor nor the capacitor
