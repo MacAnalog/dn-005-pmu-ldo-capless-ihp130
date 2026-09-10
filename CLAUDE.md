@@ -4,14 +4,18 @@
 
 ## Mission
 
-A **capless, low-quiescent-current LDO** in the open **IHP SG13G2** 130 nm PDK, thin-oxide
-(`sg13_lv_*`, 1.5 V) devices: **Vin 1.5 V nominal, Vout 1.2 V, 0.1–10 mA load, the output
-capacitor on chip (≤ 100 pF)**. The yardstick is the certified analog-db reference
-`ldo_005_buffered_ref` (`decks/reference/`, IHP tt): the headline is to **match its load/line
-regulation and 1 kHz PSRR at ≤ 50 µA quiescent current** — an order of magnitude below the
-reference's — without giving back phase margin, dropout or load-step undershoot. The spec of
-record is `doc/target-spec.md`; its machine twin is the `spec:` block in `harness.yaml`, and
-`make lint` refuses to let the two drift.
+A **capless, low-quiescent-current LDO** in the open **IHP SG13G2** 130 nm PDK, on thin-oxide
+(`sg13_lv_*`, 1.5 V) devices.
+
+- **Operating point.** **Vin 1.5 V nominal, Vout 1.2 V, 0.1–10 mA load, the output capacitor on
+  chip (≤ 100 pF)**.
+- **Yardstick.** The certified analog-db reference `ldo_005_buffered_ref` (`decks/reference/`,
+  IHP tt).
+- **Headline.** **Match the reference's load/line regulation and 1 kHz PSRR at ≤ 50 µA quiescent
+  current** — an order of magnitude below the reference's — without giving back phase margin,
+  dropout or load-step undershoot.
+- **Spec of record.** `doc/target-spec.md`; its machine twin is the `spec:` block in
+  `harness.yaml`, and `make lint` refuses to let the two drift.
 
 ## Read this before that
 
@@ -31,6 +35,8 @@ record is `doc/target-spec.md`; its machine twin is the `spec:` block in `harnes
 `spicexplorer-harness` (platform package, an editable path dependency — `uv sync` once per
 checkout) does the generic work, driven by `harness.yaml`; `Makefile` wraps it.
 
+- `make init` — set this checkout up: `.sx/platform` → `$SX_ROOT/spicexplorer-platform`, the
+  `.sx/skills` library, the agent/skill links into `.claude/`, then `uv sync`. Needs `SX_ROOT`.
 - `make doctor` — is the simulation lane alive? (`ldo/sim.py`: ngspice + the PDK model libs)
 - `make pack K="psrr iq"` — assemble **working memory** for a task. Run at task start;
   re-run with `S="loop gain fell to 0 dB"` on any new failure signature before diagnosing.
@@ -38,42 +44,54 @@ checkout) does the generic work, driven by `harness.yaml`; `Makefile` wraps it.
 - `make check` — lint + the reference reproduces its certified scorecard.
 - `make runs ARGS="--fails | --best i_q_ua | --exp 001 | --kind bench"` — query the run ledger
   (`runs/ledger.ndjson`; every `ldo.metrics.evaluate()` appends a row).
+- `python -m ldo.metrics --certify [DIR]` — (re)certify a frozen dir from its own `design.json`
+  (default `decks/reference/`); there is no `make certify` target.
 - `make freeze` — write `SHA256SUMS` into the frozen dirs after certifying a reference.
 - `make sign DIR=decks/reference AUTHOR=<designer> VERIFIED_BY=<you>` — the SECOND actor re-measures a frozen dir and signs it only if it reproduces bit for bit (clears the `scorecard-recompute` "unverifiable" lint in the checkout where it runs; rule 7).
 - `make baseline` — simulate the frozen reference decks and print the scorecard.
 
 ## Simulation lanes and reuse (contract for every agent in this repo)
 
-- **Open-source PDK (IHP SG13G2, sky130, gf180 …) → the open lane.** ngspice (with OSDI/openvaf models) through this repo's lane
-  module (`design/sim.py` or its equivalent here), KLayout / magic / netgen / kpex for layout and sign-off, xschem for schematics — natively
-  on the workstation; `make doctor` proves the lane. An open-PDK bench is never routed through the commercial tools.
+- **Open-source PDK (IHP SG13G2, sky130, gf180 …) → the open lane.** ngspice (with OSDI/openvaf
+  models) through this repo's lane module `ldo/sim.py`, KLayout / magic / netgen / kpex for layout
+  and sign-off, xschem for schematics — natively on the workstation; `make doctor` proves the lane.
+  An open-PDK bench is never routed through the commercial tools.
 - **Commercial PDK under NDA → the bridge lane only.** Those simulations run on the EDA server through the lab's
   remote-simulator bridge (the bridge submodule of the lab's `analog-skill-directory` and its two simulator skills): decks are built here, uploaded by basename with *relative* `include`s,
   simulated there, and only results come back. Kit bytes never reach the workstation or the model (`pdk_guard`
   blocks it); every server-side artifact is design-named, never tool-named (`naming_guard`).
   **A declined `/CMC` prompt is never a stop:** continue without those bytes (the kit is consumed by path
   on the server; open-PDK files are unrestricted; ask the person one sentence if a kit fact is needed).
-- **SpiceXplorer first.** Before writing a script, use what exists and compose it: the platform packages
-  (`spicexplorer_core` — `spice_engine.run_deck`, measurements; `spicexplorer_harness` — ledger, pack, lint,
-  spec; `spicexplorer-optimize`; `spicexplorer_gmid`; `spicexplorer_layout` + `spicexplorer_signoff`;
-  `spicexplorer_waveview`; `spicexplorer_circuitgraph`; `spicexplorer_netlist2xschem`), the orchestration
-  workflows and MCP tools (`spicexplorer_orchestration.workflows`: layout, sizing, campaign, sign-off,
-  literature), and the reusable agents and skills in the lab's `analog-skill-directory` (this repo's `.sx/skills` submodule; `make skills-update` moves it to the library's main). A missing function is added to the platform or the
-  library by PR (gap-as-signal), never reimplemented privately in this repo.
-- **Visual evidence and reports.** Every design cell and every testbench has a **human-readable xschem
-  sheet** (the `schematic-of-record` and `testbench-schematic` skills): generated from the certified netlist with `spicexplorer-netlist2xschem`, proven equal
-  to it, PNG render committed — never a hand drawing offered as a schematic. When a cell must live in the
-  commercial schematic editor it is **ported from that sheet** through the bridge's `xvport` lane and
-  re-proven identical with `circuitgraph`. Findings are **tables or plots regenerated from simulated
-  data** with the spec boxes drawn (the `findings-as-plots` skill); a simulation report is one `experiments/NNN-*/` directory —
-  `run.py` simulates into git-ignored `out/*.json`, figures land in committed `figs/`, `mk_readme.py`
-  rewrites its README from `out/` — or this repo's documented equivalent, so no number is typed into prose.
+- **SpiceXplorer first.** Before writing a script, use what exists and compose it. A missing function
+  is added to the platform or the library by PR (gap-as-signal), never reimplemented privately here.
+  - **Platform packages:** `spicexplorer_core` (`spice_engine.run_deck`, measurements),
+    `spicexplorer_harness` (ledger, pack, lint, spec), `spicexplorer-optimize`, `spicexplorer_gmid`,
+    `spicexplorer_layout` + `spicexplorer_signoff`, `spicexplorer_waveview`,
+    `spicexplorer_circuitgraph`, `spicexplorer_netlist2xschem`.
+  - **Orchestration workflows and MCP tools:** `spicexplorer_orchestration.workflows` — layout,
+    sizing, campaign, sign-off, literature.
+  - **Reusable agents and skills:** the lab's `analog-skill-directory`, this repo's `.sx/skills`
+    submodule; `make skills-update` moves it to the library's main.
+- **Visual evidence and reports.**
+  - **Every design cell and every testbench has a human-readable xschem sheet** (the
+    `schematic-of-record` and `testbench-schematic` skills): generated from the certified netlist
+    with `spicexplorer-netlist2xschem`, proven equal to it, PNG render committed — never a hand
+    drawing offered as a schematic. When a cell must live in the commercial schematic editor it is
+    **ported from that sheet** through the bridge's `xvport` lane and re-proven identical with
+    `circuitgraph`.
+  - **Findings are tables or plots regenerated from simulated data** with the spec boxes drawn (the
+    `findings-as-plots` skill).
+  - **A simulation report is one `experiments/NNN-*/` directory** — `run.py` simulates into
+    git-ignored `out/*.json`, figures land in committed `figs/`, `mk_readme.py` rewrites its README
+    from `out/` — or this repo's documented equivalent, so no number is typed into prose.
 
 ## Rules (mechanically enforced where possible; the rest is contract)
 
-1. **Reference first.** A number that has not passed the frozen definitions is a claim, and the
-   reduction that produces it lives in the PACKAGE (`ldo/metrics.py`), never only in an experiment: `make certify` freezes what `metrics.run_decks`
-   produced, so a number computed inside an `experiments/NNN-*/run.py` is a report, not a reference.
+1. **Reference first.** A number that has not passed the frozen definitions is a claim. The
+   reduction that produces it — the code that turns a simulated waveform into the number the spec
+   is written in — lives in the PACKAGE (`ldo/metrics.py`), never only in an experiment:
+   `python -m ldo.metrics --certify` freezes what `metrics.run_decks` produced, so a number
+   computed inside an `experiments/NNN-*/run.py` is a report, not a reference.
 2. **Decks are built, never text-edited, and portable.** A sizing point is an `ldo.dut.Design`;
    every deck is generated from it. No machine-specific absolute path may appear in a frozen deck —
    `deck-portable` in `scripts/lint.py` refuses one, because a certified deck naming a path only
@@ -95,18 +113,25 @@ checkout) does the generic work, driven by `harness.yaml`; `Makefile` wraps it.
 
 ## Agents and methods
 
-In `.claude/agents/` (each starts from `make pack`, reads `harness.yaml`, obeys rules 7–10):
+Nine agents in `.claude/agents/`, linked from `.sx/skills` (each starts from `make pack`, reads
+`harness.yaml`, obeys rules 7–10):
 
-- `paper-analyst` — one paper → a falsifiable technique brief + its `pdf/INDEX.md` row. Never simulates.
-- `variant-runner` — parallel netlist-lane batches; scorecard tables only; reference first row, control when a knob moves.
-- `signoff-verifier` — independent re-measurement of delivery claims from raw artefacts (rule 7). Reports; never fixes.
-- `schematic-builder` — the reviewable `.sch`/`.sym` of record, proven equal to netlist and simulation.
-- `gardener` — report-only consistency sweep. Has no write tools, by design.
+| agent | what it does |
+|---|---|
+| `paper-analyst` | one paper → a falsifiable technique brief + its `pdf/INDEX.md` row. Never simulates. |
+| `variant-runner` | parallel netlist-lane batches; scorecard tables only; reference first row, control when a knob moves. |
+| `signoff-verifier` | independent re-measurement of delivery claims from raw artefacts (rule 7). Reports; never fixes. |
+| `schematic-builder` | the reviewable `.sch`/`.sym` of record, proven equal to netlist and simulation. |
+| `gardener` | report-only consistency sweep. Has no write tools, by design. |
+| `layout-brief-author` | the cell's LAYOUT BRIEF: net-sensitivity and parasitic budgets, tolerated mismatch per device class, per-net DC current budgets — all measured on the frozen benches before anything is drawn. |
+| `layout-designer` | certified netlist → parameterized gdsfactory generator → GDS, proven DRC-clean and LVS-identical, extracted, and re-run on the cell's own frozen benches. |
+| `layout-reviewer` | report-only independent review: rebuilds the GDS, re-runs DRC/LVS/PEX itself, and returns findings as `REVIEW.md` + `REVIEW.yaml` + `REVIEW.png`. Never edits the layout. |
+| `layout-schematic-codesign` | the joint sizing + layout search as a `sim_engine: layout` project driven by `spicexplorer-optimize`, one round per generator repair. |
 
 Visual evidence is not optional: the methods in `.claude/skills/` — `schematic-of-record`,
 `testbench-schematic` (components, not text), `findings-as-plots` (spec boxes drawn on every
 figure), `layout-evidence` (generator → GDS → DRC/LVS/PEX → review overlay) — say how each
-artefact is produced and gated. Layout work uses the workspace's `layout-*` agents.
+artefact is produced and gated.
 
 ## Parallel sessions & blast radius
 

@@ -11,7 +11,7 @@ agent owns that checkout — or bypass the loader.
 **What was done (minimum, local).** `assemble(circuit, …)` takes a `Circuit` object, and
 `Circuit(id=, dir=, manifest=)` is a plain frozen dataclass whose methods read
 `datasheet.yaml`, `analyses/<id>.yaml`, `pdk/<pdk>/{sizing,corners}.yaml`, `pdk/<pdk>/netlist.spice`
-under `dir`. So `lab.dut.circuit(id)` now resolves `circuits/<id>/circuit.yaml` in THIS repo first
+under `dir`. So `ldo.dut.circuit(id)` now resolves `circuits/<id>/circuit.yaml` in THIS repo first
 and builds the `Circuit` itself; the analog-db root stays the fallback (the reference still comes
 from there). The candidate directory is an exact analog-db circuit directory, hand-lowered
 (`abstract/netlist.spice` + `pdk/ihp-sg13g2/netlist.spice` kept in step by hand — there is no
@@ -23,6 +23,6 @@ for circuit roots — `load_circuit(id, roots=[…])` or `SPICEXPLORER_ANALOG_DB
 
 **Second gap, same seam.** `assemble()` takes the simulation temperature from the datasheet's
 `default_conditions.temp` only; a corner table (-40/27/125 °C) needs a per-deck temperature.
-`lab.dut.Design.temp` rewrites the ONE generated `.temp` line at build time (asserting there is
+`ldo.dut.Design.temp` rewrites the ONE generated `.temp` line at build time (asserting there is
 exactly one) — a generator-level substitution, not a text edit of a frozen deck; the reference's
 `design.json` has no `temp` key so its decks are byte-identical (`make check` still passes).

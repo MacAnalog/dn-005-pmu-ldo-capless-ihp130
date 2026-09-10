@@ -10,6 +10,52 @@ holds only what is specific to this design: `harness.yaml`, the docs under `doc/
 
 Start at [CLAUDE.md](CLAUDE.md) (the entry map), then [doc/target-spec.md](doc/target-spec.md).
 
+## Setup
+
+Six steps from a clean checkout, run at the repo root. `make init` needs `SX_ROOT` pointing at
+your `spicexplorer-workspace` checkout (the lab puts it in `~/.sx_env`).
+
+| # | step | command | done when |
+|---|---|---|---|
+| 1 | link `.sx/platform` + the `.sx/skills` library, link the agents and skills into `.claude/`, and `uv sync` | `make init` | it prints `init OK: …; next: make doctor` |
+| 2 | name the PDK install | `export PDK_ROOT=$HOME/local/pdks PDK=ihp-sg13g2` | — |
+| 3 | let ngspice load the OSDI models | `export SPICE_USERINIT_DIR=$PDK_ROOT/ihp-sg13g2/libs.tech/ngspice` | — |
+| 4 | keep work dirs out of the repo | `export SX_SCRATCH=$HOME/sx-scratch` | — |
+| 5 | prove the simulation lane | `make doctor` | it parses a scalar out of an ngspice log |
+| 6 | prove the repo | `make check` | lint passes and the reference reproduces its certified scorecard |
+
+```bash
+export SX_ROOT=<your spicexplorer-workspace checkout>
+make init                                # .sx links + agents/skills + uv sync (step 1)
+uv sync                                  # editable path deps on ../../spicexplorer-platform
+export PDK_ROOT=$HOME/local/pdks PDK=ihp-sg13g2
+export SPICE_USERINIT_DIR=$PDK_ROOT/ihp-sg13g2/libs.tech/ngspice   # its .spiceinit loads the OSDI models
+export SX_SCRATCH=$HOME/sx-scratch       # work dirs land under here (never in the repo, never in /tmp)
+make doctor                              # the lane is alive when this parses a scalar out of an ngspice log
+make check                               # lint + the reference reproduces its certified scorecard
+```
+
+See [doc/environment.md](doc/environment.md) for the PDK pin and the lane's gotchas.
+
+## Repository map
+
+| path | what |
+|---|---|
+| `harness.yaml` | the design described to the harness: spec rows, frozen dirs, denylist, ledger columns |
+| `CLAUDE.md` | the entry map agents read first |
+| `doc/` | target spec, design reference (constraints), benches, environment, experiment log, journal + index, the memory model |
+| `ldo/` | `config` (paths, PDK), `sim` (lane), `dut` (the sizing point → deck), `metrics` (measure, check, log) |
+| `scripts/lint.py` | repo-specific checks on top of the harness (frozen decks rebuild from `ldo/`) |
+| `decks/reference/` | the certified reference benches + `scorecard.json` (provenance block) + `decks.sha256`, sha-locked |
+| `decks/candidate/` | the **design of record's** 13 certified benches + `scorecard.json`, sha-locked |
+| `circuits/ldo_ihp_capless/` | the candidate as an analog-db circuit dir (manifest, datasheet, analyses, IHP binding + `sizing.yaml` = the design of record) |
+| `layout/` | `gen_ldo.py` (parameterized gdsfactory generator; sizing read from `sizing.yaml`), `signoff.py` (build/render/DRC/LVS/PEX), `postlayout.py` (frozen benches on the extracted netlist) |
+| `experiments/NNN-*/` | one directory per hypothesis; `_template/README.md` is the shape |
+| `pdf/` | papers + `INDEX.md` (cite by handle; open-access links preferred over vendored PDFs) |
+| `.claude/agents/` | gardener, layout-brief-author, layout-designer, layout-reviewer, layout-schematic-codesign, paper-analyst, schematic-builder, signoff-verifier, variant-runner |
+| `.claude/skills/` | the 15 methods linked from `.sx/skills`, including the visual-evidence four: schematic of record, testbench schematics, findings as plots, layout evidence |
+| `runs/` | `ledger.ndjson`, git-ignored; keeper numbers graduate into experiment READMEs |
+
 ## Where the design stands
 
 The cell of record is `circuits/ldo_ihp_capless/` — a double-mirror FVF output stage under a
@@ -18,11 +64,22 @@ two-stage error amplifier ([doc/design-reference.md](doc/design-reference.md)). 
 carries the certified cell's 50 devices, 33 nets and all 239 of its parameter rows
 ([004](experiments/004-schematic/README.md)), benched by 13 testbench schematics that each netlist
 back to the certified deck they were drawn from
-([006](experiments/006-visual-benches/README.md)) and laid out twice — the second drawing
+([006](experiments/006-visual-benches/README.md)) and laid out twice. The second drawing
 ([005](experiments/005-layout/README.md), [`layout/ldo_ihp_capless/REPORT.md`](layout/ldo_ihp_capless/REPORT.md))
-is the layout of record: current density 30/30 segments, DRC 0, LVS matched at two sizing points,
-40/40 knob endpoints, kpex CC + RC, 13/13 benches inside the box. **The post-layout row of record
-is the stitched RC extraction**, independently signed off in
+is the layout of record.
+
+**Sign-off gates on that drawing**, all from [005](experiments/005-layout/README.md):
+
+| gate | result |
+|---|---|
+| DRC | 0 violations |
+| LVS | matched at two sizing points |
+| LVS over the knob walk | 40 of 40 endpoints |
+| current density | 30 of 30 segments |
+| parasitic extraction (kpex) | CC and RC |
+| frozen benches on the extracted netlist | 13 of 13 inside the box |
+
+**The post-layout row of record is the stitched RC extraction**, independently signed off in
 [`layout/ldo_ihp_capless/SIGNOFF.md`](layout/ldo_ihp_capless/SIGNOFF.md) (2026-09-05): dropout
 134.66 mV of a 200 mV bound (65.3 mV margin), 8/8 spec lines PASS. The CC extraction (same layout,
 every wire resistance zeroed) is kept as the ideal-metal comparison row, not the record — its
@@ -39,102 +96,174 @@ certification.
 | post-layout, CC extraction (ideal-metal comparison), tt / 27 °C | 1.199 | 0.026 | 0.056 | 104.7 | **33.81** | 70.09 | 127.6 | 69.30 | **PASS** |
 | worst corner (5 MOS × −40/27/125 °C) | 1.198 | 0.056 | 0.248 | 135.0 | **61.9** @ ff/125 | 59.66 | **310.8** @ ss/−40 | 70.35 | 12/15 PASS |
 
-**Re-certified 2026-09-05** on the *drawn* device set (layout review F19): the pass array as 76
+### Re-certified 2026-09-05 on the drawn device set
+
+Layout review F19 recertified the cell on the devices the generator draws: the pass array as 76
 unit fingers, every common-centroid member as two half-width cards, the resistors as segment
-chains. Iq 36.28 → 33.81 µA and S7 104.8 → 115.1 mV with no layout parasitic involved — the
+chains. Iq 36.28 → 33.81 µA and S7 104.8 → 115.1 mV, with no layout parasitic involved — the
 schematic of record simply did not describe the devices the generator has drawn since its first
 round ([`layout/ldo_ihp_capless/PLAN.md` §0.1](layout/ldo_ihp_capless/PLAN.md)). Every S7-derived
 parasitic budget in the layout brief tightens ~23 % as a result.
 
-The headline is met: the reference's regulation and PSRR class at **4.5 % of its quiescent
-current**, with the output capacitor on chip (21 pF) and phase margin 26° better. The box is
-judged at tt/27 °C and passes there before *and* after layout. Sign-off over corners does not:
-S5 binds at ff/125 °C and S7 at ss/−40 °C, and both are the **same** cause — a resistor-referenced
-bias whose current spreads 2.4× over the corner grid, so the two failures pull one knob in
-opposite directions — the resistor corner alone reproduces both failures. A supply-independent
-bias is the named next increment, but it does **not** relax both ends at once: pinned at the
-design's own 36.3 µA it still fails S7 at ff/125 °C, and the window that clears both corners is
-**Iq ≈ 41–50 µA**. **The corner-robust headline is therefore 41–50 µA, not 36.28 µA**
-([003 §3](experiments/003-sizing/README.md), [design-reference §4](doc/design-reference.md)).
+### The headline, and the corner where it does not hold
 
-## Open — independent review `doc/reviews/review-002-capless-ldo.md`
+- **Met at tt / 27 °C, before and after layout.** The reference's regulation and PSRR class at
+  **4.5 % of its quiescent current**, with the output capacitor on chip (21 pF) and phase margin
+  26° better.
+- **Sign-off over corners is not met.** Two spec lines leave the box, and both come from the same
+  resistor-referenced bias, whose current spreads 2.4× over the corner grid — the resistor corner
+  alone reproduces both failures.
+
+| corner | spec that binds | measured | bound |
+|---|---|---|---|
+| ff / 125 °C | S5 quiescent current | 61.9 µA | ≤ 50 µA |
+| ss / −40 °C | S7 load-step undershoot | 310.8 mV | ≤ 150 mV |
+
+- **The two failures pull one knob in opposite directions.** A supply-independent bias is the
+  named next increment, and it does **not** relax both ends at once: pinned at the design's own
+  36.3 µA it still fails S7 at ff/125 °C, and the window that clears both corners is
+  **Iq ≈ 41–50 µA**.
+- **The corner-robust headline is therefore 41–50 µA, not 36.28 µA**
+  ([003 §3](experiments/003-sizing/README.md), [design-reference §4](doc/design-reference.md)).
+
+## Open findings — independent review `doc/reviews/review-002-capless-ldo.md`
 
 An independent verifier re-derived every committed number from the sources on 2026-09-04 and
 **signed both scorecards**: the pre-layout row reproduces to the last committed digit and the
-first drawing's post-layout row to within 0.05 mV. The headline above stands as measured. Its
-findings, with the four the second drawing addressed marked *(closed)* — those four are closed by
-the **designer**, so they need a `layout-reviewer` pass before anyone should treat them as
-verified (rule 7). **Updated 2026-09-05**: a second independent pass,
-[`layout/ldo_ihp_capless/SIGNOFF.md`](layout/ldo_ihp_capless/SIGNOFF.md), re-measured the current
-(`it13`) drawing from raw artefacts and signed both post-layout extractions —
-`verify_postlayout_post` (CC, the ideal-metal comparison row) and `verify_postlayout_rc` (RC, now
-the **post-layout row of record**) — so the row below no longer carries `evidence="awaiting"` in
-that checkout. The previous verifier's signed `005_postlayout_post` row still belongs to the
-*first* drawing:
+first drawing's post-layout row to within 0.05 mV. The headline above stands as measured.
 
-| id | what | why it is still open |
-|---|---|---|
-| **B1** | *(closed 2026-09-04, second drawing)* **The 10 mA path is 12–28× over the process metal current-density limit.** | Redrawn on TopMetal1 (2 µm straps, 15 mA/µm) fed by 6 µm Metal2 combs and 48-cut via risers, with the pass array folded to 76 fingers (`xmp_nf_mult = 4`) so a shared source/drain column carries 0.263 mA against the 0.36 mA flat limit — `w`/`m` in `sizing.yaml` untouched, so it is not a re-sizing. **30 of 30 segments pass, worst 0.836×** (the round-5 drawing added two rows for the split `vss`
-returns; still 0.836× worst-case), and the check is now a *blocking* sign-off stage (`spicexplorer_signoff.current_density` over budgets the generator emits from its own drawn geometry), not a hand calculation. Cost: +19.6 % area, S7 +22.7 mV, S8 −3.7°, all inside the box. [005 §1](experiments/005-layout/README.md), `doc/journal/a-floorplan-is-bought-not-found.md`. |
-| **M3** | *(green at the recertified cell; verifier re-measure pending)* The schematic of record netlists `cap_cmim` with no `w`/`l` and `VREF vref vss 3`, and the equivalence check passes anyway. | **Green: the drawing is the certified netlist, devices AND sizes** — closing the finding is the verifier's call (rule 7), and that re-measure is pending. `build_sch.py::check_parameters` joins the certified netlist and the drawing's netlist device by device and compares **every parameter by number** (symbols resolved against the deck's own `.param` bindings, SI suffixes normalised through the platform's parsers); `w`/`l` may never be defaulted, `VREF` is checked against `vref_val` = 0.6 V by name, and the step **exits non-zero** rather than reporting. It reads **239 of 239 rows green** over the recertified cell's 50 devices (`bf3a4f8`), with `VREF` at 0.6 V: both causes were emitter defects and are fixed upstream (`spicexplorer-platform @1775a67`). The same assertion runs on the flat drawing and on the five-block hierarchy that replaced it, and the value half of it, extended to the benches in [006](experiments/006-visual-benches/README.md), then caught a further emitter defect that truncated a `pulse(...)` stimulus in the netlist of two bench sheets. The honest claim remains that the drawing **cannot drift unnoticed** — the netlist stays the design of record. [004 §2](experiments/004-schematic/README.md), `doc/journal/an-isomorphism-carries-no-sizes.md`. |
-| **M7** | *(closed 2026-09-04)* The LVS golden netlist was written by the generator from its own device table. | `layout/netlist_ref.py` parses the certified binding once and hands out **both** the device list the generator places **and** the LVS reference, so there is no second table to drift. The only thing the reference adds is the layout's dummy devices — needed because the IHP deck extracts a shorted dummy as a device and `--purge` does not remove it (measured) — and the emitter **asserts each dummy has all four terminals on one rail**, so a dummy card can only ever be inert while a real device's size still comes from the certified file. `gen_ldo.py` no longer carries a device table at all. |
-| **M8** | *(closed 2026-09-04)* Half the Metal1-short fix (`stub_clear`) was an unexercised regression. | The obstacle map moved to `layout/router.py` (no gdsfactory, so it runs in the repo venv) and `layout/test_builder.py` builds the collision by hand — **twenty-one cases in the current suite**
-(ten of them the router obstacle-map cases this finding is about; the rest were added later for
-the RC/PEX netlist-selection findings, F24/F26/F27), and the reviewer ran the negative control
-rather than taking the claim: with `claim_box` stubbed out to a no-op, **4 of 9 router cases
-fail** and the suite exits 1, `test_without_the_claim_the_allocator_walks_into_the_comb` reporting *"alloc returned 44.1, inside the comb"*. `layout/signoff.py` runs the suite as its first, blocking stage, so the guard is exercised every round rather than waiting for a sizing point to happen to produce the collision. The second drawing then found the same class of bug one layer up — `gate` merged into `vout` on a Metal2 power-comb spine, DRC 0 again — and the fix is **structural**: the map is layer-aware and `claim_box()` records any drawn rectangle, so the power combs are obstacles to Metal2 and simply are not on Metal3's layer. The hard-coded `to_track_m3` bypass is **deleted**, and the class is gone by measurement (`col_vias` 3 and 4, which extracted `gate|vout` before, both LVS-match in the 40-endpoint walk). `xmp_nf_mult` is no longer a layout knob — it is a sizing knob in `sizing.yaml`, where an off-grid value now raises instead of silently drawing a different device. |
-| **m5-r** | Closing m5 by DELETING `VOUT_THRESH: 1.14` from the candidate's `analyses/dropout.yaml` left the whole candidate circuit un-assemblable, and nothing noticed for a review round. | The bench really does ignore the parameter (m5 stands), but the class template still carries `${VOUT_THRESH}` in its comment header and analog-db's `assemble()` scans the rendered text, comments included. The binding is restored with the reason written beside it; `deck_rebuild` now guards **every** frozen dir, which is what would have caught it. The real fix — dropping the dead placeholder from the class template — is an analog-db change. `doc/journal/one-guarded-frozen-dir-guards-one-frozen-dir.md`. |
-| **m3** | *(layout part closed 2026-09-04; the mismatch run is still open)* No interdigitation, common centroid, dummies or guard rings on the matched pairs; **no mismatch or Monte Carlo run exists anywhere in this branch**. | The second drawing gives each matching class the pattern its measured headroom asks for: `ea_in_pair` and `ea_nmos_load` **A B B A** common-centroid (each member split in two half-width instances), the `fb_divider` as **[A B B A] × 4** serpentine segments with both centroids on the block centre, `bias_n_group` interdigitated about one axis, the rest same-row/same-orientation — with a tied dummy at each end of all eight groups (16 MOS + 2 resistor dummies, declared in the LVS reference) and **5 closed guard rings** replacing the periodic point taps. What is **not** closed: routing is not matched half-for-half (the channel allocator finds each terminal a free column), and **no mismatch Monte Carlo exists**. What is now measured, on the extracted cell rather than argued from the brief's coefficients: [007](experiments/007-post-layout-corners/README.md) injects each class's offset into `layout/ldo_ihp_capless/asbuilt/core_pex.sp` and finds the dVT at which the box opens, so the two sub-σ classes carry a **measured** out-of-box threshold instead of an estimate: **+15.0 mV (9.1 σ)** for `ea_nmos_load` and **+20.0 mV (17.9 σ)** for `bias_p_group`, i.e. no measurable yield loss at tt/27. 007 also carries the control that keeps that from being a null result — delete the extracted capacitance and the brief's cliff reappears exactly where the brief puts it (+2.0 mV → S7 198.0 mV, out of the box), and the single net `ea_o1` removes it again. The distribution itself is still not simulated (the PDK's mismatch sections cannot be selected without editing the certified `corners.yaml`), and routing is still not matched half-for-half — although the reviewer's own translation-XOR reads **0.000 µm² on all seven classes** at device bbox + 1.2 µm, with equal via counts. |
-| **m11** | S8 constrains phase margin only; light-load gain margin is **5.75 dB** and the sensitivity peak **14.09 dB** at 0.1 mA. | Neither is in the box or the reported columns. |
-| **m4** | `zout_peak_db` is the rise of output impedance from DC, not peaking; it reads 100.2 dB on a 72°-phase-margin loop (the reference reads 5.88 dB on the identical definition). | Report-only and not used for S8, but it is printed in every scorecard and reads as an alarm. Renaming it changes a bench definition, which would re-freeze the decks — deferred deliberately. |
+Four findings were closed by the **designer** in the second drawing, so under rule 7 they needed a
+`layout-reviewer` pass before anyone treated them as verified. **Updated 2026-09-05**: a second
+independent pass, [`layout/ldo_ihp_capless/SIGNOFF.md`](layout/ldo_ihp_capless/SIGNOFF.md),
+re-measured the current (`it13`) drawing from raw artefacts and signed both post-layout extractions
+— `verify_postlayout_post` (CC, the ideal-metal comparison row) and `verify_postlayout_rc` (RC, now
+the **post-layout row of record**) — so the RC row no longer carries `evidence="awaiting"` in that
+checkout. The previous verifier's signed `005_postlayout_post` row still belongs to the *first*
+drawing.
 
-Closed from that review in this branch: **M1** (the harness fix landed — platform #129 —
-and `certify()` now writes the helper's provenance block, so `make lint` is red only for the two
-scorecards no verifier has signed yet), **M2** (the analog-db template dropped the second `sqrt`
-— analog-db PR #68 — and both frozen dirs are re-certified on the corrected bench: **candidate
-366.4 µVrms**, **reference 25.38 µVrms**; noise is not in the S1–S8 box, so no verdict moved),
-**M4/M5** (the post-layout row now comes from the frozen path, 13 of 13 benches), **M6** (the bias
-finding restated as a threshold with its cost),
-**m1** (density rules run on demand — 12 fill/density items, listed in [005](experiments/005-layout/README.md)),
-**m6**, **m7**, **m10**, **m12**. **m5** closed the finding and opened `m5-r` above. **B1**, **M7**,
-**M8** and the layout half of **m3** were closed in the second drawing (rows above), designer-signed;
-`SIGNOFF.md` (2026-09-05) has since independently re-measured DRC, LVS, current density and both
-PEX extractions on the `it13` drawing from raw artefacts and signed them (its Claims 1, 2, 3), so
-those four no longer need a `layout-reviewer` pass to be trusted at the record row — a
-`layout-reviewer` pass is still open for the floorplan/routing review proper (REPORT §10 item 1).
-The mismatch and corner halves of **m3** are addressed but not fully closed: `SIGNOFF.md` Claim 5
-independently reproduces the three decisive corner rows (signed) and Claim 4 reproduces both
-mismatch box edges and rules **the designer's numbers describe the cell as built**, but a proper
-Monte Carlo and a joint corners × mismatch sweep are still open (PLAN §6b.1).
+| id | finding | state | why it is still listed |
+|---|---|---|---|
+| **B1** | the 10 mA path is 12–28× over the process metal current-density limit | closed 2026-09-04, second drawing | the redraw is measured (30/30 segments); the floorplan/routing review proper is still open |
+| **M3** | the schematic of record netlists `cap_cmim` with no `w`/`l` and `VREF vref vss 3`, and the equivalence check passes anyway | green at the recertified cell | closing the finding is the verifier's call (rule 7) and that re-measure is pending |
+| **M7** | the LVS golden netlist was written by the generator from its own device table | closed 2026-09-04 | listed for the record of how it closed |
+| **M8** | half the Metal1-short fix (`stub_clear`) was an unexercised regression | closed 2026-09-04 | listed for the record of how it closed |
+| **m5-r** | deleting `VOUT_THRESH: 1.14` from the candidate's `analyses/dropout.yaml` left the whole candidate circuit un-assemblable, and nothing noticed for a review round | open | the dead placeholder still sits in the analog-db class template |
+| **m3** | no interdigitation, common centroid, dummies or guard rings on the matched pairs; no mismatch or Monte Carlo run anywhere in this branch | layout part closed 2026-09-04 | routing is not matched half-for-half and no mismatch Monte Carlo exists |
+| **m11** | S8 constrains phase margin only; light-load gain margin is **5.75 dB** and the sensitivity peak **14.09 dB** at 0.1 mA | open | neither is in the box or the reported columns |
+| **m4** | `zout_peak_db` is the rise of output impedance from DC, not peaking; it reads 100.2 dB on a 72°-phase-margin loop (the reference reads 5.88 dB on the identical definition) | open, deferred | report-only and not used for S8, but printed in every scorecard, where it reads as an alarm; renaming it changes a bench definition, which would re-freeze the decks, so it is deferred deliberately |
 
-## Setup
+### B1 — the 10 mA path, redrawn on upper metal
 
-```bash
-uv sync                                  # editable path deps on ../../spicexplorer-platform
-export PDK_ROOT=$HOME/local/pdks PDK=ihp-sg13g2
-export SPICE_USERINIT_DIR=$PDK_ROOT/ihp-sg13g2/libs.tech/ngspice   # its .spiceinit loads the OSDI models
-export SX_SCRATCH=$HOME/sx-scratch       # work dirs land under here (never in the repo, never in /tmp)
-make doctor                              # the lane is alive when this parses a scalar out of an ngspice log
-make check                               # lint + the reference reproduces its certified scorecard
-```
+Redrawn on TopMetal1 (2 µm straps, 15 mA/µm) fed by 6 µm Metal2 combs and 48-cut via risers, with
+the pass array folded to 76 fingers (`xmp_nf_mult = 4`) so a shared source/drain column carries
+0.263 mA against the 0.36 mA flat limit. `w`/`m` in `sizing.yaml` are untouched, so this is not a
+re-sizing. **30 of 30 segments pass, worst 0.836×** (the round-5 drawing added two rows for the
+split `vss` returns; still 0.836× worst-case), and the check is now a *blocking* sign-off stage
+(`spicexplorer_signoff.current_density` over budgets the generator emits from its own drawn
+geometry), not a hand calculation. Cost: +19.6 % area, S7 +22.7 mV, S8 −3.7°, all inside the box.
+[005 §1](experiments/005-layout/README.md), `doc/journal/a-floorplan-is-bought-not-found.md`.
 
-See [doc/environment.md](doc/environment.md) for the PDK pin and the lane's gotchas.
+### M3 — the drawing is the certified netlist, devices AND sizes
 
-## Layout
+`build_sch.py::check_parameters` joins the certified netlist and the drawing's netlist device by
+device and compares **every parameter by number** (symbols resolved against the deck's own
+`.param` bindings, SI suffixes normalised through the platform's parsers); `w`/`l` may never be
+defaulted, `VREF` is checked against `vref_val` = 0.6 V by name, and the step **exits non-zero**
+rather than reporting. It reads **239 of 239 rows green** over the recertified cell's 50 devices
+(`bf3a4f8`), with `VREF` at 0.6 V. Both causes were emitter defects and are fixed upstream
+(`spicexplorer-platform @1775a67`).
 
-| path | what |
+The same assertion runs on the flat drawing and on the five-block hierarchy that replaced it. Its
+value half, extended to the benches in [006](experiments/006-visual-benches/README.md), then caught
+a further emitter defect that truncated a `pulse(...)` stimulus in the netlist of two bench sheets.
+The honest claim remains that the drawing **cannot drift unnoticed** — the netlist stays the design
+of record. [004 §2](experiments/004-schematic/README.md),
+`doc/journal/an-isomorphism-carries-no-sizes.md`.
+
+### M7 — one device table feeds both the placer and the LVS reference
+
+`layout/netlist_ref.py` parses the certified binding once and hands out **both** the device list
+the generator places **and** the LVS reference, so there is no second table to drift. The only
+thing the reference adds is the layout's dummy devices — needed because the IHP deck extracts a
+shorted dummy as a device and `--purge` does not remove it (measured) — and the emitter **asserts
+each dummy has all four terminals on one rail**, so a dummy card can only ever be inert while a
+real device's size still comes from the certified file. `gen_ldo.py` no longer carries a device
+table at all.
+
+### M8 — the obstacle map now has its own cases, and a negative control
+
+The obstacle map moved to `layout/router.py` (no gdsfactory, so it runs in the repo venv) and
+`layout/test_builder.py` builds the collision by hand — **twenty-one cases in the current suite**
+(ten of them the router obstacle-map cases this finding is about; the rest were added later for the
+RC/PEX netlist-selection findings, F24/F26/F27). The reviewer ran the negative control rather than
+taking the claim: with `claim_box` stubbed out to a no-op, **4 of 9 router cases fail** and the
+suite exits 1, `test_without_the_claim_the_allocator_walks_into_the_comb` reporting *"alloc
+returned 44.1, inside the comb"*. `layout/signoff.py` runs the suite as its first, blocking stage,
+so the guard is exercised every round rather than waiting for a sizing point to happen to produce
+the collision.
+
+The second drawing then found the same class of bug one layer up — `gate` merged into `vout` on a
+Metal2 power-comb spine, DRC 0 again — and the fix is **structural**: the map is layer-aware and
+`claim_box()` records any drawn rectangle, so the power combs are obstacles to Metal2 and simply
+are not on Metal3's layer. The hard-coded `to_track_m3` bypass is **deleted**, and the class is
+gone by measurement (`col_vias` 3 and 4, which extracted `gate|vout` before, both LVS-match in the
+40-endpoint walk). `xmp_nf_mult` is no longer a layout knob — it is a sizing knob in `sizing.yaml`,
+where an off-grid value now raises instead of silently drawing a different device.
+
+### m5-r — the deleted placeholder that broke every candidate deck
+
+The bench really does ignore the parameter (m5 stands), but the class template still carries
+`${VOUT_THRESH}` in its comment header and analog-db's `assemble()` scans the rendered text,
+comments included. The binding is restored with the reason written beside it; `deck_rebuild` now
+guards **every** frozen dir, which is what would have caught it. The real fix — dropping the dead
+placeholder from the class template — is an analog-db change.
+`doc/journal/one-guarded-frozen-dir-guards-one-frozen-dir.md`.
+
+### m3 — matching drawn, mismatch measured at two edges, distribution still unsimulated
+
+The second drawing gives each matching class the pattern its measured headroom asks for:
+`ea_in_pair` and `ea_nmos_load` **A B B A** common-centroid (each member split in two half-width
+instances), the `fb_divider` as **[A B B A] × 4** serpentine segments with both centroids on the
+block centre, `bias_n_group` interdigitated about one axis, the rest same-row/same-orientation —
+with a tied dummy at each end of all eight groups (16 MOS + 2 resistor dummies, declared in the LVS
+reference) and **5 closed guard rings** replacing the periodic point taps.
+
+What is **not** closed: routing is not matched half-for-half (the channel allocator finds each
+terminal a free column), and **no mismatch Monte Carlo exists**.
+
+What is now measured, on the extracted cell rather than argued from the brief's coefficients:
+[007](experiments/007-post-layout-corners/README.md) injects each class's offset into
+`layout/ldo_ihp_capless/asbuilt/core_pex.sp` and finds the dVT at which the box opens, so the two
+sub-σ classes carry a **measured** out-of-box threshold instead of an estimate:
+
+| class | out-of-box dVT | in sigma | reading at tt / 27 °C |
+|---|---|---|---|
+| `ea_nmos_load` | +15.0 mV | 9.1 σ | no measurable yield loss |
+| `bias_p_group` | +20.0 mV | 17.9 σ | no measurable yield loss |
+
+007 also carries the control that keeps that from being a null result: delete the extracted
+capacitance and the brief's cliff reappears exactly where the brief puts it (+2.0 mV → S7
+198.0 mV, out of the box), and the single net `ea_o1` removes it again. The distribution itself is
+still not simulated (the PDK's mismatch sections cannot be selected without editing the certified
+`corners.yaml`), and routing is still not matched half-for-half — although the reviewer's own
+translation-XOR reads **0.000 µm² on all seven classes** at device bbox + 1.2 µm, with equal via
+counts.
+
+### Closed from that review in this branch
+
+| finding | closed by |
 |---|---|
-| `harness.yaml` | the design described to the harness: spec rows, frozen dirs, denylist, ledger columns |
-| `CLAUDE.md` | the entry map agents read first |
-| `doc/` | target spec, design reference (constraints), benches, environment, experiment log, journal + index, the memory model |
-| `ldo/` | `config` (paths, PDK), `sim` (lane), `dut` (the sizing point → deck), `metrics` (measure, check, log) |
-| `scripts/lint.py` | repo-specific checks on top of the harness (frozen decks rebuild from `ldo/`) |
-| `decks/reference/` | the certified reference benches + `scorecard.json` (provenance block) + `decks.sha256`, sha-locked |
-| `decks/candidate/` | the **design of record's** 13 certified benches + `scorecard.json`, sha-locked |
-| `circuits/ldo_ihp_capless/` | the candidate as an analog-db circuit dir (manifest, datasheet, analyses, IHP binding + `sizing.yaml` = the design of record) |
-| `layout/` | `gen_ldo.py` (parameterized gdsfactory generator; sizing read from `sizing.yaml`), `signoff.py` (build/render/DRC/LVS/PEX), `postlayout.py` (frozen benches on the extracted netlist) |
-| `experiments/NNN-*/` | one directory per hypothesis; `_template/README.md` is the shape |
-| `pdf/` | papers + `INDEX.md` (cite by handle; open-access links preferred over vendored PDFs) |
-| `.claude/agents/` | variant-runner, signoff-verifier, schematic-builder, paper-analyst, gardener |
-| `.claude/skills/` | the visual-evidence methods: schematic of record, testbench schematics, findings as plots, layout evidence |
-| `runs/` | `ledger.ndjson`, git-ignored; keeper numbers graduate into experiment READMEs |
+| **M1** | the harness fix landed (platform #129) and `certify()` now writes the helper's provenance block, so `make lint` is red only for the two scorecards no verifier has signed yet |
+| **M2** | the analog-db template dropped the second `sqrt` (analog-db PR #68) and both frozen dirs are re-certified on the corrected bench: **candidate 366.4 µVrms**, **reference 25.38 µVrms**; noise is not in the S1–S8 box, so no verdict moved |
+| **M4/M5** | the post-layout row now comes from the frozen path, 13 of 13 benches |
+| **M6** | the bias finding restated as a threshold with its cost |
+| **m1** | density rules run on demand — 12 fill/density items, listed in [005](experiments/005-layout/README.md) |
+| **m6, m7, m10, m12** | closed |
+| **m5** | closed the finding and opened `m5-r` above |
+| **B1, M7, M8, layout half of m3** | closed in the second drawing (sections above), designer-signed; `SIGNOFF.md` (2026-09-05) has since independently re-measured DRC, LVS, current density and both PEX extractions on the `it13` drawing from raw artefacts and signed them (its Claims 1, 2, 3), so those four no longer need a `layout-reviewer` pass to be trusted at the record row |
+
+Still open behind those closures: a `layout-reviewer` pass for the floorplan/routing review proper
+(REPORT §10 item 1). The mismatch and corner halves of **m3** are addressed but not fully closed —
+`SIGNOFF.md` Claim 5 independently reproduces the three decisive corner rows (signed) and Claim 4
+reproduces both mismatch box edges and rules that **the designer's numbers describe the cell as
+built**, but a proper Monte Carlo and a joint corners × mismatch sweep are still open (PLAN §6b.1).

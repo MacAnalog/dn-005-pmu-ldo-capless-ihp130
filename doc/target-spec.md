@@ -33,23 +33,35 @@
 | S7 | load-step undershoot, 0.1 → 10 mA | ≤ 150 mV | 1.96 mV (1 → 10 mA into 1 µF; not comparable) | `tran_load_step` | `engur2023` 100 mV for 0 → 15 mA in 80 ns at 1.5/1.2 V; `zhang2023` 140 mV; the bench edge for candidates is 100 ns |
 | S8 | loop phase margin at 1 mA | ≥ 60 deg | **46.4°** (1 mA, 1 µF Cout) | `ac_loopgain` | `ni2022` ≥ 74°, `perez2018` 89.6°; the reference's 46° is what a three-stage loop costs and is the thing not to give back |
 
-Report-only columns (measured on every evaluate, never pass/fail): DC loop gain, loop UGF,
-gain margin, sensitivity peak, Zout peaking, load-step recovery time, integrated output noise,
-line-transient deviation.
+## Report-only columns
+
+Measured on every `evaluate`, never pass/fail. The values are the reference's own certification,
+the same run as the baseline column above.
+
+| column | reference baseline (certified) |
+|---|---|
+| DC loop gain | 91.9 dB |
+| loop UGF | 569 kHz |
+| gain margin | 41.6 dB |
+| sensitivity peak (Ms) | 4.34 dB |
+| Zout peaking | 5.88 dB |
+| load-step recovery time | 0.87 µs |
+| integrated output noise | 25.4 µVrms (10 Hz–10 MHz) |
+| line-transient deviation | 3.45 mVpp |
+
+Two derived, report-only figures at the bound: **Hazucha FoM 7.5 ps**
+(100 pF · 150 mV / 10 mA · 50 µA / 10 mA) and **current efficiency 99.5 %** at 10 mA.
+
+## Where the reference baseline comes from
 
 **Reference baseline** = analog-db `ldo_005_buffered_ref`, IHP tt, 27 °C, certified in
 `experiments/001-reference` on the frozen decks (`decks/reference/scorecard.json`, `make check`
-re-measures it). It was certified **at its committed operating point — 3.3 V thick-oxide
-devices, Vout 1.6 V, 1 mA nominal, 1 µF external Cout** — because no analog-db LDO binding
-operates at this challenge's conditions. Only S2, S3, S5, S6 and S8 are quotable yardsticks;
-S4 and S7 depend on the pass device family and the output capacitor and are set from the
-literature instead. Full certified scorecard: `experiments/001-reference/README.md`.
+re-measures it). Full certified scorecard: `experiments/001-reference/README.md`.
 
-Report-only from the same certification: DC loop gain 91.9 dB, UGF 569 kHz,
-gain margin 41.6 dB, Ms 4.34 dB, Zout peaking 5.88 dB, recovery
-0.87 µs, output noise 25.4 µVrms (10 Hz–10 MHz), line-step 3.45 mVpp.
-
-Every bound cites its origin in the last column (handles are `pdf/INDEX.md` rows; two of them
-are abstract-only and are used for bracketing, never as the sole source of a bound). Derived,
-report-only: Hazucha FoM at the bound 7.5 ps (100 pF · 150 mV / 10 mA · 50 µA / 10 mA),
-current efficiency 99.5 % at 10 mA.
+- **It was certified at its committed operating point** — 3.3 V thick-oxide devices, Vout 1.6 V,
+  1 mA nominal, 1 µF external Cout — because no analog-db LDO binding operates at this challenge's
+  conditions.
+- **Quotable yardsticks: S2, S3, S5, S6 and S8 only.** S4 and S7 depend on the pass device family
+  and the output capacitor, so their bounds are set from the literature instead.
+- **Every bound cites its origin** in the last column of the box. Handles are `pdf/INDEX.md` rows;
+  two of them are abstract-only and are used for bracketing, never as the sole source of a bound.
