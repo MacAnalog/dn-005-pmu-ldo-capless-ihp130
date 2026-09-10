@@ -103,3 +103,20 @@ re-derives and `scorecard-recompute` is clean.
 `decks/reference`, so **`make check` proves the yardstick reproduces, not this design's own
 scorecard.** That is a real gap: nothing drift-checks the design of record. Decide it before the
 next certification.
+
+## One known local lint failure, and why it is not a defect
+
+In a checkout that ran the certification, `make lint` reports:
+
+```
+[scorecard-recompute] ledger row 2026-09-07T23:02:35 'candidate_certify':
+    raw decks/candidate/decks.sha256 is missing
+```
+
+**That row is correct and must not be edited.** It records where the file was when that run
+happened; *"never hand-edit the ledger — an edited row is not evidence of a run"*. The scorecard's
+own pointer moved with the directory and re-derives cleanly; only this historical row still names
+the old path.
+
+- `runs/` is git-ignored and per checkout, so **a fresh clone never sees this.**
+- It clears at the next certification, which logs a row at the new path.
