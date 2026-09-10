@@ -138,8 +138,11 @@ point; anything carried over from the 36.28 µA point is labelled as such where 
 - **Sign-off over corners is not met, and the two failing lines are no longer one story.** At
   36.28 µA ([003 §3](experiments/003-sizing/README.md)) S5 and S7 were the same resistor-bias
   mechanism pulled in opposite directions. At the sizing point the repo now holds, S5 still is
-  that — and so is S7 **on the schematic**, at both corners 003 named and four more. It is on the
-  **drawn** cell that S7 stops being that story:
+  that. S7 **on the schematic** still fails at both corners 003 named and at four more — but
+  whether it is still 003's mechanism was not re-measured there: the hybrid-bundle decoupling and
+  the `r_bias_l` sweep are 36.28 µA runs, and one of the six (ss / 125 °C, 152.8 mV) fails at
+  `i_q_ua` 34.05, essentially nominal. It is on the **drawn** cell that the story demonstrably
+  changes:
 
 | lane | corners that fail | spec that binds | measured | bound |
 |---|---|---|---|---|
@@ -170,7 +173,7 @@ corner verdict above is current. These were derived at **36.28 µA** and have no
 - the `r_bias_l` threshold sweep and the **Iq ≈ 41–50 µA** window that clears both ends — the exit
   path's price ([review-002 §3.4 + M6](doc/reviews/review-002-capless-ldo.md),
   [design-reference §4](doc/design-reference.md) — 003 §3 carries neither the sweep nor the window,
-  only the corner table they were derived from). It is a figure for a bias increment, not a
+  only the corner finding they answer). It is a figure for a bias increment, not a
   measurement of the cell of record;
 - `experiments/003-sizing/figs/corners.png`, that grid's figure.
 
