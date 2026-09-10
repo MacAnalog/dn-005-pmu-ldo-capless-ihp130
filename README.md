@@ -137,8 +137,9 @@ point; anything carried over from the 36.28 µA point is labelled as such where 
   26° better.
 - **Sign-off over corners is not met, and the two failing lines are no longer one story.** At
   36.28 µA ([003 §3](experiments/003-sizing/README.md)) S5 and S7 were the same resistor-bias
-  mechanism pulled in opposite directions. At the sizing point the repo now holds, S5 still is that
-  — and S7 is not:
+  mechanism pulled in opposite directions. At the sizing point the repo now holds, S5 still is
+  that — and so is S7 **on the schematic**, at both corners 003 named and four more. It is on the
+  **drawn** cell that S7 stops being that story:
 
 | lane | corners that fail | spec that binds | measured | bound |
 |---|---|---|---|---|
@@ -151,7 +152,8 @@ point; anything carried over from the 36.28 µA point is labelled as such where 
   ([007 §2](experiments/007-post-layout-corners/README.md)). The mechanism is the
   resistor-referenced bias, and 007's own `i_q_ua` column carries the spread at this sizing point
   — 24.32 µA at ss / −40 °C to 58.37 µA at ff / 125 °C, **2.4×** on a 33.81 µA nominal.
-- **S7 does not fail where 003 said it does.** The drawn cell's parasitics *rescue* the cold
+- **Post-layout, S7 does not fail where 003 said it does** — the schematic row still does, at six
+  corners rather than 003's two. The drawn cell's parasitics *rescue* the cold
   corners — ≈44 fF of undesigned capacitance on the error-amp output node `ea_o1` takes tt / −40 °C
   from 288.7 mV (schematic) to 106.9 mV (extracted) — and spend margin at 125 °C, where S7 leaves
   the box in four of five corners post-layout against the one (ss / 125 °C) that already did on the
@@ -166,9 +168,9 @@ point; anything carried over from the 36.28 µA point is labelled as such where 
 corner verdict above is current. These were derived at **36.28 µA** and have not been re-derived:
 
 - the `r_bias_l` threshold sweep and the **Iq ≈ 41–50 µA** window that clears both ends — the exit
-  path's price ([003 §3](experiments/003-sizing/README.md),
-  [review-002 §3.4 + M6](doc/reviews/review-002-capless-ldo.md),
-  [design-reference §4](doc/design-reference.md)). It is a figure for a bias increment, not a
+  path's price ([review-002 §3.4 + M6](doc/reviews/review-002-capless-ldo.md),
+  [design-reference §4](doc/design-reference.md) — 003 §3 carries neither the sweep nor the window,
+  only the corner table they were derived from). It is a figure for a bias increment, not a
   measurement of the cell of record;
 - `experiments/003-sizing/figs/corners.png`, that grid's figure.
 
