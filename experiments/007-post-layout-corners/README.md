@@ -1,5 +1,6 @@
 # 007 — the extracted cell outside tt / 27 °C: corners, temperature and device mismatch
 
+**Phase:** `layout`
 **Paper(s):** none — this is a sign-off measurement, not a technique trial.
 **Hypothesis:** the layout parasitics do not change the corner verdict. Every corner that fails
 post-layout is a corner that already fails pre-layout at the re-certified sizing point, and the

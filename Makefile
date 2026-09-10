@@ -25,6 +25,9 @@ template-status:  ## which template version this design was cut from (.sx/templa
 template-update:  ## propagate the template's MINOR updates into this design (three-way merge; nothing committed). VER=1.03 to pick one
 	@$(PY) scripts/template_update.py update $(VER)
 
+template-migrate:  ## cross a MAJOR template release (1.xx -> 2.00): moves directories, repoints harness.yaml, commits nothing. ARGS="--dry-run" first
+	@$(PY) scripts/migrate_v1_to_v2.py $(ARGS)
+
 skills-update:  ## move .sx/skills (the shared agent/skill library) to its main, re-link, and stage the pin — then commit it
 	@git -C .sx/skills fetch -q origin main && git -C .sx/skills checkout -q origin/main
 	@.sx/skills/bin/sx-link . --set design
@@ -74,4 +77,4 @@ fig-layout:  ## redraw experiments/005-layout/figs/ldo_ihp_capless_labelled*.png
 clean:  ## delete this checkout's simulation work dir + experiment output (never the ledger)
 	@d=$$($(PY) -c "from ldo import config; print(config.WORK)"); echo "rm -rf $$d"; rm -rf "$$d"; rm -rf experiments/*/out/
 
-.PHONY: template-status template-update help init skills-update lint check baseline pack runs freeze doctor fig-layout clean
+.PHONY: template-status template-update template-migrate help init skills-update lint check baseline pack runs freeze doctor fig-layout clean

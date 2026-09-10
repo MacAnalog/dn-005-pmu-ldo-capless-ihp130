@@ -1,6 +1,6 @@
 # NNN — <technique>
 
-**Paper(s):** <handles from pdf/INDEX.md, or none>
+**Paper(s):** <handles from references/INDEX.md, or none>
 **Hypothesis:** <falsifiable: what moves, by how much, measured how>
 **Control:** <what is held or re-allocated so the effect is attributable>
 **Verdict:** IN PROGRESS

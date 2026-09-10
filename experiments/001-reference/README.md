@@ -4,6 +4,7 @@
 
 | | |
 |---|---|
+| **Phase** | `system` |
 | **Paper(s)** | none — this is the carried-forward analog-db reference, not a technique |
 | **Hypothesis** | The committed IHP binding of `ldo_005_buffered_ref` runs all ten LDO-class benches through this repo's `ldo/` (platform `NGSpice_Wrapper` + analog-db `assemble()`) and reproduces the analog-db scoreboard baseline `67ea759104` (ngspice-45) to the drift tolerances in `ldo.metrics.TOL`. Falsified if any bench fails to run or any number moves. |
 | **Control** | the frozen deck bytes: `scripts/lint.py::deck_rebuild` proves `ldo.dut.Design.deck()` regenerates them; `make check` re-simulates them |

@@ -19,7 +19,7 @@ cannot load is not a memory.
 |---|---|---|---|
 | **working** | assembled fresh: `make pack K="…"` | retrieval over the tiers below | the agent, at task start and again on every new symptom (`S="…"`) |
 | **episodic** | `runs/ledger.ndjson` — one row per simulation, gitignored, per checkout | **automatic**: `ldo.metrics.evaluate()` via `spicexplorer_harness.log_run` | `make runs`, the pack's Episodes section |
-| **semantic** | `doc/journal/` (one file per lesson) + `doc/journal.md` (index); overflow in `doc/memory/semantic/`; curated docs `doc/design-reference.md`, `doc/pdk-notes.md` (not written in this design), `pdf/INDEX.md`, experiment READMEs | distillation at experiment close-out, or the moment a failure surprises you; **provenance required** | the pack's Lessons/Constraints/Papers sections |
+| **semantic** | `doc/journal/` (one file per lesson) + `doc/journal.md` (index); overflow in `doc/memory/semantic/`; curated docs `doc/design-reference.md`, `doc/pdk-notes.md` (not written in this design), `references/INDEX.md`, experiment READMEs | distillation at experiment close-out, or the moment a failure surprises you; **provenance required** | the pack's Lessons/Constraints/Papers sections |
 | **procedural** | `ldo/`, `scripts/`, `Makefile`, `harness.yaml`, agent definitions, `CLAUDE.md`; recipes in `doc/memory/procedural/` | **human-reviewed only** (trap → gate promotion) | `CLAUDE.md` harness commands |
 
 ## 2. Learning actions

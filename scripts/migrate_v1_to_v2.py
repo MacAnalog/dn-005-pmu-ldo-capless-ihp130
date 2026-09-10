@@ -183,11 +183,18 @@ def make_signoff(plan: Plan, template: Path | None) -> None:
 
 
 def move_reference(plan: Plan) -> None:
-    """Move the ONE frozen reference directory into `signoff/prelayout/decks`.
+    """Report where the design of record should end up — and never move it.
 
-    Only when it is unambiguous: exactly one `frozen:` entry, it lives under `decks/`, and the
-    reference scorecard sits in it. Anything else is a decision, and the script says so instead of
-    guessing — a design with several frozen dirs knows which is its pre-layout reference.
+    This function used to `git mv` a single unambiguous `decks/<ref>` into
+    `signoff/prelayout/decks`. Measured on a live design, that is WRONG and it fails loudly:
+    a certified `scorecard.json` carries a provenance block naming its own artefacts by path
+    (`raw: decks/candidate/decks.sha256`), so moving the directory invalidates the certification
+    that makes it worth keeping. `scorecard-recompute` catches it, which is the good case; the bad
+    case is a design that ships a reference nobody can verify.
+
+    Regenerating that block means re-certifying — a live simulation and a second actor's signature.
+    That is a deliberate act at a moment of the owner's choosing, not a side effect of a rename.
+    So: say what should move, say what it costs, and leave the bytes alone.
     """
     y = (REPO / "harness.yaml").read_text()
     frozen = re.search(r"^frozen:\s*\[(.*?)\]", y, re.M)
@@ -195,36 +202,26 @@ def move_reference(plan: Plan) -> None:
     card = re.search(r'^reference_scorecard:\s*["\']?([^"\'\n#]*)', y, re.M)
     card = (card.group(1).strip() if card else "")
     if not entries:
-        plan.note("nothing is frozen yet: certify into signoff/prelayout/decks when you do")
+        plan.note("nothing is frozen yet — certify straight into signoff/prelayout/decks when you do, "
+                  "and the provenance block will name the right path from the start")
         return
-    if len(entries) > 1 or not entries[0].startswith("decks/"):
-        plan.note(
-            f"frozen: {entries} — this one is yours to decide, and DO NOT let "
-            f"`reference_scorecard: {card or '(unset)'}` decide it for you.\n"
-            f"      `signoff/prelayout/decks` holds THIS DESIGN'S OWN certified benches. "
-            f"`reference_scorecard` means something different — the scorecard `make check` "
-            f"reproduces — and a design may legitimately point that at a prior-art YARDSTICK it "
-            f"is trying to beat. Measured on a live design: the directory named `reference` was "
-            f"the yardstick and the directory named `candidate` was the design of record, so "
-            f"following that key would have promoted prior art and left the design behind.\n"
-            f"      Move the design's own dir by hand (`git mv <dir> signoff/prelayout/decks`), "
-            f"update `frozen:`, and leave a yardstick where it is — `decks/` is a declared "
-            f"artefact home. Then say in signoff/README.md which is which.")
+    if any(e.startswith("signoff/") for e in entries):
+        plan.note("a frozen dir already lives under signoff/")
         return
-    src = entries[0]
-    if src.startswith("signoff/"):
-        plan.note("the frozen reference already lives under signoff/")
-        return
-    dst = "signoff/prelayout/decks"
-    plan.do(f"git mv {src} {dst}", lambda: (
-        (REPO / dst).parent.mkdir(parents=True, exist_ok=True), sh("git", "mv", src, dst)))
-    new_card = card.replace(src, dst) if card.startswith(src) else card
-    plan.do(f"harness.yaml: frozen -> [{dst}], reference_scorecard -> {new_card}",
-            lambda: (REPO / "harness.yaml").write_text(
-                re.sub(r"^frozen:\s*\[.*?\]", f"frozen: [{dst}]",
-                       re.sub(r'^(reference_scorecard:\s*["\']?)([^"\'\n#]*)',
-                              lambda m: m.group(1) + new_card, y, flags=re.M),
-                       flags=re.M)))
+    plan.note(
+        f"frozen: {entries} — NOT moved, on purpose.\n"
+        f"      A certified scorecard's provenance block names its own artefacts BY PATH, so "
+        f"`git mv`-ing a frozen dir invalidates the certification (`scorecard-recompute` turns "
+        f"red: 'raw <old path>/decks.sha256 is missing'). Regenerating it means re-certifying and "
+        f"re-signing.\n"
+        f"      So point `signoff/` AT them instead: name the design-of-record dir in "
+        f"`signoff/README.md` and in `signoff/prelayout/REPORT.md`. Physically move it the next "
+        f"time you re-certify anyway — then the new provenance is written at the new path, for free."
+        + (f"\n      And do not let `reference_scorecard: {card}` pick WHICH dir is the design of "
+           f"record. That key means 'the scorecard `make check` reproduces', which a design may "
+           f"legitimately point at a prior-art YARDSTICK. Measured on a live design: the dir named "
+           f"`reference` was the yardstick and `candidate` was the design of record."
+           if len(entries) > 1 else ""))
 
 
 def move_layout_artifacts(plan: Plan) -> None:
@@ -257,9 +254,20 @@ def phase_rows(plan: Plan) -> None:
         if "**Phase" in t:
             continue
         rel = readme.relative_to(REPO).as_posix()
-        plan.do(f"insert **Phase:** <unset> in {rel}", lambda p=readme, t=t: p.write_text(
-            re.sub(r"^(\*\*Paper)", "**Phase:** <unset — system | topology | sizing | improve | layout>\n\\1",
-                   t, count=1, flags=re.M)))
+        # Two README shapes are in the wild and both satisfy the harness check (it looks for the
+        # substring `**Phase`): bold lines (`**Paper(s):** …`) and two-column tables
+        # (`| **Paper(s)** | … |`). Match whichever this file uses, or the row is inserted in a
+        # form its own table will not render — and `make lint` fails on a file the migration
+        # claims to have fixed.
+        m = re.search(r"^(\|\s*)?\*\*Paper", t, re.M)
+        if not m:
+            plan.note(f"{rel}: no **Paper row to anchor **Phase** to — add it by hand")
+            continue
+        row = ("| **Phase** | <unset — system \\| topology \\| sizing \\| improve \\| layout> |\n"
+               if m.group(1) else
+               "**Phase:** <unset — system | topology | sizing | improve | layout>\n")
+        plan.do(f"insert a **Phase** row in {rel} ({'table' if m.group(1) else 'bold-line'} form)",
+                lambda p=readme, t=t, i=m.start(): p.write_text(t[:i] + row + t[i:]))
 
 
 SUFFIXES = (".png", ".svg", ".pdf", ".csv", ".gds", ".gds.gz")

@@ -27,6 +27,11 @@ spec_notes:
   - "S8 must hold at 0.1 mA and 10 mA too (light-load PM is where capless LDOs die); the fast scorecard measures 1 mA, sign-off runs all three"
 
 # Certified artefacts, sha-locked with SHA256SUMS (`make freeze` after certification).
+papers_dir: references
+papers_index: references/INDEX.md
+
+experiments_rows: [Phase, Paper, Hypothesis, Verdict]
+
 frozen: [decks/reference, decks/candidate]
 reference_scorecard: decks/reference/scorecard.json
 
