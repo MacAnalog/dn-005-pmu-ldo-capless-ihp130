@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -34,5 +35,36 @@ def spec_reference(L: Lint) -> None:
                    "copy the certified numbers across (or re-certify)")
 
 
+
+# An include/library line naming an ABSOLUTE path: what `deck_portable` refuses in a frozen deck.
+_ABS_INCLUDE = re.compile(r'^\s*\.?(?:include|lib)\b[^\n]*?["\'\s](/[^"\'\s]+)', re.I | re.M)
+
+
+def abs_includes(text: str) -> list[str]:
+    """Absolute paths named on a deck's include/library lines (`include`, `.include`, `.lib`)."""
+    return [m.group(1) for m in _ABS_INCLUDE.finditer(text)]
+
+
+def deck_portable(L: Lint) -> None:
+    """A frozen deck may not carry an absolute path from the machine that certified it.
+
+    From the template (release 1.01), which took it from two designs that froze a deck naming a
+    machine-specific model library: the certified reference then reproduces only where it was made.
+    Redacting the path on write does not help — `deck_rebuild` compares bytes. The portable form is
+    a `$VAR` in the deck text, resolved as the deck reaches the simulator.
+    """
+    for rel in L.h.frozen:
+        d = L.h.path(rel)
+        if not (d / "design.json").is_file():
+            continue
+        for f in sorted(d.glob("*.spice")) + sorted(d.glob("*.scs")):
+            for path in abs_includes(f.read_text(errors="replace")):
+                L.fail("deck-portable",
+                       f"{f.relative_to(L.h.root).as_posix()} includes the absolute path {path}",
+                       "a frozen deck is committed, hashed and rebuilt byte for byte, so the path "
+                       "may not be in it: name it `$VAR` in the deck, resolve it where the deck is "
+                       "handed to the simulator, then re-certify (`make certify && make freeze`)")
+
+
 if __name__ == "__main__":
-    sys.exit(lint.main(load(REPO), extra=(spec_reference,)))
+    sys.exit(lint.main(load(REPO), extra=(spec_reference, deck_portable)))

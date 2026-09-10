@@ -71,10 +71,14 @@ checkout) does the generic work, driven by `harness.yaml`; `Makefile` wraps it.
 
 ## Rules (mechanically enforced where possible; the rest is contract)
 
-1. **Reference first.** A number that has not passed the frozen definitions is a claim.
-2. **Decks are built, never text-edited.** A sizing point is an `ldo.dut.Design`; every deck is
-   generated from it (analog-db class template + the circuit's lowered netlist + the sizing).
-   Frozen dirs are sha-locked.
+1. **Reference first.** A number that has not passed the frozen definitions is a claim, and the
+   reduction that produces it lives in the PACKAGE (`ldo/metrics.py`), never only in an experiment: `make certify` freezes what `metrics.run_decks`
+   produced, so a number computed inside an `experiments/NNN-*/run.py` is a report, not a reference.
+2. **Decks are built, never text-edited, and portable.** A sizing point is an `ldo.dut.Design`;
+   every deck is generated from it. No machine-specific absolute path may appear in a frozen deck —
+   `deck-portable` in `scripts/lint.py` refuses one, because a certified deck naming a path only
+   this machine has reproduces nowhere else, and redacting it on write fails `deck-rebuild`'s byte
+   comparison.
 3. Every experiment: **falsifiable hypothesis first**; a control whenever a knob moves.
 4. Findings are **tables or plots**; prose is interpretation. Keeper numbers graduate from the
    ledger into the experiment README — the repo is the memory.
