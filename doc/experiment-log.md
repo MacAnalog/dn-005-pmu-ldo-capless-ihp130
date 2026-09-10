@@ -13,44 +13,45 @@ each experiment's README; keep the verdict column honest the moment one lands.
 | 006-visual-benches | every certified deck drawn as a testbench schematic — sources, loads and the DUT symbol placed and wired, directives and `.control` lifted verbatim into text blocks — then netlisted back and compared with the deck instance by instance | none | CONFIRMED at the recertified decks (`bf3a4f8`) — 13 of 13 sheets netlist back with no drift |
 | 007-post-layout-corners | the extracted cell outside tt/27: 5 MOS corner bundles x -40/27/125 C on the CC extraction with the schematic row as the control, plus sigma-injection on the two sub-sigma matching classes | none | FALSIFIED (the hypothesis was "parasitics do not change the corner verdict") — they change it in both directions |
 
-## What each experiment measured
+## Headline numbers per experiment
 
-**001-reference.** load_reg 1.27 mV, i_q 759 µA, PSRR 44.5 dB, PM 46.4°.
+Each row copies the headline of the experiment's own README, which stays the home of the
+number; a value that moves is edited there first, then here.
+
+| # | headline numbers |
+|---|---|
+| 001-reference | load_reg 1.27 mV, i_q 759 µA, PSRR 44.5 dB, PM 46.4° |
+| 002-literature | fold at hand sizes, tt/27: v_out 1.195 V, i_q 53.8 µA, undershoot 74 mV, PM 60.1°, PSRR 57.1 dB; ff/125: v_out 1.190 V |
+| 003-sizing | design of record tt/27: v_out 1.200 V, i_q 36.28 uA, load_reg 0.028 mV, line_reg 0.059 mV, dropout 106 mV, PSRR 70.0 dB, undershoot 105 mV, PM 72.4/72.4/72.3 deg; corner Iq spread 25.6-61.9 uA |
+| 004-schematic | 50 vs 50 components + 33 nets under a wiring-preserving isomorphism, nothing skipped; 239 of 239 parameter rows green; the flat drawing returns the same two verdicts |
+| 005-layout | 35 317 um2 (287.4 x 122.9 um); pre -> post: undershoot 104.8 -> 113.9 mV, PM 72.42 -> 71.74 deg, i_q 36.28 -> 36.20 uA, 28.4 fF on the pass gate |
+| 006-visual-benches | loop gain 50.22434 dB and PM 72.5064° read off the drawing, equal to `decks/candidate/scorecard.json` at every printed digit |
+| 007-post-layout-corners | S5 58.37 uA of 50 at ff/125 in BOTH rows; S7 152-171 mV at 125 C in 4 of 5 corners post-layout; mismatch box edges +15.0 mV (9.1 sigma, S1) and +20.0 mV (17.9 sigma, S7); S8 never binds, worst PM 67.61 deg at ff/125 |
+
+## What each verdict rests on
 
 **002-literature.** Plain FVF passes the box at tt/27 but cannot turn the pass device off at
-ff/hot (v_out 1.37 V at ff/125); SF/SSF buffer rings; the double-mirror FVF fold regulates at
-every corner tried. Fold at hand sizes, tt/27: v_out 1.195, i_q 53.8 µA, undershoot 74 mV,
-PM 60.1°, PSRR 57.1 dB; ff/125: v_out 1.190.
+ff/hot (v_out 1.37 V at ff/125); an SF/SSF buffer rings; the double-mirror FVF fold regulates at
+every corner tried.
 
 **003-sizing.** Iq cut 50.17 -> 36.28 uA (-27.7 %), whole box PASS at tt/27 and at 12/15 corners.
 The <= 35 uA target was missed by 1.28 uA, and the corner clause was falsified in the wrong place
-— S7 at ss/-40 and S5 at ff/125, never S8. Design of record tt/27: v_out 1.200, i_q 36.28 uA,
-load_reg 0.028 mV, line_reg 0.059 mV, dropout 106 mV, PSRR 70.0 dB, undershoot 105 mV,
-PM 72.4/72.4/72.3 deg; corner Iq spread 25.6-61.9 uA.
+— S7 at ss/-40 and S5 at ff/125, never S8.
 
-**004-schematic.** **50 vs 50** components + 33 nets under a wiring-preserving isomorphism,
-nothing skipped, and **239 of 239** parameter rows green; the flat drawing returns the same two
-verdicts. The recertification renamed every segmented device, which silently collapsed the
-hierarchy from 5 blocks to 2 with both gates still green — the block-coverage assertion is the
+**004-schematic.** The recertification renamed every segmented device, which silently collapsed
+the hierarchy from 5 blocks to 2 with both gates still green — the block-coverage assertion is the
 answer. Six generator changes were needed, were proposed as a diff rather than worked around, and
 have landed in the platform (`33850e1`); the build now calls the generator's own APIs and only
 asserts they are present. The newest was a child sheet whose trunk wire CROSSES a pin without a
 junction.
 
-**005-layout.** 35 317 um2 (287.4 x 122.9 um). Pre -> post: undershoot 104.8 -> 113.9 mV,
-PM 72.42 -> 71.74 deg, i_q 36.28 -> 36.20 uA, 28.4 fF on the pass gate.
-
 **006-visual-benches.** The `ac_loopgain` sheet reproduces all 7 certified measures from its own
-netlist: loop gain 50.22434 dB and PM 72.5064° from the drawing, equal to
-`decks/candidate/scorecard.json` at every printed digit. The value half of the gate caught a live
-emitter defect that truncated `pulse(0.1m 10m 1u 100n 100n 10u 20u)` in 2 sheets and, on the
-recertified cell, the pass device's own `w`/`m` on the stock generator's sheet, while every
-topology check passed.
+netlist. The value half of the gate caught a live emitter defect that truncated
+`pulse(0.1m 10m 1u 100n 100n 10u 20u)` in 2 sheets and, on the recertified cell, the pass device's
+own `w`/`m` on the stock generator's sheet, while every topology check passed.
 
-**007-post-layout-corners.** S5 fails at ff/125 in BOTH rows (58.37 uA of 50). S7 leaves the box
-at 125 C in 4 of 5 corners post-layout (152-171 mV) where only ss/125 does pre-layout; at -40 C
-the parasitics RESCUE S7 (schematic 269-302 mV, extracted 106-116 mV) and one net does it —
-`ea_o1` alone is worth 289 -> 89 mV. S8 never binds (worst 67.61 deg at ff/125). The mismatch box
-edges are +15.0 mV (9.1 sigma, S1) and +20.0 mV (17.9 sigma, S7), and the control shows why the
-brief's cliff does not reproduce — delete the extracted C and +2.0 mV puts S7 at 198.0 mV again,
-`ea_o1` alone removes it. The two sub-sigma classes cost no yield at tt/27.
+**007-post-layout-corners.** At -40 C the parasitics RESCUE S7 (schematic 269-302 mV, extracted
+106-116 mV) and one net does it — `ea_o1` alone is worth 289 -> 89 mV. Only ss/125 leaves the box
+pre-layout. The control shows why the brief's cliff does not reproduce: delete the extracted C and
++2.0 mV puts S7 at 198.0 mV again, and `ea_o1` alone removes it. The two sub-sigma classes cost no
+yield at tt/27.

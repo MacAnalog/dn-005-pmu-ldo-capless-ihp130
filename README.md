@@ -27,7 +27,8 @@ your `spicexplorer-workspace` checkout (the lab puts it in `~/.sx_env`).
 ```bash
 export SX_ROOT=<your spicexplorer-workspace checkout>
 make init                                # .sx links + agents/skills + uv sync (step 1)
-uv sync                                  # editable path deps on ../../spicexplorer-platform
+uv sync                                  # editable path deps on ../../spicexplorer-platform;
+                                         # `make init` already ran it, re-run it after a dep change
 export PDK_ROOT=$HOME/local/pdks PDK=ihp-sg13g2
 export SPICE_USERINIT_DIR=$PDK_ROOT/ihp-sg13g2/libs.tech/ngspice   # its .spiceinit loads the OSDI models
 export SX_SCRATCH=$HOME/sx-scratch       # work dirs land under here (never in the repo, never in /tmp)
@@ -95,6 +96,13 @@ certification.
 | post-layout, RC extraction (record), tt / 27 °C | 1.199 | 0.027 | 0.056 | **134.7** | **33.77** | 70.06 | 129.5 | 69.33 | **PASS** |
 | post-layout, CC extraction (ideal-metal comparison), tt / 27 °C | 1.199 | 0.026 | 0.056 | 104.7 | **33.81** | 70.09 | 127.6 | 69.30 | **PASS** |
 | worst corner (5 MOS × −40/27/125 °C) | 1.198 | 0.056 | 0.248 | 135.0 | **61.9** @ ff/125 | 59.66 | **310.8** @ ss/−40 | 70.35 | 12/15 PASS |
+
+The corner row plotted, with each spec bound drawn:
+[`experiments/003-sizing/figs/corners.png`](experiments/003-sizing/figs/corners.png) — S5, S7 and
+S8 against temperature, one curve per MOS corner, at the design of record
+(`experiments/003-sizing/figs.py::corner_figs`, from `out/corners.json`). The drawn cell:
+[`experiments/005-layout/figs/ldo_ihp_capless_labelled.png`](experiments/005-layout/figs/ldo_ihp_capless_labelled.png)
+(`make fig-layout`, from the rebuilt GDS + `layout/ldo_ihp_capless/labels.yaml`).
 
 ### Re-certified 2026-09-05 on the drawn device set
 
@@ -195,12 +203,14 @@ table at all.
 The obstacle map moved to `layout/router.py` (no gdsfactory, so it runs in the repo venv) and
 `layout/test_builder.py` builds the collision by hand — **twenty-one cases in the current suite**
 (ten of them the router obstacle-map cases this finding is about; the rest were added later for the
-RC/PEX netlist-selection findings, F24/F26/F27). The reviewer ran the negative control rather than
-taking the claim: with `claim_box` stubbed out to a no-op, **4 of 9 router cases fail** and the
+RC/PEX netlist-selection findings, F24/F26/F27).
+
+The reviewer ran the negative control rather than taking the claim: with `claim_box` stubbed out to a no-op, **4 of 9 router cases fail** and the
 suite exits 1, `test_without_the_claim_the_allocator_walks_into_the_comb` reporting *"alloc
-returned 44.1, inside the comb"*. `layout/signoff.py` runs the suite as its first, blocking stage,
-so the guard is exercised every round rather than waiting for a sizing point to happen to produce
-the collision.
+returned 44.1, inside the comb"*.
+
+`layout/signoff.py` runs the suite as its first, blocking stage, so the guard is exercised every
+round rather than waiting for a sizing point to happen to produce the collision.
 
 The second drawing then found the same class of bug one layer up — `gate` merged into `vout` on a
 Metal2 power-comb spine, DRC 0 again — and the fix is **structural**: the map is layer-aware and

@@ -9,8 +9,9 @@ a declared write risk. The governing constraint:
 > **No memory surface may grow past what fits comfortably in an agent context.**
 
 Four mechanisms enforce it: **one file per entry**, a **small lint-enforced index**, a **size cap
-per surface** (20 KB per entry, 32 KB for the index — `memory:` in `harness.yaml`) and the
-**overflow dirs** below. A memory you cannot load is not a memory.
+per surface** (20 KB per entry, the harness default `memory.size_cap`; 32 KB for the index,
+`memory: {index_size_cap: 32000}` in `harness.yaml`) and the **overflow dirs** below. A memory you
+cannot load is not a memory.
 
 ## 1. The tiers
 
