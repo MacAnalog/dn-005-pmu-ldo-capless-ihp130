@@ -32,7 +32,7 @@ papers_index: references/INDEX.md
 
 experiments_rows: [Phase, Paper, Hypothesis, Verdict]
 
-frozen: [decks/reference, decks/candidate]
+frozen: [decks/reference, signoff/prelayout/decks]
 reference_scorecard: decks/reference/scorecard.json
 
 # Memory surfaces: entries stay under size_cap (20 KB); the one-line-per-entry index may grow past it.

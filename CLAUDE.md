@@ -71,12 +71,12 @@ unsupported, and six weeks later so does the agent that wrote it. It is not a st
 `ARTIFACT_HOMES` saying what lives there.
 
 **The two frozen deck sets are not the same kind of thing.** `signoff/README.md` says which is
-which, and neither directory moved — a certified scorecard names its own artefacts by path, so
-moving one invalidates the certification.
+which. The design of record moved under `signoff/`; the yardstick stayed, because `signoff/` is
+for this design's results.
 
 | directory | what it is |
 |---|---|
-| `decks/candidate/` | **this design's own** certified benches — the design of record |
+| `signoff/prelayout/decks/` | **this design's own** certified benches — the design of record |
 | `decks/reference/` | the analog-db **yardstick** `ldo_005_buffered_ref`, the prior art this design is measured against. Frozen, reproduced by `make check`, and not a result of ours |
 
 ## Harness commands

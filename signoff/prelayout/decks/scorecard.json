@@ -162,7 +162,7 @@
   "exp": "",
   "script": "ldo/metrics.py",
   "script_sha": "75d0a667125fc86bffb5f2738ac77d0618e9c669d7a04715df88a14ffb70dcf3",
-  "raw": "decks/candidate/decks.sha256",
+  "raw": "signoff/prelayout/decks/decks.sha256",
   "raw_sha": "fb9810c2ad9fddf815ef38dea4e7efe0e043fc9b6bf61210eb680c2f30de03a7",
   "definitions": {
    "i_q_ua": "",

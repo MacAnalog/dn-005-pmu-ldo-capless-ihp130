@@ -48,7 +48,7 @@ See [doc/environment.md](doc/environment.md) for the PDK pin and the lane's gotc
 | `ldo/` | `config` (paths, PDK), `sim` (lane), `dut` (the sizing point → deck), `metrics` (measure, check, log) |
 | `scripts/lint.py` | repo-specific checks on top of the harness (frozen decks rebuild from `ldo/`) |
 | `decks/reference/` | the certified reference benches + `scorecard.json` (provenance block) + `decks.sha256`, sha-locked |
-| `decks/candidate/` | the **design of record's** 13 certified benches + `scorecard.json`, sha-locked |
+| `signoff/prelayout/decks/` | the **design of record's** 13 certified benches + `scorecard.json`, sha-locked (was `decks/candidate/` before template 2.02) |
 | `circuits/ldo_ihp_capless/` | the candidate as an analog-db circuit dir (manifest, datasheet, analyses, IHP binding + `sizing.yaml` = the design of record) |
 | `layout/` | `gen_ldo.py` (parameterized gdsfactory generator; sizing read from `sizing.yaml`), `signoff.py` (build/render/DRC/LVS/PEX), `postlayout.py` (frozen benches on the extracted netlist) |
 | `experiments/NNN-*/` | one directory per hypothesis; `_template/README.md` is the shape |

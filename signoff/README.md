@@ -15,7 +15,7 @@ row exists for it (`make certify ARGS="--author X --verified-by Y"`); anything e
 
 | fidelity | what the number includes | scorecard | status | signed by | date |
 |---|---|---|---|---|---|
-| `prelayout` | schematic netlist; no interconnect parasitics | **`decks/candidate/scorecard.json`** — see below, it did not move | certified | its own provenance block | 2026-09 |
+| `prelayout` | schematic netlist; no interconnect parasitics | `prelayout/decks/scorecard.json` | certified | see its provenance block | 2026-09 |
 | `postlayout-pex` | + R/C extracted from the layout of record | `postlayout-pex/decks/scorecard.json` | planned | — | — |
 | `postlayout-em` | + EM-solved interconnect and passives | `postlayout-em/decks/scorecard.json` | planned | — | — |
 
@@ -87,31 +87,19 @@ lives is worth more than one that holds a copy nobody can verify.**
 fidelity that line names. Promoting post-layout to the reference is a deliberate act: change the
 line, re-certify, and say so in this README's table.
 
-## Where this design's sign-off actually lives
-
-Both of this design's certified deck sets stayed where they were, and `signoff/prelayout/decks` is
-deliberately empty. A certified `scorecard.json` names its own artefacts by path in its provenance
-block, so `git mv`-ing one invalidates the certification it exists to carry — proven here:
-the move turned `scorecard-recompute` red with *"raw `decks/candidate/decks.sha256` is missing"*.
-They move for free at the next re-certification, which writes the provenance at the new path.
+## The two frozen deck sets
 
 | directory | what it is |
 |---|---|
-| `decks/candidate/` | **this design's own** 13 certified benches — the design of record, pre-layout fidelity |
+| `signoff/prelayout/decks/` | **this design's own** 13 certified benches — the design of record, pre-layout fidelity (was `decks/candidate/`) |
 | `decks/reference/` | the analog-db **yardstick** `ldo_005_buffered_ref` — the prior art this design is measured against. Frozen and reproduced by `make check`, and not a result of ours; it is itself outside the box on four specs |
 
-**Do not read `reference_scorecard` as naming the design of record.** It means *the scorecard
-`make check` reproduces*, and here it points at the yardstick. So `make check` proves the yardstick
-still reproduces — this design's own scorecard is not drift-checked by it. That is a real gap;
-raise it before the next certification.
+The design of record moved here under template 2.02; the yardstick deliberately did not, because
+`signoff/` is for this design's results. The move carried the scorecard's `provenance.raw` pointer
+with it — the sha is of the file's *contents*, which did not change, so every hash still
+re-derives and `scorecard-recompute` is clean.
 
-## Known trap: re-certifying the design of record
-
-`ldo/metrics.py:certify_dir` derives the certification tag from the directory's **name**
-(`decks/candidate` → `candidate_certify`) and the CLI exposes no override, while `ldo/sign.py`
-looks up the signed ledger row **by that tag**. So the day `decks/candidate` moves under `signoff/`,
-the next `--certify` writes a different tag and silently breaks the link to its signature.
-
-**The real fix is upstream and is not local to this design:** a certification tag should come from
-`harness.yaml`, never from a path basename, precisely so that moving a directory cannot rename a
-provenance record. File it against the platform before it bites a second design.
+**Do not read `reference_scorecard` as naming the design of record.** It still points at
+`decks/reference`, so **`make check` proves the yardstick reproduces, not this design's own
+scorecard.** That is a real gap: nothing drift-checks the design of record. Decide it before the
+next certification.

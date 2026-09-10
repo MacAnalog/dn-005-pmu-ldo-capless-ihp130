@@ -66,7 +66,7 @@ runs at this challenge's conditions. It is therefore a yardstick for regulation 
 a competitor; `doc/journal/reference-is-not-at-the-target-point.md` has the reasoning."""),
 
     CODE("""ref = json.loads(Path("decks/reference/scorecard.json").read_text())
-cand = json.loads(Path("decks/candidate/scorecard.json").read_text())
+cand = json.loads(Path("signoff/prelayout/decks/scorecard.json").read_text())
 keys = [s.key for s in H.spec]
 cmp = pd.DataFrame({
     "reference (3.3 V, 1 uF)": {k: ref["scorecard"].get(k) for k in keys},

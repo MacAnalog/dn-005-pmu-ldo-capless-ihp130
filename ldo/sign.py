@@ -93,7 +93,7 @@ def sign(out: Path, *, author: str, verified_by: str) -> int:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="ldo.sign", description=__doc__.split("\n\n")[0])
-    ap.add_argument("dir", help="frozen dir to re-measure and sign (decks/reference, decks/candidate)")
+    ap.add_argument("dir", help="frozen dir to re-measure and sign (decks/reference, signoff/prelayout/decks)")
     ap.add_argument("--author", required=True, help="the designer who certified it (who you are independent of)")
     ap.add_argument("--verified-by", required=True, help="you, the second actor (a `verifiers:` id if the roster exists)")
     a = ap.parse_args(argv)
