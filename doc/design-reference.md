@@ -44,7 +44,7 @@ carries `XR1_1..8`, `XR2_1..8`, `XRB_1..5`, `XMB0A`/`XMB0B`, `XM1A`/`XM1B`, `XM2
 | artefact | path |
 |---|---|
 | the design of record (sizing knobs and their defaults; a bare `ldo.dut.CANDIDATE` renders it) | `circuits/ldo_ihp_capless/pdk/ihp-sg13g2/sizing.yaml` |
-| certified decks, sha-locked | `decks/candidate/` with `SHA256SUMS` |
+| certified decks, sha-locked | `signoff/prelayout/decks/` with `SHA256SUMS` |
 | schematic of record | `experiments/004-schematic/` |
 | layout generator | `layout/gen_ldo.py` |
 
