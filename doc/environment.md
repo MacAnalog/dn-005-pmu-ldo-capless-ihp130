@@ -12,12 +12,13 @@ KIND: REFERENCE (procedural gotchas; recipes that outgrow this file go to `doc/m
 | work dir | `$LDO_WORK`, else `$SX_SCRATCH/ldo-ihp130-<checkout hash>`, else `~/sx-scratch/ldo-ihp130-<hash>` — per checkout, outside the repo, never `/tmp` |
 | parallel width | `LDO_JOBS` (default cpu_count − 2); ngspice is pinned single-threaded in the shared `.spiceinit` |
 | experiment stamp | `LDO_EXP=NNN` |
+| doctor | `make doctor` → `python -m ldo.sim`; the lane is alive when it parses a scalar out of an ngspice log |
 
 ## Gotchas
 
 - **ngspice exits 0 after a failed operating point** and leaves a rawfile full of zeros;
-  `ldo.sim.run` scans the log for the fatal strings and raises `SimError`. A run with no parsed
-  `print` scalar is a failure, not a zero.
+  `ldo.sim.run` classifies the log with the platform's `spicexplorer_core.spice_engine.sim_log.fatal_lines`
+  and raises `SimError`. A run with no parsed `print` scalar is a failure, not a zero.
 - **`print` output lands in the wrapper's log file**, not on stdout: `NGSpice_Wrapper` runs
   `ngspice -b -o <log>`; `ldo.sim` parses the measures out of `result.log_path` with
   analog-db's `runner.parse_measures` (same regex the analog-db tier uses).

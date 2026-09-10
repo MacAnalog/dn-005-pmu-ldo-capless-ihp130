@@ -1,5 +1,6 @@
 # 006 — visual testbenches: every certified deck as a schematic that netlists back to it
 
+**Phase:** `sizing`
 **Paper(s):** none
 **Hypothesis:** each of the 13 frozen benches can be drawn as a schematic a reviewer can read —
 every source, load and probe placed and wired as a component, the cell placed as its own symbol,

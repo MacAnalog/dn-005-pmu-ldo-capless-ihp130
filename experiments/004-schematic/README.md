@@ -1,5 +1,6 @@
 # 004 — schematic of record: the drawing that provably IS the certified netlist
 
+**Phase:** `sizing`
 **Paper(s):** none
 **Hypothesis:** the certified cell can be drawn as a hierarchy a reviewer can read — a top sheet of
 five functional blocks in signal order, one child sheet per block — and the drawing can be *proved*

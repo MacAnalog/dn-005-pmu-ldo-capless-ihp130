@@ -3,13 +3,15 @@
 KIND: REFERENCE
 
 Four memory tiers (CoALA, arXiv:2309.02427, as distilled in the workspace plan
-`plan_harness_engineering.md` §4e), each with a physical home in this repo, a declared writer,
-and a declared write risk. The governing constraint:
+`plan_harness_engineering.md` §4e), each with a physical home in this repo, a declared writer and
+a declared write risk. The governing constraint:
 
 > **No memory surface may grow past what fits comfortably in an agent context.**
 
-One file per entry, a small lint-enforced index, a size cap per surface, and the overflow
-dirs below all exist to satisfy that rule. A memory you cannot load is not a memory.
+Four mechanisms enforce it: **one file per entry**, a **small lint-enforced index**, a **size cap
+per surface** (20 KB per entry, the harness default `memory.size_cap`; 32 KB for the index,
+`memory: {index_size_cap: 32000}` in `harness.yaml`) and the **overflow dirs** below. A memory you
+cannot load is not a memory.
 
 ## 1. The tiers
 
@@ -17,7 +19,7 @@ dirs below all exist to satisfy that rule. A memory you cannot load is not a mem
 |---|---|---|---|
 | **working** | assembled fresh: `make pack K="…"` | retrieval over the tiers below | the agent, at task start and again on every new symptom (`S="…"`) |
 | **episodic** | `runs/ledger.ndjson` — one row per simulation, gitignored, per checkout | **automatic**: `ldo.metrics.evaluate()` via `spicexplorer_harness.log_run` | `make runs`, the pack's Episodes section |
-| **semantic** | `doc/journal/` (one file per lesson) + `doc/journal.md` (index); overflow in `doc/memory/semantic/`; curated docs `doc/design-reference.md`, `doc/pdk-notes.md`, `pdf/INDEX.md`, experiment READMEs | distillation at experiment close-out, or the moment a failure surprises you; **provenance required** | the pack's Lessons/Constraints/Papers sections |
+| **semantic** | `doc/journal/` (one file per lesson) + `doc/journal.md` (index); overflow in `doc/memory/semantic/`; curated docs `doc/design-reference.md`, `doc/pdk-notes.md` (not written in this design), `references/INDEX.md`, experiment READMEs | distillation at experiment close-out, or the moment a failure surprises you; **provenance required** | the pack's Lessons/Constraints/Papers sections |
 | **procedural** | `ldo/`, `scripts/`, `Makefile`, `harness.yaml`, agent definitions, `CLAUDE.md`; recipes in `doc/memory/procedural/` | **human-reviewed only** (trap → gate promotion) | `CLAUDE.md` harness commands |
 
 ## 2. Learning actions
@@ -36,11 +38,18 @@ dirs below all exist to satisfy that rule. A memory you cannot load is not a mem
 
 ## 4. Entry format and supersession
 
-Entry file: `# YYYY-MM-DD — title`, blank line, `KIND: journal entry | type: semantic|procedural
-| status: live`, body. Filenames are slugs (code may cite them), the date lives in the title.
-Retiring an entry is a three-place edit: `status: superseded` in the header, a
-`[superseded <date> — see …]` note as the first body line, and `**superseded**` in the index
-row. The pack serves only live entries. Retire the claim that died, not the whole entry.
+**Entry file:** `# YYYY-MM-DD — title`, blank line,
+`KIND: journal entry | type: semantic|procedural | status: live`, body. Filenames are slugs (code
+may cite them); the date lives in the title.
+
+**Retiring an entry is a three-place edit**, and the pack serves only live entries. Retire the
+claim that died, not the whole entry.
+
+| place | edit |
+|---|---|
+| the entry's header line | `status: superseded` |
+| the entry's first body line | `[superseded <date> — see …]` |
+| the index row in `doc/journal.md` | `**superseded**` |
 
 ## 5. Blast radius
 
@@ -49,7 +58,12 @@ rows. Shared docs are written at close-out, from the experiment's own README.
 
 ## 6. Enforcement
 
-`make lint` (`spicexplorer_harness.lint`): every entry indexed, typed, dated, under the size
-cap, supersession complete; every experiment dir logged with Paper/Hypothesis/Verdict rows;
-every PDF indexed; spec numbers present in `doc/target-spec.md`; frozen dirs match their
-`SHA256SUMS`; the denylist is clean; the pack retrieves at least one constraint and one lesson.
+`make lint` (`spicexplorer_harness.lint`) holds these:
+
+- **Journal:** every entry indexed, typed, dated, under the size cap, supersession complete.
+- **Experiments:** every experiment dir logged, each README carrying Paper/Hypothesis/Verdict rows.
+- **Papers:** every PDF indexed.
+- **Spec:** every `spec:` bound present as a literal in `doc/target-spec.md`.
+- **Frozen dirs:** contents match their `SHA256SUMS`, and each rebuilds from its own `design.json`.
+- **Provenance:** the denylist is clean.
+- **Context pack:** it retrieves at least one constraint and one lesson.

@@ -6,6 +6,11 @@ sources: decks rebuilt from `lab.dut.Design`, the layout rebuilt from `layout/ge
 rule-check, connectivity-check, extraction and every bench re-run by the verifier. No number in
 this review is quoted from the designer's logs.
 
+**Reading it today.** This is the verifier's text as signed, left unedited. The design package was
+renamed `lab/` -> `ldo/` after the review (commit `4a29d2a`), so every `lab.` and `lab/` path below
+is today's `ldo.` / `ldo/`. Which findings are closed, and by what, is in the README's
+open-findings section; this file records what was true on 2026-09-04.
+
 ## 1. Verdict
 
 **The headline stands as measured.** A capless LDO at 36.28 µA quiescent current passes the whole
