@@ -7,6 +7,15 @@ passes the whole box at tt/27 °C and at 12 of 15 corners. The three failures ar
 ff/125 °C, 61.9 µA against 50** and **S7 (undershoot) at ss/−40 °C and ss/27 °C, 311 and 255 mV
 against 150**. They look like two unrelated problems and are one.
 
+**Correction, 2026-09-10 (007).** Every measured number in this entry — the 12/15, the
+25.6/61.9 µA spread, the 311/255 mV, both sweep tables and the 41–50 µA window — is experiment 003
+at the **36.28 µA** sizing point. Experiment 007 re-ran the same grid on the re-certified
+**33.81 µA** cell of record and reads **8/15 pre-layout**, S5 **58.37 µA** at ff/125 °C, and S7
+failing at **six of fifteen corners on the schematic** (four post-layout). The rule below stands —
+the Iq column still spreads 2.40×, 24.32 → 58.37 µA, and S5 and S7 still fail at ff/125 °C and
+ss/−40 °C on the schematic — but the mechanism reading, the `r_bias_l` sweeps and the 41–50 µA
+window were not re-derived at this sizing point; see `design-reference.md` §4.
+
 The bias is resistor-referenced: `I_ref = (VDD − Vgs(XMB0)) / R(r_bias_l)`, and `rhigh`'s sheet
 resistance moves from `res_wcs` to `res_bcs` across the corner bundles. Every branch current
 therefore scales with the corner, and the quiescent-current column shows it directly: **25.6 µA at
