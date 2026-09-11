@@ -124,6 +124,63 @@ def artifact_home(L: Lint) -> None:
                f"never committed, and stays in the scratch root ($SX_SCRATCH)")
 
 
+def dropout_threshold_binding(L: Lint) -> None:
+    """`VOUT_THRESH` is bound in `analyses/dropout.yaml` exactly while the class template needs it.
+
+    review-002 **m5** found the parameter dead: the LDO-class dropout bench measures a regulation
+    window (`|Vout-VOUT_NOM| <= VREG_TOL`) plus a slope test and never reads a threshold. Deleting
+    the binding (**m5-r**) then broke the `dropout` bench for a whole review round, because
+    analog-db's `assemble()` scans the RENDERED template text — comment lines included — for
+    unresolved `${...}`, and the class template still explains the retired criterion using
+    `${VOUT_THRESH}`.
+
+    Both directions are a defect, so both fail here:
+
+    * placeholder present, binding missing → `dropout` does not assemble, and one bench of thirteen
+      sinks every scorecard;
+    * binding present, placeholder gone → analog-db has retired it, `safe_substitute` now ignores
+      the key, and the binding is exactly the dead declared condition m5 was about.
+
+    The second direction is what closes m5-r: it fires the moment the shared root re-pins past the
+    analog-db change, rather than leaving the row open until someone remembers.
+    """
+    try:  # noqa: PLC0415 - local imports: a checkout with `.sx/platform` unlinked has neither
+        from spicexplorer_analog_db.assemble import resolve_template
+
+        from ldo.dut import LOCAL_CIRCUITS, circuit
+    except Exception:
+        return  # analog-db is not importable here; `package-importable` is the check that says so
+    for d in sorted(p for p in LOCAL_CIRCUITS.glob("*") if (p / "circuit.yaml").is_file()):
+        adoc_path = d / "analyses" / "dropout.yaml"
+        if not adoc_path.is_file():
+            continue
+        try:
+            adoc = circuit(d.name).analysis("dropout")
+            tpath = resolve_template(circuit(d.name).klass, adoc.get("template", "dropout"))
+        except Exception:
+            continue  # a malformed circuit dir is `deck_rebuild`'s failure to report, not this one
+        if tpath is None or not Path(tpath).is_file():
+            continue  # the class template library is not resolvable in this checkout
+        rel = adoc_path.relative_to(L.h.root).as_posix()
+        needs = "${VOUT_THRESH}" in Path(tpath).read_text(errors="replace")
+        bound = "VOUT_THRESH" in (adoc.get("params") or {})
+        if needs and not bound:
+            L.fail("dropout-threshold",
+                   f"{rel} binds no VOUT_THRESH, but the class template still carries "
+                   f"`${{VOUT_THRESH}}` ({tpath})",
+                   "assemble() scans the rendered text INCLUDING comments, so the dropout bench "
+                   "will not build and every 13-bench scorecard fails with it: restore "
+                   "`VOUT_THRESH: 1.14` under params, with the reason beside it (review-002 m5-r)")
+        elif bound and not needs:
+            L.fail("dropout-threshold",
+                   f"{rel} still binds VOUT_THRESH, but the class template no longer has the "
+                   f"placeholder ({tpath})",
+                   "analog-db has retired it and safe_substitute now ignores the key, so the "
+                   "binding is a declared bench condition the bench does not read: delete it, "
+                   "re-certify the frozen decks (`make check && make freeze`) and close m5-r in "
+                   "README.md")
+
+
 def signoff_index(L: Lint) -> None:
     """Every directory under `signoff/` is named in `signoff/README.md`.
 
@@ -154,7 +211,12 @@ def signoff_index(L: Lint) -> None:
 
 
 # `package-importable` is NOT here: the platform ships it (driven by `package:` in harness.yaml).
-EXTRA = (spec_reference, deck_portable, artifact_home, signoff_index)
+EXTRA = (spec_reference, deck_portable, dropout_threshold_binding, artifact_home, signoff_index)
 
 if __name__ == "__main__":
-    sys.exit(lint.main(load(REPO), extra=(spec_reference, deck_portable)))
+    # NOTE: this tuple, not EXTRA, is what `make lint` runs — `spicexplorer_harness.lint.main`
+    # takes the checks as an argument and never reads a module-level EXTRA. `artifact_home` and
+    # `signoff_index` are therefore defined and NOT run; that divergence predates this line and is
+    # left for whoever owns those two checks to rule on, rather than silently switched on here.
+    sys.exit(lint.main(load(REPO), extra=(spec_reference, deck_portable,
+                                          dropout_threshold_binding)))

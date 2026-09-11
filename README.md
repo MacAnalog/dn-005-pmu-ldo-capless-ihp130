@@ -95,12 +95,25 @@ certification.
 | sized, tt / 27 °C (design of record) | 1.199 | 0.026 | 0.056 | 104.7 | **33.81** | 70.01 | 115.1 | 72.51 | **PASS** |
 | post-layout, RC extraction (record), tt / 27 °C | 1.199 | 0.027 | 0.056 | **134.7** | **33.77** | 70.06 | 129.5 | 69.33 | **PASS** |
 | post-layout, CC extraction (ideal-metal comparison), tt / 27 °C | 1.199 | 0.026 | 0.056 | 104.7 | **33.81** | 70.09 | 127.6 | 69.30 | **PASS** |
-| worst corner (5 MOS × −40/27/125 °C) | 1.198 | 0.056 | 0.248 | 135.0 | **61.9** @ ff/125 | 59.66 | **310.8** @ ss/−40 | 70.35 | 12/15 PASS |
+| worst corner, schematic (5 MOS × −40/27/125 °C) | 1.197 | 0.054 | 0.266 | 131.8 | **58.37** @ ff/125 | 59.02 | **301.8** @ sf/−40 | 70.37 | 8/15 PASS |
+| worst corner, post-layout CC (same grid) | 1.197 | 0.054 | 0.266 | 131.8 | **58.37** @ ff/125 | 59.02 | **171.1** @ ss/125 | 67.61 | 10/15 PASS |
 
-The corner row plotted, with each spec bound drawn:
-[`experiments/003-sizing/figs/corners.png`](experiments/003-sizing/figs/corners.png) — S5, S7 and
-S8 against temperature, one curve per MOS corner, at the design of record
-(`experiments/003-sizing/figs.py::corner_figs`, from `out/corners.json`). The drawn cell:
+Both corner rows are [007](experiments/007-post-layout-corners/README.md) §1, measured at **this**
+sizing point (Iq 33.81 µA). Each column is that column's worst over the 15-cell grid, so neither row
+describes a single corner. Both are **CC** rows: the RC corner grid was never run, and adding tt/27's
++30.0 mV CC→RC dropout gap to the worst S4 (131.8 mV) is an arithmetic addition, not a measurement
+([007 §5](experiments/007-post-layout-corners/README.md)). The row this table carried until
+2026-09-10 — **61.9 µA @ ff/125, 310.8 mV @ ss/−40, 12/15 PASS** — is
+[003 §3](experiments/003-sizing/README.md) at the **superseded 36.28 µA sizing**; it stays 003's
+record and is not a description of the cell this repo holds.
+
+The corner grid at the current sizing point, plotted:
+[`experiments/007-post-layout-corners/figs/corners_s5_s7.png`](experiments/007-post-layout-corners/figs/corners_s5_s7.png)
+— S5 and S7 across the grid, schematic and extracted.
+[`experiments/003-sizing/figs/corners.png`](experiments/003-sizing/figs/corners.png) draws the same
+three specs (S5, S7, S8) against temperature at the **36.28 µA** point
+(`experiments/003-sizing/figs.py::corner_figs`, from that experiment's `out/corners.json`); it is
+003's record, not a plot of the cell of record. The drawn cell:
 [`experiments/005-layout/figs/ldo_ihp_capless_labelled.png`](experiments/005-layout/figs/ldo_ihp_capless_labelled.png)
 (`make fig-layout`, from the rebuilt GDS + `layout/ldo_ihp_capless/labels.yaml`).
 
@@ -113,26 +126,59 @@ schematic of record simply did not describe the devices the generator has drawn 
 round ([`layout/ldo_ihp_capless/PLAN.md` §0.1](layout/ldo_ihp_capless/PLAN.md)). Every S7-derived
 parasitic budget in the layout brief tightens ~23 % as a result.
 
-### The headline, and the corner where it does not hold
+### The headline, and the corners where it does not hold
+
+Every **measured corner** number in this section is
+[007](experiments/007-post-layout-corners/README.md) §1–§3, at the re-certified 33.81 µA sizing
+point; anything carried over from the 36.28 µA point is labelled as such where it appears.
 
 - **Met at tt / 27 °C, before and after layout.** The reference's regulation and PSRR class at
   **4.5 % of its quiescent current**, with the output capacitor on chip (21 pF) and phase margin
   26° better.
-- **Sign-off over corners is not met.** Two spec lines leave the box, and both come from the same
-  resistor-referenced bias, whose current spreads 2.4× over the corner grid — the resistor corner
-  alone reproduces both failures.
+- **Sign-off over corners is not met, and the two failing lines are no longer one story.** At
+  36.28 µA ([003 §3](experiments/003-sizing/README.md)) S5 and S7 were the same resistor-bias
+  mechanism pulled in opposite directions. At the sizing point the repo now holds, S5 still is
+  that. S7 **on the schematic** still fails at both corners 003 named and at four more — but
+  whether it is still 003's mechanism was not re-measured there: the hybrid-bundle decoupling and
+  the `r_bias_l` sweep are 36.28 µA runs, and one of the six (ss / 125 °C, 152.8 mV) fails at
+  `i_q_ua` 34.05, essentially nominal. It is on the **drawn** cell that the story demonstrably
+  changes:
 
-| corner | spec that binds | measured | bound |
-|---|---|---|---|
-| ff / 125 °C | S5 quiescent current | 61.9 µA | ≤ 50 µA |
-| ss / −40 °C | S7 load-step undershoot | 310.8 mV | ≤ 150 mV |
+| lane | corners that fail | spec that binds | measured | bound |
+|---|---|---|---|---|
+| schematic **and** post-layout | ff / 125 °C | S5 quiescent current | 58.37 µA, identical to five digits in both | ≤ 50 µA |
+| schematic | 6 of 15: tt, ss, sf, fs / −40 °C and ss / 27 °C, ss / 125 °C | S7 load-step undershoot | 152.8–301.8 mV | ≤ 150 mV |
+| post-layout (CC) | 4 of 15: tt, ss, sf, fs / 125 °C | S7 load-step undershoot | 152.1–171.1 mV | ≤ 150 mV |
 
-- **The two failures pull one knob in opposite directions.** A supply-independent bias is the
-  named next increment, and it does **not** relax both ends at once: pinned at the design's own
-  36.3 µA it still fails S7 at ff/125 °C, and the window that clears both corners is
-  **Iq ≈ 41–50 µA**.
-- **The corner-robust headline is therefore 41–50 µA, not 36.28 µA**
-  ([003 §3](experiments/003-sizing/README.md), [design-reference §4](doc/design-reference.md)).
+- **S5 is a schematic-level failure of the bias**, not a layout one: pre and post read the same
+  58.37 µA, so nothing in the layout lane can move it
+  ([007 §2](experiments/007-post-layout-corners/README.md)). The mechanism is the
+  resistor-referenced bias, and 007's own `i_q_ua` column carries the spread at this sizing point
+  — 24.32 µA at ss / −40 °C to 58.37 µA at ff / 125 °C, **2.4×** on a 33.81 µA nominal.
+- **Post-layout, S7 does not fail where 003 said it does** — the schematic row still does, at six
+  corners rather than 003's two. The drawn cell's parasitics *rescue* the cold
+  corners — ≈44 fF of undesigned capacitance on the error-amp output node `ea_o1` takes tt / −40 °C
+  from 288.7 mV (schematic) to 106.9 mV (extracted) — and spend margin at 125 °C, where S7 leaves
+  the box in four of five corners post-layout against the one (ss / 125 °C) that already did on the
+  schematic: the extraction's +34.45 fF on `gate` is worth ~10 mV and the pre-layout margin there is
+  only 10.9–14.3 mV. The post-layout S7 constraint is **temperature**, not the `gate` parasitic
+  budget
+  ([007 §2–§3](experiments/007-post-layout-corners/README.md)).
+- **S8 never binds** anywhere on the grid: worst post-layout phase margin 67.61° at ff / 125 °C,
+  7.6° above the line.
+
+**What is still quoted from the old sizing point.** 007 re-ran the corner grid at 33.81 µA, so the
+corner verdict above is current. These were derived at **36.28 µA** and have not been re-derived:
+
+- the `r_bias_l` threshold sweep and the **Iq ≈ 41–50 µA** window that clears both ends — the exit
+  path's price ([review-002 §3.4 + M6](doc/reviews/review-002-capless-ldo.md),
+  [design-reference §4](doc/design-reference.md) — 003 §3 carries neither the sweep nor the window,
+  only the corner finding they answer). It is a figure for a bias increment, not a
+  measurement of the cell of record;
+- `experiments/003-sizing/figs/corners.png`, that grid's figure.
+
+Never run at either sizing point: the **RC** corner grid, and any joint corners × mismatch sweep
+([007 §5](experiments/007-post-layout-corners/README.md)).
 
 ## Open findings — independent review `doc/reviews/review-002-capless-ldo.md`
 
@@ -155,7 +201,7 @@ drawing.
 | **M3** | the schematic of record netlists `cap_cmim` with no `w`/`l` and `VREF vref vss 3`, and the equivalence check passes anyway | green at the recertified cell | closing the finding is the verifier's call (rule 7) and that re-measure is pending |
 | **M7** | the LVS golden netlist was written by the generator from its own device table | closed 2026-09-04 | listed for the record of how it closed |
 | **M8** | half the Metal1-short fix (`stub_clear`) was an unexercised regression | closed 2026-09-04 | listed for the record of how it closed |
-| **m5-r** | deleting `VOUT_THRESH: 1.14` from the candidate's `analyses/dropout.yaml` left the whole candidate circuit un-assemblable, and nothing noticed for a review round | open | the dead placeholder still sits in the analog-db class template |
+| **m5-r** | deleting `VOUT_THRESH: 1.14` from the candidate's `analyses/dropout.yaml` makes the `dropout` bench fail to assemble — 1 of 13, which sinks every scorecard — and nothing noticed for a review round | open | re-measured 2026-09-10: the dead placeholder is still in the analog-db class template at the pinned commit, so the binding is still load-bearing |
 | **m3** | no interdigitation, common centroid, dummies or guard rings on the matched pairs; no mismatch or Monte Carlo run anywhere in this branch | layout part closed 2026-09-04 | routing is not matched half-for-half and no mismatch Monte Carlo exists |
 | **m11** | S8 constrains phase margin only; light-load gain margin is **5.75 dB** and the sensitivity peak **14.09 dB** at 0.1 mA | open | neither is in the box or the reported columns |
 | **m4** | `zout_peak_db` is the rise of output impedance from DC, not peaking; it reads 100.2 dB on a 72°-phase-margin loop (the reference reads 5.88 dB on the identical definition) | open, deferred | report-only and not used for S8, but printed in every scorecard, where it reads as an alarm; renaming it changes a bench definition, which would re-freeze the decks, so it is deferred deliberately |
@@ -222,11 +268,26 @@ where an off-grid value now raises instead of silently drawing a different devic
 
 ### m5-r — the deleted placeholder that broke every candidate deck
 
-The bench really does ignore the parameter (m5 stands), but the class template still carries
-`${VOUT_THRESH}` in its comment header and analog-db's `assemble()` scans the rendered text,
-comments included. The binding is restored with the reason written beside it; `deck_rebuild` now
-guards **every** frozen dir, which is what would have caught it. The real fix — dropping the dead
-placeholder from the class template — is an analog-db change.
+**Re-measured 2026-09-10.** The bench really does ignore the parameter (m5 stands), and the binding
+is still load-bearing anyway. `assemble()` renders the class template with
+`Template.safe_substitute` and then scans the **rendered** text — comment lines included — for
+unresolved `${…}`; `ldo.dut.Design.deck()` strips comments only afterwards. Delete the binding and
+rebuild all 13 candidate benches and **12 still build**: only `dropout` raises
+`AssembleError: … unresolved placeholders ['VOUT_THRESH']`. A 13-bench scorecard needs all 13, which
+is what "un-assemblable" meant. The binding is restored with the reason written beside it, and
+`deck_rebuild` now guards **every** frozen dir, which is what would have caught the deletion.
+
+**What it is waiting on, precisely.** The real fix — dropping the dead placeholder from the class
+template — is an analog-db change, and it has **not merged**: `${VOUT_THRESH}` is still in
+`_shared/classes/ldo/testbench-templates/dropout.spice` on analog-db `origin/main` (`3b9535f7`) and
+at the commit the shared root is pinned to (`2da526c5`). The retirement exists only on an unmerged
+working branch. So m5-r closes when that change is on `main` **and** the shared root has re-pinned
+past it — not when the branch exists.
+
+When it lands, nothing here breaks: `safe_substitute` ignores mapping keys the template does not
+use, so the binding turns inert rather than into an error, and it can be deleted at leisure.
+`scripts/lint.py::dropout_threshold_binding` is what will say so — it fails in **both** directions,
+a template that needs the binding without one and a binding that outlives its placeholder.
 `doc/journal/one-guarded-frozen-dir-guards-one-frozen-dir.md`.
 
 ### m3 — matching drawn, mismatch measured at two edges, distribution still unsimulated

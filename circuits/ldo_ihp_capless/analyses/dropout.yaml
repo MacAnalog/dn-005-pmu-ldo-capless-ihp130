@@ -11,8 +11,16 @@ params:
   # The bench does NOT read this (review-002 m5 stands: the criterion is the regulation window
   # |Vout-VOUT_NOM| <= VREG_TOL plus the slope test). It is bound because the LDO class dropout
   # template still carries `${VOUT_THRESH}` in its comment header and analog-db's assemble()
-  # scans the RENDERED text, comments included -- unbound, every candidate deck fails to build.
-  # Deleting it (2026-09-04) made this circuit un-assemblable; the real fix is in the template.
+  # scans the RENDERED text, comments included; ldo.dut.Design.deck() strips comments only
+  # afterwards. Re-measured 2026-09-10 at the pinned analog-db: delete this line and 12 of the
+  # 13 candidate benches still build, but `dropout` raises
+  #   AssembleError: ldo_ihp_capless/dropout@ihp-sg13g2/tt: unresolved placeholders ['VOUT_THRESH']
+  # and a 13-bench scorecard needs all 13. So the line is load-bearing, not decorative.
+  # The real fix is upstream and is NOT merged: `${VOUT_THRESH}` is still in the class template on
+  # analog-db origin/main (3b9535f7) and at the commit the shared root is pinned to (2da526c5).
+  # When it lands this line becomes inert rather than wrong -- assemble() renders with
+  # Template.safe_substitute, which ignores mapping keys the template does not use -- and
+  # scripts/lint.py::dropout_threshold_binding is what will say it can go (review-002 m5-r).
   VOUT_THRESH: 1.14
 flags: []
 produces: [v_dropout]
