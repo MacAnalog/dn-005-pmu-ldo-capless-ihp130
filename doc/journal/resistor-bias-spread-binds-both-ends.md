@@ -7,9 +7,10 @@ passes the whole box at tt/27 °C and at 12 of 15 corners. The three failures ar
 ff/125 °C, 61.9 µA against 50** and **S7 (undershoot) at ss/−40 °C and ss/27 °C, 311 and 255 mV
 against 150**. They look like two unrelated problems and are one.
 
-**Correction, 2026-09-10 (007).** Every measured number in this entry — the 12/15, the
-25.6/61.9 µA spread, the 311/255 mV, both sweep tables and the 41–50 µA window — is experiment 003
-at the **36.28 µA** sizing point. Experiment 007 re-ran the same grid on the re-certified
+**Correction, 2026-09-10 (007).** Every measured number in this entry was taken at the
+**36.28 µA** sizing point: the 12/15, the 25.6/61.9 µA spread and the 311/255 mV from experiment
+003, and both sweep tables and the 41–50 µA window from review-002 §3.4 + M6 (003 §3 carries
+neither — see the 2026-09-04 correction below and README §"the `r_bias_l` threshold sweep"). Experiment 007 re-ran the same grid on the re-certified
 **33.81 µA** cell of record and reads **8/15 pre-layout**, S5 **58.37 µA** at ff/125 °C, and S7
 failing at **six of fifteen corners on the schematic** (four post-layout). The rule below stands —
 the Iq column still spreads 2.40×, 24.32 → 58.37 µA, and S5 and S7 still fail at ff/125 °C and
