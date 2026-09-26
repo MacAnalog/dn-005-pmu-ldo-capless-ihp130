@@ -162,7 +162,7 @@ checkout) does the generic work, driven by `harness.yaml`; `Makefile` wraps it.
 
 ## Agents and methods
 
-Nine agents in `.claude/agents/`, linked from `.sx/skills` (each starts from `make pack`, reads
+Ten agents in `.claude/agents/`, linked from `.sx/skills` (each starts from `make pack`, reads
 `harness.yaml`, obeys rules 7–10):
 
 | agent | what it does |
@@ -171,6 +171,7 @@ Nine agents in `.claude/agents/`, linked from `.sx/skills` (each starts from `ma
 | `variant-runner` | parallel netlist-lane batches; scorecard tables only; reference first row, control when a knob moves. |
 | `signoff-verifier` | independent re-measurement of delivery claims from raw artefacts (rule 7). Reports; never fixes. |
 | `schematic-builder` | the reviewable `.sch`/`.sym` of record, proven equal to netlist and simulation. |
+| `schematic-reviewer` | report-only confirmation that the committed schematics of record are legible and complete: opens every render and scores it against the drawing rules, checks that each certified cell and bench has its sheet, symbol and render, and re-runs the README's gate-1 identity commands itself. `schematic-builder` dispatches it after each drawing round; it ends `ALL PASS` or `N sheets not confirmed`. Has no write tools; never edits a sheet. |
 | `gardener` | report-only consistency sweep. Has no write tools, by design. |
 | `layout-brief-author` | the cell's LAYOUT BRIEF: net-sensitivity and parasitic budgets, tolerated mismatch per device class, per-net DC current budgets — all measured on the frozen benches before anything is drawn. |
 | `layout-designer` | certified netlist → parameterized gdsfactory generator → GDS, proven DRC-clean and LVS-identical, extracted, and re-run on the cell's own frozen benches. |
