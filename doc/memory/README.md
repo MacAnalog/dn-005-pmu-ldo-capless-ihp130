@@ -51,6 +51,11 @@ claim that died, not the whole entry.
 | the entry's first body line | `[superseded <date> — see …]` |
 | the index row in `doc/journal.md` | `**superseded**` |
 
+`type: seed` marks the template's example entry in `doc/journal/`. `make lint` indexes and
+checks it like any entry. The bare pack leaves it out; `make pack K="…"` still serves one when a
+keyword names it in its title or index row. The pack's floor of one lesson counts only this
+design's own entries, which are `semantic` or `procedural`, never `seed`.
+
 ## 5. Blast radius
 
 One experiment = one worktree; the ledger and work dirs are per checkout; `EXP=NNN` stamps
